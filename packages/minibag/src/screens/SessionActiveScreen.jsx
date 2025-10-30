@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Clock, Users, Share2, Copy } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Plus, Minus, Clock, Users, Share2, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
@@ -22,8 +22,10 @@ export default function SessionActiveScreen({
   onNavigateToShopping,
   onNavigateToStep,
   onEndSession,
+  onUpdateParticipants, // For updating participant items
   items,
   getItemName,
+  getItemSubtitles,
   getTotalWeight,
   handleShare,
   handleLanguageChange,
@@ -60,6 +62,270 @@ export default function SessionActiveScreen({
   // Get current user's nickname (for "You're joined as..." message)
   const myNickname = currentParticipant?.nickname || 'You';
 
+  // Get current participant's items (for non-host users)
+  const myParticipantData = !isHost
+    ? participants.find(p => p.id === currentParticipant?.id)
+    : null;
+  const myItems = myParticipantData?.items || {};
+
+  // Calculate total weight for current participant
+  const myTotalWeight = useMemo(
+    () => getTotalWeight(myItems),
+    [myItems, getTotalWeight]
+  );
+
+  // Only show items that the host has selected
+  const hostSelectedItems = useMemo(
+    () => items.filter(v => hostItems[v.id]),
+    [items, hostItems]
+  );
+
+  // Handle item quantity changes for participants
+  const updateMyItemQuantity = (itemId, newQuantity) => {
+    if (!myParticipantData) return;
+
+    const updatedParticipants = participants.map(p => {
+      if (p.id === currentParticipant?.id) {
+        const newItems = { ...p.items };
+        if (newQuantity === 0) {
+          delete newItems[itemId];
+        } else {
+          newItems[itemId] = newQuantity;
+        }
+        return { ...p, items: newItems };
+      }
+      return p;
+    });
+    onUpdateParticipants(updatedParticipants);
+  };
+
+  // PARTICIPANT VIEW - Simplified, locked to their own items
+  if (!isHost) {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+        <AppHeader
+          i18n={i18n}
+          onLanguageChange={handleLanguageChange}
+          showEndSessionMenu={false}
+          onHelpClick={onHelpClick}
+          onLogoClick={onLogoClick}
+        />
+        <div className="p-6 pt-20">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-lg font-semibold text-gray-900">Shopping Session</p>
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <Clock size={12} />
+                <span>4 hour session</span>
+              </div>
+            </div>
+            {currentParticipant && (
+              <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
+                <span className="text-lg">{currentParticipant.avatar_emoji}</span>
+                <p className="text-sm text-green-800">
+                  You're joined as <span className="font-semibold">{myNickname}</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Avatar circles - Read-only for participants */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">
+              {`${participants.length + 1} of 4 people`}
+            </p>
+            <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
+              {/* Host slot */}
+              <ParticipantAvatar
+                displayText={session?.creator_nickname || 'Host'}
+                label="Host"
+                isSelected={false}
+                hasItems={Object.keys(hostItems).length > 0}
+                onClick={() => {}} // Non-interactive for participants
+              />
+
+              {/* Participant slots - show 3 slots total */}
+              {[0, 1, 2].map((slotIndex) => {
+                const participant = participants[slotIndex];
+
+                if (participant) {
+                  // Active participant slot
+                  const participantName = participant.nickname || participant.name || `P${slotIndex + 1}`;
+                  const isMe = participant.id === currentParticipant?.id;
+
+                  return (
+                    <ParticipantAvatar
+                      key={participant.id || participantName}
+                      displayText={participantName.slice(0, 2).toUpperCase()}
+                      label={isMe ? `You (${participantName})` : participantName}
+                      isSelected={isMe}
+                      hasItems={Object.keys(participant.items || {}).length > 0}
+                      onClick={() => {}} // Non-interactive for participants
+                    />
+                  );
+                } else {
+                  // Empty slot
+                  return (
+                    <div
+                      key={`empty-${slotIndex}`}
+                      className="flex flex-col items-center flex-shrink-0 opacity-30"
+                    >
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-2 border-2 border-dashed border-gray-300 bg-gray-50">
+                        <Users size={24} className="text-gray-400" />
+                      </div>
+                      <p className="text-xs text-gray-400">Empty</p>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          </div>
+
+          {/* Weight indicator */}
+          <div className="mb-4 flex justify-between items-center">
+            <p className="text-base text-gray-900">Your bag</p>
+            <p className={`text-base ${myTotalWeight >= 10 ? 'text-red-600' : 'text-gray-900'}`}>
+              {myTotalWeight}kg / 10kg
+            </p>
+          </div>
+
+          {/* Direct item selection from host's catalog - Matches Host UI */}
+          <div className="mb-6">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-lg font-semibold text-gray-900">Select Items</p>
+              <p className="text-sm text-gray-600">{myTotalWeight}kg added</p>
+            </div>
+
+            {hostSelectedItems.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {hostSelectedItems.map(veg => {
+                  const quantity = myItems[veg.id] || 0;
+                  const isSelected = quantity > 0;
+
+                  return (
+                    <div
+                      key={veg.id}
+                      className={`flex items-center gap-3 py-3 px-2 ${
+                        isSelected ? 'bg-gray-50' : ''
+                      }`}
+                    >
+                      {veg.thumbnail_url || veg.img ? (
+                        <img
+                          src={veg.thumbnail_url || veg.img}
+                          alt={veg.name}
+                          loading="lazy"
+                          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
+                        🥬
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base text-gray-900">{getItemName(veg)}</p>
+                        {getItemSubtitles && getItemSubtitles(veg) && (
+                          <p className="text-xs text-gray-500 truncate">{getItemSubtitles(veg)}</p>
+                        )}
+                      </div>
+
+                      {isSelected ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const newVal = Math.max(0, quantity - 0.5);
+                              updateMyItemQuantity(veg.id, newVal);
+                            }}
+                            className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
+                          >
+                            <Minus size={16} strokeWidth={2} />
+                          </button>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.25"
+                              min="0.25"
+                              max="10"
+                              value={quantity}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val > 0) {
+                                  const otherItemsWeight = myTotalWeight - quantity;
+                                  if (otherItemsWeight + val <= 10) {
+                                    updateMyItemQuantity(veg.id, val);
+                                  }
+                                } else if (e.target.value === '') {
+                                  // Allow empty for editing
+                                  updateMyItemQuantity(veg.id, 0.25);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                // Ensure valid value on blur
+                                const val = parseFloat(e.target.value);
+                                if (isNaN(val) || val <= 0) {
+                                  updateMyItemQuantity(veg.id, 0.25);
+                                }
+                              }}
+                              className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
+                            />
+                            <span className="text-sm text-gray-600">kg</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (myTotalWeight < 10) {
+                                updateMyItemQuantity(veg.id, quantity + 0.5);
+                              }
+                            }}
+                            disabled={myTotalWeight >= 10}
+                            className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:hover:bg-gray-400 flex-shrink-0 transition-colors"
+                          >
+                            <Plus size={16} className="text-white" strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (myTotalWeight < 10) {
+                              updateMyItemQuantity(veg.id, 0.5);
+                            }
+                          }}
+                          disabled={myTotalWeight >= 10}
+                          className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg">
+                <Users size={32} className="text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Host hasn't selected any items yet</p>
+                <p className="text-xs text-gray-400 mt-1">You'll see items here when host adds them</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
+          <button
+            onClick={onNavigateToShopping}
+            disabled={Object.keys(myItems).length === 0}
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            Confirm my list
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // HOST VIEW - Original functionality with avatar switching
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
       <AppHeader
@@ -196,10 +462,63 @@ export default function SessionActiveScreen({
           )}
         </div>
 
+        {/* Aggregated Demand - Show all items with breakdown */}
+        {currentParticipant?.is_creator && Object.keys(allItems).length > 0 && (
+          <div className="mb-6">
+            <p className="text-lg font-semibold text-gray-900 mb-4">Shopping List (Aggregated)</p>
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
+              {Object.entries(allItems).map(([itemId, totalQty]) => {
+                const veg = items.find(v => v.id === itemId);
+                const hostQty = hostItems[itemId] || 0;
+
+                // Get participant quantities for this item
+                const participantQtys = participants
+                  .filter(p => p.items && p.items[itemId])
+                  .map(p => ({
+                    name: p.nickname || p.name,
+                    qty: p.items[itemId]
+                  }));
+
+                return (
+                  <div key={itemId} className="p-3">
+                    <div className="flex items-center gap-3 mb-2">
+                      {veg?.thumbnail_url || veg?.img ? (
+                        <img
+                          src={veg.thumbnail_url || veg.img}
+                          alt={veg?.name}
+                          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
+                          🥬
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-base font-semibold text-gray-900">{getItemName(veg)}</p>
+                        <p className="text-sm text-gray-600">Total: {totalQty}kg</p>
+                      </div>
+                    </div>
+
+                    {/* Breakdown by person */}
+                    <div className="ml-13 mt-1 text-xs text-gray-500 space-y-0.5">
+                      {hostQty > 0 && (
+                        <p>• You: {hostQty}kg</p>
+                      )}
+                      {participantQtys.map((p, idx) => (
+                        <p key={idx}>• {p.name}: {p.qty}kg</p>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Group total */}
         <div className="border-t-2 border-gray-900 pt-4 mb-6">
           <div className="flex justify-between items-center">
-            <p className="text-base text-gray-900">Group total</p>
+            <p className="text-base text-gray-900">Total weight</p>
             <p className="text-2xl text-gray-900">{getTotalWeight(allItems)}kg</p>
           </div>
         </div>

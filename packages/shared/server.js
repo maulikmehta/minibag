@@ -14,6 +14,7 @@ import * as catalogAPI from './api/catalog.js';
 import * as sessionsAPI from './api/sessions.js';
 import * as paymentsAPI from './api/payments.js';
 import * as analyticsAPI from './api/analytics.js';
+import * as participantsAPI from './api/participants.js';
 
 // Validation middleware imports
 import {
@@ -22,6 +23,9 @@ import {
   validatePayment,
   validateSessionStatus
 } from './middleware/validation.js';
+
+// WebSocket handlers
+import { setupSocketHandlers } from './websocket/handlers.js';
 
 // Get current file directory
 const __filename = fileURLToPath(import.meta.url);
@@ -157,6 +161,9 @@ app.get('/api/sessions/:session_id', sessionsAPI.getSession);
 app.post('/api/sessions/:session_id/join', validateJoinSession, sessionsAPI.joinSession);
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 
+// Participants API routes
+app.put('/api/participants/:participant_id/items', participantsAPI.updateParticipantItems);
+
 // Payments API routes
 app.post('/api/sessions/:session_id/payments', validatePayment, paymentsAPI.recordPayment);
 app.get('/api/sessions/:session_id/payments', paymentsAPI.getSessionPayments);
@@ -173,40 +180,7 @@ app.get('/api/analytics/sessions/recent', analyticsAPI.getRecentSessions);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
-  socket.on('join-session', (sessionId) => {
-    socket.join(sessionId);
-    console.log(`Client ${socket.id} joined session ${sessionId}`);
-    io.to(sessionId).emit('user-joined', { socketId: socket.id });
-  });
-
-  socket.on('leave-session', (sessionId) => {
-    socket.leave(sessionId);
-    console.log(`Client ${socket.id} left session ${sessionId}`);
-    io.to(sessionId).emit('user-left', { socketId: socket.id });
-  });
-
-  socket.on('session-update', (data) => {
-    const { sessionId, update } = data;
-    io.to(sessionId).emit('session-updated', update);
-  });
-
-  socket.on('payment-recorded', (data) => {
-    const { sessionId, payment } = data;
-    io.to(sessionId).emit('payment-updated', payment);
-    console.log(`Payment recorded in session ${sessionId}:`, payment);
-  });
-
-  socket.on('payment-edited', (data) => {
-    const { sessionId, payment } = data;
-    io.to(sessionId).emit('payment-updated', payment);
-    console.log(`Payment edited in session ${sessionId}:`, payment);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
+  setupSocketHandlers(socket, io);
 });
 
 // Enhanced error handling

@@ -225,8 +225,29 @@ export async function deletePayment(paymentId) {
 }
 
 // ============================================================================
-// PARTICIPANT ITEMS API (for future use)
+// PARTICIPANT ITEMS API
 // ============================================================================
+
+/**
+ * Update all items for a participant (bulk update)
+ * @param {string} participantId - Participant ID (UUID)
+ * @param {Object} items - Object map of {item_id: quantity}
+ * @returns {Promise<Object>} Updated participant data
+ */
+export async function updateParticipantItems(participantId, items) {
+  // Convert items object to array format for API
+  const itemsArray = Object.entries(items).map(([itemId, quantity]) => ({
+    item_id: itemId,
+    quantity: parseFloat(quantity),
+    unit: 'kg'
+  }));
+
+  const response = await apiFetch(`/api/participants/${participantId}/items`, {
+    method: 'PUT',
+    body: JSON.stringify({ items: itemsArray }),
+  });
+  return response.data;
+}
 
 /**
  * Add item to participant's list
@@ -323,6 +344,7 @@ export default {
   deletePayment,
 
   // Participant Items
+  updateParticipantItems,
   addParticipantItem,
   updateParticipantItem,
   deleteParticipantItem,

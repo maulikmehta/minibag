@@ -170,7 +170,25 @@ class SocketService {
    * @param {Object} participant - Participant data
    */
   emitParticipantJoined(participant) {
-    this.emit('participant-joined', participant);
+    if (!this.currentSessionId) {
+      console.error('Cannot emit participant-joined: no session');
+      return;
+    }
+    // emit() helper automatically adds sessionId and timestamp
+    this.emit('participant-joined', { participant });
+  }
+
+  /**
+   * Notify that participant items have been updated
+   * @param {string} participantId - Participant ID
+   * @param {Object} items - Updated items map
+   */
+  emitParticipantItemsUpdated(participantId, items) {
+    if (!this.currentSessionId) {
+      console.error('Cannot emit participant-items-updated: no session');
+      return;
+    }
+    this.emit('participant-items-updated', { participantId, items });
   }
 
   /**

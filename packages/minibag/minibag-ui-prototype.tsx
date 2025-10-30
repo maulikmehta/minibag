@@ -3,7 +3,7 @@ import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRu
 import { useTranslation } from 'react-i18next';
 import useCatalog from './src/hooks/useCatalog.js';
 import useSession from './src/hooks/useSession.js';
-import { recordPayment, getSessionPayments } from './src/services/api.js';
+import { recordPayment, getSessionPayments, updateParticipantItems } from './src/services/api.js';
 import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
@@ -30,6 +30,7 @@ import {
   PARTICIPANT_SESSION_TOUR_STEPS,
   PARTICIPANT_ADD_ITEMS_TOUR_STEPS
 } from './src/config/tooltips.config.js';
+import { transformSessionData } from './src/utils/sessionTransformers.js';
 import './src/styles/driver-custom.css';
 
 // Hardcoded data removed - now fetched from API via useCatalog hook
@@ -80,6 +81,52 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedItemForPayment, setSelectedItemForPayment] = useState(null);
 
+  // Persist participant items to localStorage (for refresh recovery)
+  const PARTICIPANT_ITEMS_KEY = 'minibag_participant_items';
+
+  const saveParticipantItemsToLocalStorage = useCallback((participantId, items) => {
+    try {
+      const key = `${PARTICIPANT_ITEMS_KEY}_${participantId}`;
+      localStorage.setItem(key, JSON.stringify({
+        items,
+        timestamp: Date.now()
+      }));
+    } catch (err) {
+      console.error('Failed to save participant items:', err);
+    }
+  }, []);
+
+  const loadParticipantItemsFromLocalStorage = useCallback((participantId) => {
+    try {
+      const key = `${PARTICIPANT_ITEMS_KEY}_${participantId}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return null;
+
+      const { items, timestamp } = JSON.parse(stored);
+
+      // Expire after 4 hours
+      const fourHours = 4 * 60 * 60 * 1000;
+      if (Date.now() - timestamp > fourHours) {
+        localStorage.removeItem(key);
+        return null;
+      }
+
+      return items;
+    } catch (err) {
+      console.error('Failed to load participant items:', err);
+      return null;
+    }
+  }, []);
+
+  const clearParticipantItemsFromLocalStorage = useCallback((participantId) => {
+    try {
+      const key = `${PARTICIPANT_ITEMS_KEY}_${participantId}`;
+      localStorage.removeItem(key);
+    } catch (err) {
+      console.error('Failed to clear participant items:', err);
+    }
+  }, []);
+
   // Handle join session if joinSessionId is provided
   React.useEffect(() => {
     if (joinSessionId && currentScreen === 'home') {
@@ -104,22 +151,34 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
   // Sync session data to local state when session loads
   React.useEffect(() => {
-    if (session) {
-      // Sync participants from API to local state
-      if (apiParticipants && apiParticipants.length > 0) {
-        setParticipants(apiParticipants.filter(p => !p.is_creator));
-      }
+    if (session && apiParticipants) {
+      // Transform API data to frontend format using centralized transformers
+      const { hostItems: transformedHostItems, participants: transformedParticipants } =
+        transformSessionData(session, apiParticipants);
 
-      // Sync host items from session to local state
-      if (session.items && session.items.length > 0) {
-        const itemsMap = {};
-        session.items.forEach(item => {
-          itemsMap[item.item_id] = item.quantity;
-        });
-        setHostItems(itemsMap);
+      setHostItems(transformedHostItems);
+
+      // If current user is a participant, restore their items from localStorage
+      if (currentParticipant && !currentParticipant.is_creator) {
+        const localItems = loadParticipantItemsFromLocalStorage(currentParticipant.id);
+
+        if (localItems) {
+          // Merge localStorage items with API data (localStorage takes precedence for current user)
+          const updatedParticipants = transformedParticipants.map(p => {
+            if (p.id === currentParticipant.id) {
+              return { ...p, items: localItems };
+            }
+            return p;
+          });
+          setParticipants(updatedParticipants);
+        } else {
+          setParticipants(transformedParticipants);
+        }
+      } else {
+        setParticipants(transformedParticipants);
       }
     }
-  }, [session, apiParticipants]);
+  }, [session, apiParticipants, currentParticipant, loadParticipantItemsFromLocalStorage]);
 
   // Redirect to session-active if session is restored from localStorage
   React.useEffect(() => {
@@ -128,6 +187,31 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       setCurrentScreen('session-active');
     }
   }, [session, currentParticipant, currentScreen, joinSessionId, billSessionId]);
+
+  // Listen for participant item updates (host only)
+  React.useEffect(() => {
+    if (session?.session_id && currentParticipant?.is_creator) {
+      const handleParticipantItemsUpdate = ({ participantId, items }) => {
+        console.log(`Host received update: Participant ${participantId} updated items`, items);
+
+        // Update local participants state
+        setParticipants(prevParticipants => {
+          return prevParticipants.map(p => {
+            if (p.id === participantId) {
+              return { ...p, items };
+            }
+            return p;
+          });
+        });
+      };
+
+      socketService.on('participant-items-updated', handleParticipantItemsUpdate);
+
+      return () => {
+        socketService.off('participant-items-updated', handleParticipantItemsUpdate);
+      };
+    }
+  }, [session?.session_id, currentParticipant?.is_creator]);
 
   // Load payments when session is active
   React.useEffect(() => {
@@ -460,14 +544,42 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           // Step 4 is not accessible from session-active
         }}
         onEndSession={() => {
+          // Clear participant items from localStorage
+          if (currentParticipant && !currentParticipant.is_creator) {
+            clearParticipantItemsFromLocalStorage(currentParticipant.id);
+          }
           leaveSession(); // Clear session from state and localStorage
           setCurrentScreen('home');
           setHostItems({});
           setParticipants([]);
           setSelectedParticipant('host');
         }}
+        onUpdateParticipants={async (updatedParticipants) => {
+          setParticipants(updatedParticipants);
+          // Auto-save participant items to localStorage and backend
+          if (currentParticipant && !currentParticipant.is_creator) {
+            const myData = updatedParticipants.find(p => p.id === currentParticipant.id);
+            if (myData) {
+              // Save to localStorage for refresh recovery
+              saveParticipantItemsToLocalStorage(currentParticipant.id, myData.items);
+
+              // Save to backend so host can see
+              try {
+                await updateParticipantItems(currentParticipant.id, myData.items);
+                console.log('Participant items synced to backend');
+
+                // Emit WebSocket event so host gets real-time update
+                socketService.emitParticipantItemsUpdated(currentParticipant.id, myData.items);
+              } catch (error) {
+                console.error('Failed to sync participant items to backend:', error);
+                // Don't block UI - localStorage is still saved
+              }
+            }
+          }
+        }}
         items={VEGETABLES}
         getItemName={getItemName}
+        getItemSubtitles={getItemSubtitles}
         getTotalWeight={getTotalWeight}
         handleShare={handleShare}
         handleLanguageChange={handleLanguageChange}
