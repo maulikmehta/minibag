@@ -43,7 +43,18 @@ export default function SessionActiveScreen({
 
   // Get session info
   const sessionCode = session?.session_id || 'loading...';
-  const hostNickname = currentParticipant?.nickname || 'You';
+
+  // Determine if current user is host
+  const isHost = currentParticipant?.is_creator || false;
+
+  // Get the actual host's nickname (for display in Host avatar slot)
+  // If current user is host, show their nickname; otherwise show "Host" placeholder
+  const actualHostNickname = isHost
+    ? (currentParticipant?.nickname || 'Host')
+    : (session?.creator_nickname || 'Host');
+
+  // Get current user's nickname (for "You're joined as..." message)
+  const myNickname = currentParticipant?.nickname || 'You';
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
@@ -123,7 +134,7 @@ export default function SessionActiveScreen({
             <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
               <span className="text-lg">{currentParticipant.avatar_emoji}</span>
               <p className="text-sm text-green-800">
-                You're joined as <span className="font-semibold">{hostNickname}</span>
+                You're joined as <span className="font-semibold">{myNickname}</span> {isHost && '(Host)'}
               </p>
             </div>
           )}
@@ -137,8 +148,8 @@ export default function SessionActiveScreen({
           <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
             {/* Host slot */}
             <ParticipantAvatar
-              displayText={hostNickname}
-              label="Host"
+              displayText={actualHostNickname}
+              label={isHost ? "You (Host)" : "Host"}
               isSelected={selectedParticipant === 'host'}
               hasItems={Object.keys(hostItems).length > 0}
               onClick={() => onSelectedParticipantChange('host')}
