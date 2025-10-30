@@ -10,6 +10,7 @@ import CategoryButton from './src/components/performance/CategoryButton.jsx';
 import ItemCard from './src/components/performance/ItemCard.jsx';
 import LanguageSwitcher from './src/components/LanguageSwitcher.jsx';
 import PaymentModal from './src/components/PaymentModal.jsx';
+import ParticipantAvatar from './src/components/session/ParticipantAvatar.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -1411,25 +1412,13 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
             </p>
             <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
               {/* Host slot */}
-              <button
+              <ParticipantAvatar
+                displayText={hostNickname}
+                label="Host"
+                isSelected={selectedParticipant === 'host'}
+                hasItems={Object.keys(hostItems).length > 0}
                 onClick={() => setSelectedParticipant('host')}
-                className="flex flex-col items-center flex-shrink-0"
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                  selectedParticipant === 'host'
-                    ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                    : Object.keys(hostItems).length > 0
-                    ? 'border-2 border-green-600'
-                    : 'border-2 border-gray-300'
-                } bg-white`}>
-                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                    <span className="text-sm font-medium text-gray-900">{hostNickname}</span>
-                  </div>
-                </div>
-                <p className={`text-xs ${selectedParticipant === 'host' ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
-                  Host
-                </p>
-              </button>
+              />
 
               {/* Participant slots - show 3 slots total */}
               {[0, 1, 2].map((slotIndex) => {
@@ -1438,28 +1427,14 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
                 if (participant) {
                   // Active participant slot
                   return (
-                    <button
+                    <ParticipantAvatar
                       key={participant.name}
+                      displayText={participant.name.slice(0, 2).toUpperCase()}
+                      label={participant.name}
+                      isSelected={selectedParticipant === participant.name}
+                      hasItems={Object.keys(participant.items || {}).length > 0}
                       onClick={() => setSelectedParticipant(participant.name)}
-                      className="flex flex-col items-center flex-shrink-0"
-                    >
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                        selectedParticipant === participant.name
-                          ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                          : Object.keys(participant.items || {}).length > 0
-                          ? 'border-2 border-green-600'
-                          : 'border-2 border-gray-300'
-                      } bg-white`}>
-                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-900">
-                            {participant.name.slice(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                      <p className={`text-xs ${selectedParticipant === participant.name ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
-                        {participant.name}
-                      </p>
-                    </button>
+                    />
                   );
                 } else {
                   // Empty slot
