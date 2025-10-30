@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
 import AppHeader from '../../components/layout/AppHeader.jsx';
+import ProgressBar from '../../components/layout/ProgressBar.jsx';
 
 export default function SessionCreateScreen({
   categories,
@@ -17,12 +18,15 @@ export default function SessionCreateScreen({
   getTotalWeight,
   onSessionCreated,
   onLanguageChange,
-  onHelpClick
+  onHelpClick,
+  onLogoClick,
+  onNavigateToStep,
+  initialHostItems = {}
 }) {
   const { i18n } = useTranslation();
 
-  // Local state for this screen
-  const [hostItems, setHostItems] = useState({});
+  // Local state for this screen - initialize from parent's hostItems when navigating back
+  const [hostItems, setHostItems] = useState(initialHostItems);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [creatingSession, setCreatingSession] = useState(false);
@@ -33,6 +37,13 @@ export default function SessionCreateScreen({
   const [hostNicknameOptions, setHostNicknameOptions] = useState([]);
   const [selectedHostNickname, setSelectedHostNickname] = useState(null);
   const [loadingHostNicknames, setLoadingHostNicknames] = useState(false);
+
+  // Update local state when navigating back with existing items
+  useEffect(() => {
+    if (Object.keys(initialHostItems).length > 0) {
+      setHostItems(initialHostItems);
+    }
+  }, [initialHostItems]);
 
   // Set default category to vegetables when categories are loaded
   useEffect(() => {
@@ -52,6 +63,9 @@ export default function SessionCreateScreen({
     () => items.filter(item => vegCategoryIds.includes(item.category_id)),
     [items, vegCategoryIds]
   );
+
+  // List is never locked on Step 1 - host can always edit before shopping starts
+  const isListLocked = false;
 
   // Memoize totalWeight calculation
   const totalWeight = useMemo(() => getTotalWeight(hostItems), [hostItems, getTotalWeight]);
@@ -173,65 +187,69 @@ export default function SessionCreateScreen({
         i18n={i18n}
         onLanguageChange={onLanguageChange || handleLanguageChange}
         onHelpClick={onHelpClick}
+        onLogoClick={onLogoClick}
       />
-      <div className="p-6">
-        {/* Progress indicator */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-900">Step 1 of 4</p>
-            <p className="text-sm text-gray-600">{totalWeight}kg added</p>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div className="bg-green-600 h-1.5 rounded-full" style={{width: '25%'}}></div>
-          </div>
+      <div className="p-6 pt-20">
+        {/* Progress Bar */}
+        <ProgressBar
+          currentStep={1}
+          onStepClick={(step) => onNavigateToStep && onNavigateToStep(step)}
+          canNavigate={!isListLocked}
+        />
+
+        <div className="mb-6 flex items-center justify-between">
+          <p className="text-lg font-semibold text-gray-900">
+            {isListLocked ? 'Your Items (Locked)' : 'Add Items'}
+          </p>
+          <p className="text-sm text-gray-600">{totalWeight}kg added</p>
         </div>
 
-        <div className="mb-6">
-          <p className="text-lg font-semibold text-gray-900">Add Items</p>
-        </div>
+        {/* Category circles - Hidden when locked */}
+        {!isListLocked && (
+          <div className="mb-6 -mx-2">
+            <div className="flex gap-4 overflow-x-auto pb-4 px-2" data-tour="category-filters">
+              {categories.map(cat => {
+                const isVegCategory = vegCategoryIds.includes(cat.id);
+                const isDisabled = !isVegCategory;
 
-        {/* Category circles */}
-        <div className="mb-6 -mx-2">
-          <div className="flex gap-4 overflow-x-auto pb-4 px-2" data-tour="category-filters">
-            {categories.map(cat => {
-              const isVegCategory = vegCategoryIds.includes(cat.id);
-              const isDisabled = !isVegCategory;
-
-              return (
-                <CategoryButton
-                  key={cat.id}
-                  category={cat}
-                  isSelected={selectedCategory === cat.id}
-                  isDisabled={isDisabled}
-                  onClick={() => {
-                    if (isVegCategory) {
-                      setSelectedCategory(cat.id);
-                      setSearchQuery('');
-                    }
-                  }}
-                />
-              );
-            })}
+                return (
+                  <CategoryButton
+                    key={cat.id}
+                    category={cat}
+                    isSelected={selectedCategory === cat.id}
+                    isDisabled={isDisabled}
+                    onClick={() => {
+                      if (isVegCategory) {
+                        setSelectedCategory(cat.id);
+                        setSearchQuery('');
+                      }
+                    }}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Search with Voice */}
-        <div className="mb-6 relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search items..."
-            className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none"
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-            <VoiceSearch
-              onSearch={(transcript) => setSearchQuery(transcript)}
-              userLanguage="english"
-              data-tour="voice-search"
+        {/* Search with Voice - Hidden when locked */}
+        {!isListLocked && (
+          <div className="mb-6 relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items..."
+              className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none"
             />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <VoiceSearch
+                onSearch={(transcript) => setSearchQuery(transcript)}
+                userLanguage="english"
+                data-tour="voice-search"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Items */}
         <div className="divide-y divide-gray-200">
@@ -270,6 +288,7 @@ export default function SessionCreateScreen({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
+                        if (isListLocked) return;
                         const newVal = Math.max(0, quantity - 0.5);
                         if (newVal === 0) {
                           const { [veg.id]: _, ...rest } = hostItems;
@@ -278,7 +297,8 @@ export default function SessionCreateScreen({
                           setHostItems({ ...hostItems, [veg.id]: newVal });
                         }
                       }}
-                      className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
+                      disabled={isListLocked}
+                      className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Minus size={16} strokeWidth={2} />
                     </button>
@@ -291,6 +311,7 @@ export default function SessionCreateScreen({
                         max="10"
                         value={quantity}
                         onChange={(e) => {
+                          if (isListLocked) return;
                           const val = parseFloat(e.target.value);
                           if (!isNaN(val) && val > 0) {
                             const otherItemsWeight = getTotalWeight(hostItems) - quantity;
@@ -303,23 +324,26 @@ export default function SessionCreateScreen({
                           }
                         }}
                         onBlur={(e) => {
+                          if (isListLocked) return;
                           // Ensure valid value on blur
                           const val = parseFloat(e.target.value);
                           if (isNaN(val) || val <= 0) {
                             setHostItems({ ...hostItems, [veg.id]: 0.25 });
                           }
                         }}
-                        className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
+                        disabled={isListLocked}
+                        className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <span className="text-sm text-gray-600">kg</span>
                     </div>
                     <button
                       onClick={() => {
+                        if (isListLocked) return;
                         if (totalWeight < 10) {
                           setHostItems({ ...hostItems, [veg.id]: quantity + 0.5 });
                         }
                       }}
-                      disabled={totalWeight >= 10}
+                      disabled={totalWeight >= 10 || isListLocked}
                       className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:hover:bg-gray-400 flex-shrink-0 transition-colors"
                     >
                       <Plus size={16} className="text-white" strokeWidth={2.5} />
@@ -328,12 +352,13 @@ export default function SessionCreateScreen({
                 ) : (
                   <button
                     onClick={() => {
+                      if (isListLocked) return;
                       if (totalWeight < 10) {
                         setHostItems({ ...hostItems, [veg.id]: 0.5 });
                         setSearchQuery(''); // Clear search after adding item
                       }
                     }}
-                    disabled={totalWeight >= 10}
+                    disabled={totalWeight >= 10 || isListLocked}
                     data-tour="quantity-controls"
                     className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
                   >
@@ -346,9 +371,16 @@ export default function SessionCreateScreen({
         </div>
 
         {Object.keys(hostItems).length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-40">
             <button
-              onClick={handleCreateSessionClick}
+              onClick={() => {
+                if (isListLocked) {
+                  // Navigate to session-active screen
+                  onSessionCreated(hostItems);
+                } else {
+                  handleCreateSessionClick();
+                }
+              }}
               disabled={creatingSession}
               className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
@@ -357,6 +389,8 @@ export default function SessionCreateScreen({
                   <Loader2 size={20} className="animate-spin" strokeWidth={2} />
                   Creating...
                 </>
+              ) : isListLocked ? (
+                'Go to Session →'
               ) : (
                 <>
                   <Check size={20} strokeWidth={2} />

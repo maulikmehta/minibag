@@ -5,12 +5,13 @@ import LanguageSwitcher from '../LanguageSwitcher.jsx';
 /**
  * AppHeader Component
  *
- * Branded header bar for app screens.
+ * Fixed/sticky header bar for app screens.
  * Shows Minibag logo, language switcher, help icon, and optional end session menu.
  *
  * @param {boolean} showLogo - Whether to show the logo icon (default: true)
  * @param {Object} i18n - i18n instance for language management
  * @param {function} onLanguageChange - Language change handler
+ * @param {function} onLogoClick - Logo/brand click handler (navigate home with warning)
  * @param {boolean} showEndSessionMenu - Whether to show end session menu (host only)
  * @param {boolean} endSessionMenuOpen - Whether end session menu is open
  * @param {function} onEndSessionMenuToggle - Toggle end session menu
@@ -22,6 +23,7 @@ function AppHeader({
   showLogo = true,
   i18n = null,
   onLanguageChange = null,
+  onLogoClick = null,
   showEndSessionMenu = false,
   endSessionMenuOpen = false,
   onEndSessionMenuToggle = null,
@@ -30,15 +32,18 @@ function AppHeader({
   rightContent = null
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-      <div className="flex items-center gap-2">
+    <div className="fixed top-0 left-0 right-0 z-50 max-w-md mx-auto flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
+      <button
+        onClick={onLogoClick}
+        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+      >
         {showLogo && (
           <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
             <ShoppingBag size={18} className="text-white" strokeWidth={2.5} />
           </div>
         )}
         <h1 className="text-lg font-bold text-gray-900">Minibag</h1>
-      </div>
+      </button>
 
       <div className="flex items-center gap-3">
         {/* Language Switcher */}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
+import ProgressBar from '../components/layout/ProgressBar.jsx';
 
 /**
  * ShoppingScreen Component
@@ -21,6 +22,13 @@ import AppHeader from '../components/layout/AppHeader.jsx';
  * @param {function} setSelectedItemForPayment - Set selected item for payment
  * @param {function} onRecordPayment - Callback when payment is recorded (itemId, payment) => void
  * @param {function} onDoneShopping - Callback when done button clicked
+ * @param {boolean} showSessionMenu - Whether session menu is open
+ * @param {function} onShowSessionMenuChange - Toggle session menu
+ * @param {function} onEndSession - End session handler
+ * @param {function} handleLanguageChange - Language change handler
+ * @param {Object} i18n - i18n instance
+ * @param {function} onHelpClick - Help icon click handler
+ * @param {function} onLogoClick - Logo click handler
  */
 function ShoppingScreen({
   hostItems,
@@ -34,7 +42,14 @@ function ShoppingScreen({
   selectedItemForPayment,
   setSelectedItemForPayment,
   onRecordPayment,
-  onDoneShopping
+  onDoneShopping,
+  showSessionMenu,
+  onShowSessionMenuChange,
+  onEndSession,
+  handleLanguageChange,
+  i18n,
+  onHelpClick,
+  onLogoClick
 }) {
   // Calculate total quantities for all items
   const allItems = { ...hostItems };
@@ -50,17 +65,27 @@ function ShoppingScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
-      <AppHeader />
-      <div className="p-6">
-        {/* Progress indicator */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-900">Step 3 of 4</p>
-            <p className="text-sm text-gray-600">₹{totalPaid} paid</p>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div className="bg-green-600 h-1.5 rounded-full" style={{width: '75%'}}></div>
-          </div>
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={handleLanguageChange}
+        showEndSessionMenu={currentParticipant?.is_creator}
+        endSessionMenuOpen={showSessionMenu}
+        onEndSessionMenuToggle={onShowSessionMenuChange}
+        onEndSession={onEndSession}
+        onHelpClick={onHelpClick}
+        onLogoClick={onLogoClick}
+      />
+      <div className="p-6 pt-20">
+        {/* Progress Bar */}
+        <ProgressBar
+          currentStep={3}
+          canNavigate={false}
+        />
+
+        {/* Live indicator - Shows shopping session is active */}
+        <div className="flex items-center justify-end gap-1.5 mb-4" data-tour="live-indicator">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <p className="text-sm text-green-600 font-medium">Live</p>
         </div>
 
         <div className="mb-6">

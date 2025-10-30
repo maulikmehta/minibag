@@ -5,6 +5,7 @@ import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
+import ProgressBar from '../components/layout/ProgressBar.jsx';
 
 export default function SessionActiveScreen({
   session,
@@ -19,13 +20,15 @@ export default function SessionActiveScreen({
   onNavigateToHostCreate,
   onNavigateToParticipantAddItems,
   onNavigateToShopping,
+  onNavigateToStep,
   onEndSession,
   items,
   getItemName,
   getTotalWeight,
   handleShare,
   handleLanguageChange,
-  onHelpClick
+  onHelpClick,
+  onLogoClick
 }) {
   const { t, i18n } = useTranslation();
 
@@ -67,27 +70,17 @@ export default function SessionActiveScreen({
         onEndSessionMenuToggle={onShowSessionMenuChange}
         onEndSession={onEndSession}
         onHelpClick={onHelpClick}
+        onLogoClick={onLogoClick}
       />
-      <div className="p-6">
-        {/* Progress indicator */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => currentParticipant?.is_creator && onNavigateToHostCreate()}
-              data-tour="back-button"
-              className={`text-sm font-medium ${currentParticipant?.is_creator ? 'text-green-600 hover:text-green-700 cursor-pointer' : 'text-gray-900 cursor-default'}`}
-            >
-              ← Step 2 of 4
-            </button>
-            <div className="flex items-center gap-1.5" data-tour="live-indicator">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <p className="text-sm text-green-600 font-medium">Live</p>
-            </div>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div className="bg-green-600 h-1.5 rounded-full" style={{width: '50%'}}></div>
-          </div>
-        </div>
+      <div className="p-6 pt-20">
+        {/* Progress Bar - Only show for host */}
+        {currentParticipant?.is_creator && (
+          <ProgressBar
+            currentStep={2}
+            onStepClick={(step) => onNavigateToStep && onNavigateToStep(step)}
+            canNavigate={true}
+          />
+        )}
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">

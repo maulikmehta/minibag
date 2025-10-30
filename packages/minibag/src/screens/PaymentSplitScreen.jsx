@@ -1,4 +1,6 @@
 import React from 'react';
+import AppHeader from '../components/layout/AppHeader.jsx';
+import ProgressBar from '../components/layout/ProgressBar.jsx';
 
 /**
  * PaymentSplitScreen Component
@@ -12,6 +14,14 @@ import React from 'react';
  * @param {Array} items - Catalog items array
  * @param {function} getItemName - Function to get localized item name
  * @param {Object} session - Session object with session_id
+ * @param {Object} currentParticipant - Current participant object
+ * @param {boolean} showSessionMenu - Whether session menu is open
+ * @param {function} onShowSessionMenuChange - Toggle session menu
+ * @param {function} onEndSession - End session handler
+ * @param {function} handleLanguageChange - Language change handler
+ * @param {Object} i18n - i18n instance
+ * @param {function} onHelpClick - Help icon click handler
+ * @param {function} onLogoClick - Logo click handler
  * @param {function} onDone - Callback when done button clicked
  */
 function PaymentSplitScreen({
@@ -21,6 +31,14 @@ function PaymentSplitScreen({
   items,
   getItemName,
   session,
+  currentParticipant,
+  showSessionMenu,
+  onShowSessionMenuChange,
+  onEndSession,
+  handleLanguageChange,
+  i18n,
+  onHelpClick,
+  onLogoClick,
   onDone
 }) {
   // Calculate total quantities for all items
@@ -85,18 +103,22 @@ function PaymentSplitScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
-      <AppHeader />
-      <div className="p-6">
-        {/* Progress indicator */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-900">Step 4 of 4</p>
-            <p className="text-sm text-green-600 font-medium">Complete</p>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div className="bg-green-600 h-1.5 rounded-full" style={{width: '100%'}}></div>
-          </div>
-        </div>
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={handleLanguageChange}
+        showEndSessionMenu={currentParticipant?.is_creator}
+        endSessionMenuOpen={showSessionMenu}
+        onEndSessionMenuToggle={onShowSessionMenuChange}
+        onEndSession={onEndSession}
+        onHelpClick={onHelpClick}
+        onLogoClick={onLogoClick}
+      />
+      <div className="p-6 pt-20">
+        {/* Progress Bar */}
+        <ProgressBar
+          currentStep={4}
+          canNavigate={false}
+        />
 
         <div className="mb-6">
           <p className="text-lg font-semibold text-gray-900">Split Costs</p>

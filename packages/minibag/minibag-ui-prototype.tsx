@@ -180,6 +180,30 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [currentScreen, currentParticipant, showScreenTour]);
 
+  // Logo click handler - end session and go home
+  const handleLogoClick = useCallback(() => {
+    // If on home screen, do nothing
+    if (currentScreen === 'home') return;
+
+    // If in an active session, warn before leaving
+    if (session && currentParticipant) {
+      const confirmed = window.confirm(
+        'End session and start fresh? All progress will be lost.'
+      );
+      if (confirmed) {
+        // End session completely - clear from state and localStorage
+        leaveSession();
+        setHostItems({});
+        setParticipants([]);
+        setSelectedParticipant('host');
+        setCurrentScreen('home');
+      }
+    } else {
+      // No active session, navigate directly
+      setCurrentScreen('home');
+    }
+  }, [currentScreen, session, currentParticipant, leaveSession]);
+
   // AUTO-LOAD TOURS REMOVED - Now using on-demand help icon instead
   // All tours are now triggered by clicking the help (?) icon in the header
 
@@ -310,14 +334,28 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         getItemName={getItemName}
         getItemSubtitles={getItemSubtitles}
         getTotalWeight={getTotalWeight}
+        initialHostItems={hostItems}
         onSessionCreated={(items) => {
           if (items) {
             setHostItems(items);
           }
           setCurrentScreen('session-active');
         }}
+        onNavigateToStep={(step) => {
+          // Handle progress bar step navigation
+          if (step === 1) {
+            // Already on host-create, no-op
+          } else if (step === 2) {
+            // Can navigate to session-active if session exists
+            if (session && currentParticipant) {
+              setCurrentScreen('session-active');
+            }
+          }
+          // Steps 3 and 4 are not accessible from host-create
+        }}
         onLanguageChange={handleLanguageChange}
         onHelpClick={handleHelpClick}
+        onLogoClick={handleLogoClick}
       />
     );
   }
@@ -391,6 +429,17 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onNavigateToHostCreate={() => setCurrentScreen('host-create')}
         onNavigateToParticipantAddItems={() => setCurrentScreen('participant-add-items')}
         onNavigateToShopping={() => setCurrentScreen('shopping')}
+        onNavigateToStep={(step) => {
+          // Handle progress bar step navigation
+          if (step === 1) {
+            setCurrentScreen('host-create');
+          } else if (step === 2) {
+            // Already on session-active, no-op
+          } else if (step === 3) {
+            setCurrentScreen('shopping');
+          }
+          // Step 4 is not accessible from session-active
+        }}
         onEndSession={() => {
           leaveSession(); // Clear session from state and localStorage
           setCurrentScreen('home');
@@ -404,6 +453,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         handleShare={handleShare}
         handleLanguageChange={handleLanguageChange}
         onHelpClick={handleHelpClick}
+        onLogoClick={handleLogoClick}
       />
     );
   }
@@ -450,6 +500,19 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           }
         }}
         onDoneShopping={() => setCurrentScreen('payment-split')}
+        showSessionMenu={showSessionMenu}
+        onShowSessionMenuChange={setShowSessionMenu}
+        onEndSession={() => {
+          leaveSession(); // Clear session from state and localStorage
+          setCurrentScreen('home');
+          setHostItems({});
+          setParticipants([]);
+          setSelectedParticipant('host');
+        }}
+        handleLanguageChange={handleLanguageChange}
+        i18n={i18n}
+        onHelpClick={handleHelpClick}
+        onLogoClick={handleLogoClick}
       />
     );
   }
@@ -464,7 +527,29 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         items={items}
         getItemName={getItemName}
         session={session}
-        onDone={() => setCurrentScreen('home')}
+        currentParticipant={currentParticipant}
+        showSessionMenu={showSessionMenu}
+        onShowSessionMenuChange={setShowSessionMenu}
+        onEndSession={() => {
+          leaveSession(); // Clear session from state and localStorage
+          setCurrentScreen('home');
+          setHostItems({});
+          setParticipants([]);
+          setSelectedParticipant('host');
+        }}
+        handleLanguageChange={handleLanguageChange}
+        i18n={i18n}
+        onHelpClick={handleHelpClick}
+        onLogoClick={handleLogoClick}
+        onDone={() => {
+          // Clear session and reset state when done
+          leaveSession();
+          setHostItems({});
+          setParticipants([]);
+          setSelectedParticipant('host');
+          setItemPayments({});
+          setCurrentScreen('home');
+        }}
       />
     );
   }
