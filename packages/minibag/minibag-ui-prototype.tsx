@@ -8,6 +8,7 @@ import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
 import ItemCard from './src/components/performance/ItemCard.jsx';
+import LanguageSwitcher from './src/components/LanguageSwitcher.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -24,36 +25,6 @@ import './src/styles/driver-custom.css';
 
 // 3-letter names matching backend pool
 const FALLBACK_NAMES = ['Raj', 'Avi', 'Ria', 'Dev', 'Sia', 'Jay', 'Pia', 'Sam'];
-
-// Language Switcher Component - Minimal Inline Toggle
-function LanguageSwitcher({ currentLanguage, onLanguageChange }) {
-  const languages = [
-    { code: 'en', label: 'EN' },
-    { code: 'gu', label: 'GU' },
-    { code: 'hi', label: 'HI' }
-  ];
-
-  // Safety check - default to 'en' if currentLanguage is undefined
-  const activeLang = currentLanguage?.split('-')[0] || 'en';
-  const currentIndex = languages.findIndex(l => l.code === activeLang);
-  const currentLabel = languages[currentIndex]?.label || 'EN';
-
-  const handleToggle = () => {
-    // Cycle through languages: EN → GU → HI → EN
-    const nextIndex = (currentIndex + 1) % languages.length;
-    onLanguageChange(languages[nextIndex].code);
-  };
-
-  return (
-    <button
-      onClick={handleToggle}
-      data-tour="language-switcher"
-      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-    >
-      {currentLabel}
-    </button>
-  );
-}
 
 export default function MinibagPrototype({ joinSessionId = null, billSessionId = null, billParticipantId = null }) {
   // Language translation
