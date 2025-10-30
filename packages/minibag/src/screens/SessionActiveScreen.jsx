@@ -43,7 +43,7 @@ export default function SessionActiveScreen({
   // Get selected participant's items
   const selectedItems = selectedParticipant === 'host'
     ? hostItems
-    : (participants.find(p => p.name === selectedParticipant)?.items || {});
+    : (participants.find(p => (p.nickname || p.name) === selectedParticipant)?.items || {});
 
   // Get session info
   const sessionCode = session?.session_id || 'loading...';
@@ -121,14 +121,16 @@ export default function SessionActiveScreen({
 
               if (participant) {
                 // Active participant slot
+                // Use nickname property from API, fallback to name
+                const participantName = participant.nickname || participant.name || `P${slotIndex + 1}`;
                 return (
                   <ParticipantAvatar
-                    key={participant.name}
-                    displayText={participant.name.slice(0, 2).toUpperCase()}
-                    label={participant.name}
-                    isSelected={selectedParticipant === participant.name}
+                    key={participant.id || participantName}
+                    displayText={participantName.slice(0, 2).toUpperCase()}
+                    label={participantName}
+                    isSelected={selectedParticipant === participantName}
                     hasItems={Object.keys(participant.items || {}).length > 0}
-                    onClick={() => onSelectedParticipantChange(participant.name)}
+                    onClick={() => onSelectedParticipantChange(participantName)}
                   />
                 );
               } else {

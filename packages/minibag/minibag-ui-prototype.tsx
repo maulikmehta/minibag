@@ -102,6 +102,25 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [billSessionId, billParticipantId, currentScreen, loadSession]);
 
+  // Sync session data to local state when session loads
+  React.useEffect(() => {
+    if (session) {
+      // Sync participants from API to local state
+      if (apiParticipants && apiParticipants.length > 0) {
+        setParticipants(apiParticipants.filter(p => !p.is_creator));
+      }
+
+      // Sync host items from session to local state
+      if (session.items && session.items.length > 0) {
+        const itemsMap = {};
+        session.items.forEach(item => {
+          itemsMap[item.item_id] = item.quantity;
+        });
+        setHostItems(itemsMap);
+      }
+    }
+  }, [session, apiParticipants]);
+
   // Redirect to session-active if session is restored from localStorage
   React.useEffect(() => {
     if (session && currentParticipant && currentScreen === 'home' && !joinSessionId && !billSessionId) {

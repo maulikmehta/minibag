@@ -83,7 +83,7 @@ function ParticipantBillScreen({
 
         <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
           <p className="text-sm text-gray-600 mb-1">Shopping completed by Host</p>
-          <p className="text-base text-gray-900">You are: {participant.name}</p>
+          <p className="text-base text-gray-900">You are: {participant.nickname || participant.name || 'Participant'}</p>
         </div>
 
         <div className="border border-gray-300 rounded-lg overflow-hidden mb-6">

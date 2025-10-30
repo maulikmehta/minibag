@@ -65,6 +65,7 @@ function PaymentSplitScreen({
   // Calculate participant costs
   const participantCosts = {};
   participants.forEach(p => {
+    const pName = p.nickname || p.name || 'Participant';
     let cost = 0;
     Object.entries(p.items || {}).forEach(([itemId, qty]) => {
       const payment = itemPayments[itemId];
@@ -74,13 +75,14 @@ function PaymentSplitScreen({
         cost += pricePerKg * qty;
       }
     });
-    participantCosts[p.name] = cost;
+    participantCosts[pName] = cost;
   });
 
   const totalToReceive = Object.values(participantCosts).reduce((sum, cost) => sum + cost, 0);
 
   const handleSendPaymentRequest = (participant) => {
-    const owes = participantCosts[participant.name];
+    const pName = participant.nickname || participant.name || 'Participant';
+    const owes = participantCosts[pName];
 
     const itemsList = Object.entries(participant.items || {})
       .map(([itemId, qty]) => {
@@ -95,8 +97,8 @@ function PaymentSplitScreen({
       .filter(Boolean)
       .join('%0A');
 
-    const billUrl = `${window.location.origin}/bill/${session.session_id}/${participant.id || participant.name.toLowerCase()}`;
-    const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${participant.name}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(owes)}\n\nView & pay: ${billUrl}`);
+    const billUrl = `${window.location.origin}/bill/${session.session_id}/${participant.id || pName.toLowerCase()}`;
+    const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(owes)}\n\nView & pay: ${billUrl}`);
 
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
@@ -178,15 +180,16 @@ function PaymentSplitScreen({
 
         <div className="space-y-3 mb-6">
           {participants.map(p => {
-            const owes = participantCosts[p.name];
+            const pName = p.nickname || p.name || 'Participant';
+            const owes = participantCosts[pName];
             return (
-              <div key={p.name} className="border border-gray-300 rounded-lg p-4">
+              <div key={p.id || pName} className="border border-gray-300 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-900 text-xs flex-shrink-0">
-                      {p.name.slice(0, 2).toUpperCase()}
+                      {pName.slice(0, 2).toUpperCase()}
                     </div>
-                    <p className="text-base text-gray-900">{p.name}</p>
+                    <p className="text-base text-gray-900">{pName}</p>
                   </div>
                   <p className="text-xl text-gray-900">₹{owes.toFixed(0)}</p>
                 </div>

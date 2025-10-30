@@ -14,7 +14,7 @@ export default function ParticipantAddItemsScreen({
   onBack
 }) {
   // Get current participant's items
-  const currentParticipantItems = participants.find(p => p.name === selectedParticipant)?.items || {};
+  const currentParticipantItems = participants.find(p => (p.nickname || p.name) === selectedParticipant)?.items || {};
 
   // Calculate total weight for current participant
   const totalWeight = useMemo(
