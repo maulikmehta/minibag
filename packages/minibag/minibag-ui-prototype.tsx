@@ -19,6 +19,8 @@ import ShoppingScreen from './src/screens/ShoppingScreen.jsx';
 import PaymentSplitScreen from './src/screens/PaymentSplitScreen.jsx';
 import SessionActiveScreen from './src/screens/SessionActiveScreen.jsx';
 import SessionCreateScreen from './src/screens/SessionCreateScreen/index.jsx';
+import JoinSessionScreen from './src/screens/JoinSessionScreen/index.jsx';
+import ParticipantAddItemsScreen from './src/screens/ParticipantAddItemsScreen/index.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -76,11 +78,6 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const [itemPayments, setItemPayments] = useState({});
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedItemForPayment, setSelectedItemForPayment] = useState(null);
-  const [joiningSession, setJoiningSession] = useState(false);
-  const [participantName, setParticipantName] = useState('');
-  const [nicknameOptions, setNicknameOptions] = useState([]);
-  const [selectedNickname, setSelectedNickname] = useState(null);
-  const [loadingNicknames, setLoadingNicknames] = useState(false);
 
   // Handle join session if joinSessionId is provided
   React.useEffect(() => {
@@ -104,35 +101,6 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [billSessionId, billParticipantId, currentScreen, loadSession]);
 
-  // Fetch nickname options when join screen loads
-  React.useEffect(() => {
-    if (currentScreen === 'join' && nicknameOptions.length === 0 && !loadingNicknames) {
-      setLoadingNicknames(true);
-      fetch('/api/sessions/nickname-options')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setNicknameOptions(data.data);
-            // Auto-select first option
-            if (data.data.length > 0) {
-              setSelectedNickname(data.data[0]);
-            }
-          }
-        })
-        .catch(err => {
-          console.error('Failed to fetch nickname options:', err);
-          // Fallback options if API fails
-          setNicknameOptions([
-            { nickname: 'Raj', avatar_emoji: '👨', gender: 'male' },
-            { nickname: 'Ria', avatar_emoji: '👩', gender: 'female' }
-          ]);
-          setSelectedNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male' });
-        })
-        .finally(() => {
-          setLoadingNicknames(false);
-        });
-    }
-  }, [currentScreen, nicknameOptions.length, loadingNicknames]);
 
   // Load payments when session is active
   React.useEffect(() => {
@@ -306,51 +274,6 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [i18n.language]);
 
-  // Handle joining a session
-  const handleJoinSession = async () => {
-    if (!participantName.trim()) {
-      alert('Please enter your name');
-      return;
-    }
-
-    if (!selectedNickname) {
-      alert('Please select a nickname');
-      return;
-    }
-
-    // Check if session is full (max 4 people: 1 host + 3 participants)
-    if (participants.length >= 3) {
-      alert('This list is full! Maximum 4 people can shop together.');
-      return;
-    }
-
-    try {
-      setJoiningSession(true);
-
-      // Join session via API with nickname selection
-      const result = await joinSession(joinSessionId, [], {
-        real_name: participantName,
-        selected_nickname_id: selectedNickname.id,
-        selected_nickname: selectedNickname.nickname,
-        selected_avatar_emoji: selectedNickname.avatar_emoji
-      });
-
-      console.log('✅ Joined session:', result);
-
-      // Navigate to session-active screen
-      setCurrentScreen('session-active');
-    } catch (error) {
-      console.error('❌ Failed to join session:', error);
-      // Check if error is due to full session
-      if (error.message && error.message.includes('full')) {
-        alert('This list is full! Maximum 4 people can shop together.');
-      } else {
-        alert('Unable to join list. Please check the link and try again.');
-      }
-    } finally {
-      setJoiningSession(false);
-    }
-  };
 
   // Memoize totalWeight calculation (must be at top level, before any conditional returns)
   const totalWeight = useMemo(() => getTotalWeight(hostItems), [hostItems, getTotalWeight]);
@@ -387,168 +310,18 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
   // SCREEN: JOIN SESSION
   if (currentScreen === 'join') {
-    // Check if session failed to load or doesn't exist
-    const sessionNotFound = !sessionLoading && !session && joinSessionId;
-
-    if (sessionNotFound) {
-      return (
-        <div className="max-w-md mx-auto bg-white min-h-screen">
-          <div className="p-6 flex flex-col items-center justify-center min-h-screen">
-            <div className="w-16 h-16 mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
-              <X size={32} className="text-red-600" strokeWidth={2.5} />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Session not found</h1>
-            <p className="text-sm text-gray-600 mb-8 text-center max-w-sm">
-              This shopping list has expired or doesn't exist anymore.
-            </p>
-
-            <div className="space-y-3 w-full">
-              <button
-                onClick={() => {
-                  setCurrentScreen('host-create');
-                }}
-                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
-              >
-                Start your own list
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentScreen('home');
-                }}
-                className="w-full py-4 border-2 border-gray-300 hover:border-green-600 text-gray-900 hover:text-green-600 rounded-xl text-base font-medium transition-colors"
-              >
-                Go to home
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div className="max-w-md mx-auto bg-white min-h-screen">
-        <div className="p-6">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
-              <Users size={32} className="text-green-600" strokeWidth={2.5} />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Join shopping list</h1>
-            <p className="text-sm text-gray-600">
-              Someone invited you to their Minibag!
-            </p>
-          </div>
-
-          {/* Session Info (if loaded) */}
-          {session && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <div className="flex items-center gap-3 mb-3">
-                <MapPin size={16} className="text-gray-600" />
-                <p className="text-sm text-gray-900 font-medium">{session.location_text || 'Local area'}</p>
-              </div>
-              <div className="flex items-center gap-3 mb-3">
-                <Clock size={16} className="text-gray-600" />
-                <p className="text-sm text-gray-600">
-                  {session.scheduled_time ? new Date(session.scheduled_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Soon'}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <ShoppingBag size={16} className="text-gray-600" />
-                <p className="text-sm text-gray-600">
-                  {session.items?.length || 0} items in list
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Name Input */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              What's your name?
-            </label>
-            <input
-              type="text"
-              value={participantName}
-              onChange={(e) => {
-                // Allow only letters and spaces
-                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                setParticipantName(value);
-              }}
-              placeholder="Enter your name"
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-              maxLength={50}
-              autoFocus
-              required
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              We'll use this for payment splits & receipts
-            </p>
-          </div>
-
-          {/* Nickname Selection */}
-          <div className="mb-6" data-tour="participant-nickname-selection">
-            <label className="block text-sm font-medium text-gray-900 mb-3">
-              Choose your shopping buddy name
-            </label>
-            {loadingNicknames ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 size={24} className="animate-spin text-green-600" />
-              </div>
-            ) : (
-              <div className="flex justify-center gap-8">
-                {nicknameOptions.map((option, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => setSelectedNickname(option)}
-                    className="flex flex-col items-center"
-                  >
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                      selectedNickname?.nickname === option.nickname
-                        ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                        : 'border-2 border-gray-300 hover:border-gray-400'
-                    }`}>
-                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                        <span className="text-2xl">{option.avatar_emoji}</span>
-                      </div>
-                    </div>
-                    <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
-                  </button>
-                ))}
-              </div>
-            )}
-            <p className="mt-3 text-xs text-gray-500 text-center">
-              How you'll appear to other shoppers
-            </p>
-          </div>
-
-          {/* Join Button */}
-          <button
-            onClick={handleJoinSession}
-            disabled={joiningSession || !participantName.trim() || !selectedNickname}
-            className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
-          >
-            {joiningSession ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Joining...
-              </>
-            ) : (
-              <>
-                <Check size={20} />
-                Join list
-              </>
-            )}
-          </button>
-
-          {/* Error Display */}
-          {sessionError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-600">{sessionError}</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <JoinSessionScreen
+        session={session}
+        sessionLoading={sessionLoading}
+        sessionError={sessionError}
+        joinSessionId={joinSessionId}
+        participants={participants}
+        joinSession={joinSession}
+        onJoinSuccess={() => setCurrentScreen('session-active')}
+        onNavigateToHome={() => setCurrentScreen('home')}
+        onNavigateToCreate={() => setCurrentScreen('host-create')}
+      />
     );
   }
 
@@ -623,157 +396,18 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
   // SCREEN: PARTICIPANT ADD ITEMS (from host's catalog)
   if (currentScreen === 'participant-add-items') {
-    // Get current participant's items
-    const currentParticipantItems = participants.find(p => p.name === selectedParticipant)?.items || {};
-    const totalWeight = getTotalWeight(currentParticipantItems);
-
-    // Only show items that the host has selected
-    const hostSelectedItems = VEGETABLES.filter(v => hostItems[v.id]);
-
     return (
-      <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
-        <div className="p-6">
-          {/* Header */}
-          <div className="mb-6" data-tour="participant-catalog-info">
-            <button
-              onClick={() => setCurrentScreen('session-active')}
-              className="mb-4 text-gray-600 hover:text-gray-900"
-            >
-              ← Back
-            </button>
-            <p className="text-2xl text-gray-900 mb-2">Add your items</p>
-            <p className="text-sm text-gray-600">Select from host's list</p>
-          </div>
-
-          {/* Weight indicator */}
-          <div className="mb-6 flex justify-between items-center">
-            <p className="text-base text-gray-900">Your bag</p>
-            <p className={`text-base ${totalWeight >= 10 ? 'text-red-600' : 'text-gray-900'}`}>
-              {totalWeight}kg / 10kg
-            </p>
-          </div>
-
-          {/* Items from host's selection */}
-          <div className="divide-y divide-gray-200">
-            {hostSelectedItems.map(veg => {
-              const quantity = currentParticipantItems[veg.id] || 0;
-              const isSelected = quantity > 0;
-
-              return (
-                <div
-                  key={veg.id}
-                  className={`flex items-center gap-3 py-3 px-2 ${
-                    isSelected ? 'bg-gray-50' : ''
-                  }`}
-                >
-                  {veg.thumbnail_url || veg.img ? (
-                    <img
-                      src={veg.thumbnail_url || veg.img}
-                      alt={veg.name}
-                      loading="lazy"
-                      className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextElementSibling.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                    🥬
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base text-gray-900 truncate">{getItemName(veg)}</p>
-                    {getItemSubtitles(veg) && (
-                      <p className="text-xs text-gray-500 truncate">{getItemSubtitles(veg)}</p>
-                    )}
-                  </div>
-
-                  {isSelected ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const newVal = Math.max(0, quantity - 0.5);
-                          const updatedParticipants = participants.map(p => {
-                            if (p.name === selectedParticipant) {
-                              const newItems = { ...p.items };
-                              if (newVal === 0) {
-                                delete newItems[veg.id];
-                              } else {
-                                newItems[veg.id] = newVal;
-                              }
-                              return { ...p, items: newItems };
-                            }
-                            return p;
-                          });
-                          setParticipants(updatedParticipants);
-                        }}
-                        className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
-                      >
-                        <Minus size={16} strokeWidth={2} />
-                      </button>
-                      <div className="flex items-center gap-1">
-                        <span className="text-base text-gray-900">{quantity}</span>
-                        <span className="text-sm text-gray-600">kg</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (totalWeight < 10) {
-                            const updatedParticipants = participants.map(p => {
-                              if (p.name === selectedParticipant) {
-                                return { ...p, items: { ...p.items, [veg.id]: quantity + 0.5 } };
-                              }
-                              return p;
-                            });
-                            setParticipants(updatedParticipants);
-                          }
-                        }}
-                        disabled={totalWeight >= 10}
-                        className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:hover:bg-gray-400 flex-shrink-0 transition-colors"
-                      >
-                        <Plus size={16} className="text-white" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        if (totalWeight < 10) {
-                          const updatedParticipants = participants.map(p => {
-                            if (p.name === selectedParticipant) {
-                              return { ...p, items: { ...p.items, [veg.id]: 0.5 } };
-                            }
-                            return p;
-                          });
-                          setParticipants(updatedParticipants);
-                        }
-                      }}
-                      disabled={totalWeight >= 10}
-                      className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
-                    >
-                      Add
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {hostSelectedItems.length === 0 && (
-            <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
-              <p className="text-gray-500">Host hasn't selected any items yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Done button */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-          <button
-            onClick={() => setCurrentScreen('session-active')}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors"
-          >
-            Done
-          </button>
-        </div>
-      </div>
+      <ParticipantAddItemsScreen
+        participants={participants}
+        selectedParticipant={selectedParticipant}
+        hostItems={hostItems}
+        items={VEGETABLES}
+        getItemName={getItemName}
+        getItemSubtitles={getItemSubtitles}
+        getTotalWeight={getTotalWeight}
+        onUpdateParticipants={setParticipants}
+        onBack={() => setCurrentScreen('session-active')}
+      />
     );
   }
 
