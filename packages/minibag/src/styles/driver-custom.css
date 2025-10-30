@@ -1,0 +1,232 @@
+/**
+ * WhatsApp-Inspired Tour Styles for Minibag
+ * Chat bubble design with familiar WhatsApp aesthetics
+ */
+
+/* Main popover styling - WhatsApp chat bubble */
+.driver-popover {
+  background: #dcf8c6; /* WhatsApp light green bubble */
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 340px;
+  padding: 8px 14px 8px 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto auto;
+  gap: 0;
+}
+
+/* Header area with title */
+.driver-popover-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #075e54; /* WhatsApp dark green */
+  margin-bottom: 6px;
+  margin-top: 4px;
+  line-height: 1.3;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* Description styling - WhatsApp message text */
+.driver-popover-description {
+  font-size: 14px;
+  color: #303030;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* Progress text styling - WhatsApp timestamp style */
+.driver-popover-progress-text {
+  font-size: 11px;
+  color: #667781;
+  font-weight: 400;
+  text-align: right;
+  margin-bottom: 8px;
+  opacity: 0.8;
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+/* Button container */
+.driver-popover-footer {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+/* All buttons base styling - WhatsApp buttons */
+.driver-popover-btn {
+  padding: 8px 14px;
+  border-radius: 20px; /* Pill-shaped like WhatsApp */
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Next button (primary) - WhatsApp green */
+.driver-popover-next-btn {
+  background: #25d366; /* WhatsApp green */
+  color: white;
+  flex: 1;
+}
+
+.driver-popover-next-btn:hover {
+  background: #20bd5a;
+  transform: scale(1.03);
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.4);
+}
+
+/* Previous button (secondary) - WhatsApp gray */
+.driver-popover-prev-btn {
+  background: #f0f2f5; /* WhatsApp light gray */
+  color: #54656f;
+  flex: 1;
+}
+
+.driver-popover-prev-btn:hover {
+  background: #e9edef;
+  transform: scale(1.03);
+}
+
+/* Close/Skip button - minimal X mark */
+.driver-popover-close-btn {
+  background: transparent;
+  color: #667781;
+  border: none;
+  padding: 0;
+  margin: 0;
+  margin-left: 8px;
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  border-radius: 0;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  cursor: pointer;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.driver-popover-close-btn:hover {
+  background: transparent;
+  color: #303030;
+  transform: scale(1.1);
+}
+
+/* Override button text for close button - make it just an X */
+.driver-popover-close-btn::before {
+  content: '×';
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.driver-popover-close-btn {
+  text-indent: -9999px;
+}
+
+.driver-popover-close-btn::before {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-indent: 0;
+}
+
+/* Done button (last step) - WhatsApp green */
+.driver-popover-btn[aria-label*="Done"] {
+  background: #25d366;
+  color: white;
+}
+
+.driver-popover-btn[aria-label*="Done"]:hover {
+  background: #20bd5a;
+  transform: scale(1.03);
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.4);
+}
+
+/* Overlay styling - very light so UI is visible */
+.driver-overlay {
+  background: rgba(11, 20, 26, 0.15); /* Very light overlay - reduced from 0.35 */
+}
+
+/* Highlighted element - WhatsApp accent with glow */
+.driver-highlighted-element {
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.5), 0 0 20px rgba(37, 211, 102, 0.3);
+}
+
+/* Arrow styling - match bubble color */
+.driver-popover-arrow {
+  border-color: #dcf8c6;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .driver-popover {
+    max-width: calc(100vw - 32px);
+    margin: 0 16px;
+  }
+
+  .driver-popover-title {
+    font-size: 16px;
+  }
+
+  .driver-popover-description {
+    font-size: 13px;
+  }
+
+  .driver-popover-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .driver-popover-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .driver-popover-next-btn,
+  .driver-popover-prev-btn {
+    width: 100%;
+  }
+}
+
+/* Animation for popover entrance */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.driver-popover {
+  animation: fadeInScale 0.2s ease-out;
+}
+
+/* Ensure tooltip is always visible */
+.driver-popover {
+  z-index: 99999 !important;
+}

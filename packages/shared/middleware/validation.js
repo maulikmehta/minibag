@@ -1,0 +1,120 @@
+import { body, param, validationResult } from 'express-validator';
+import { supabase } from '../db/supabase.js';
+
+// Validation middleware to check results
+export const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: errors.array(),
+      requestId: req.id
+    });
+  }
+  next();
+};
+
+// Session creation validation
+export const validateSessionCreation = [
+  body('location_text')
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Location text is required and must be less than 200 characters'),
+  body('scheduled_time')
+    .isString()
+    .notEmpty()
+    .withMessage('Scheduled time is required'),
+  body('selected_nickname')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Selected nickname must be between 2 and 50 characters'),
+  body('selected_nickname_id')
+    .optional()
+    .isUUID()
+    .withMessage('Invalid nickname pool ID'),
+  body('selected_avatar_emoji')
+    .optional()
+    .isString()
+    .withMessage('Invalid avatar emoji'),
+  body('real_name')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Real name must be less than 100 characters'),
+  validate
+];
+
+// Join session validation with duplicate nickname check
+export const validateJoinSession = [
+  param('session_id')
+    .isString()
+    .isLength({ min: 6, max: 8 })
+    .withMessage('Invalid session ID format'),
+  body('selected_nickname')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Selected nickname must be between 2 and 50 characters'),
+  body('selected_nickname_id')
+    .optional()
+    .isUUID()
+    .withMessage('Invalid nickname pool ID'),
+  body('selected_avatar_emoji')
+    .optional()
+    .isString()
+    .withMessage('Invalid avatar emoji'),
+  body('real_name')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Real name must be less than 100 characters'),
+  validate
+];
+
+// Payment validation
+export const validatePayment = [
+  param('session_id')
+    .isString()
+    .isLength({ min: 6, max: 8 })
+    .withMessage('Invalid session ID format'),
+  body('item_id')
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage('Item ID is required'),
+  body('amount')
+    .isFloat({ min: 0.01 })
+    .withMessage('Amount must be greater than 0'),
+  body('method')
+    .isIn(['upi', 'cash'])
+    .withMessage('Method must be "upi" or "cash"'),
+  body('recorded_by')
+    .optional()
+    .isUUID()
+    .withMessage('Invalid recorded_by participant ID'),
+  body('vendor_name')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Vendor name must be less than 100 characters'),
+  validate
+];
+
+// Update session status validation
+export const validateSessionStatus = [
+  param('session_id')
+    .isString()
+    .isLength({ min: 6, max: 8 })
+    .withMessage('Invalid session ID format'),
+  body('status')
+    .isIn(['pending', 'active', 'completed', 'archived'])
+    .withMessage('Invalid session status'),
+  validate
+];

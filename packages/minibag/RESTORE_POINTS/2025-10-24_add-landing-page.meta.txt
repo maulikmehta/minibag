@@ -1,0 +1,13 @@
+Restore Point: 2025-10-24_add-landing-page
+Date: 2025-10-24
+Time: 23:23:49
+Description: add-landing-page
+
+Files backed up:
+- minibag-ui-prototype.tsx
+
+To restore:
+  cp RESTORE_POINTS/2025-10-24_add-landing-page.tsx.bak minibag-ui-prototype.tsx
+
+Or use:
+  ./restore.sh 2025-10-24_add-landing-page

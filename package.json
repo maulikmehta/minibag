@@ -1,0 +1,28 @@
+{
+  "name": "localloops",
+  "version": "0.1.0",
+  "description": "Micro-coordination infrastructure for mobile sellers",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd packages/shared && npm run dev",
+    "dev:frontend": "cd packages/minibag && npm run dev",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "eslint packages/*/src",
+    "format": "prettier --write 'packages/*/src/**/*.{js,jsx,ts,tsx,json,css,md}'"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^9.0.0",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,1085 @@
+import React, { useState } from 'react';
+import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRupee, ShoppingBag, Loader2 } from 'lucide-react';
+import useCatalog from './src/hooks/useCatalog.js';
+import useSession from './src/hooks/useSession.js';
+
+// Hardcoded data removed - now fetched from API via useCatalog hook
+// See hooks/useCatalog.js for data fetching logic
+
+const INDIAN_NAMES = ['Raj', 'Maya', 'Amit', 'Priya'];
+
+export default function MinibagPrototype() {
+  // Fetch catalog data from API
+  const { categories, items, loading: catalogLoading, error: catalogError } = useCatalog();
+
+  // Session management
+  const {
+    session,
+    participants: apiParticipants,
+    currentParticipant,
+    loading: sessionLoading,
+    error: sessionError,
+    create: createSession,
+    connected
+  } = useSession();
+
+  // UI state
+  const [currentScreen, setCurrentScreen] = useState('home');
+  const [hostItems, setHostItems] = useState({});
+  const [participants, setParticipants] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState('host');
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [signUpContext, setSignUpContext] = useState('');
+  const [itemPayments, setItemPayments] = useState({});
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedItemForPayment, setSelectedItemForPayment] = useState(null);
+  const [creatingSession, setCreatingSession] = useState(false);
+
+  // Set default category when categories are loaded
+  React.useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
+
+  // Fallback data for offline/error state
+  const VEGETABLES = items;
+  const CATEGORIES = categories;
+
+  const getTotalWeight = (items) => {
+    return Object.values(items).reduce((sum, qty) => sum + qty, 0);
+  };
+
+  // Handle session creation
+  const handleCreateSession = async () => {
+    try {
+      setCreatingSession(true);
+
+      // Format items for API
+      const formattedItems = Object.entries(hostItems).map(([itemId, quantity]) => ({
+        item_id: itemId,
+        quantity: parseFloat(quantity),
+        unit: 'kg'
+      }));
+
+      // Create session via API
+      const result = await createSession({
+        location_text: 'My location', // TODO: Get from user input
+        neighborhood: 'Local area',   // TODO: Get from user input
+        scheduled_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
+        title: 'Shopping Run',
+        description: 'Group shopping session',
+        items: formattedItems
+      });
+
+      console.log('✅ Session created:', result);
+
+      // Navigate to session-active screen
+      setCurrentScreen('session-active');
+    } catch (error) {
+      console.error('❌ Failed to create session:', error);
+      alert('Failed to create session: ' + error.message);
+    } finally {
+      setCreatingSession(false);
+    }
+  };
+
+  // LOADING STATE
+  if (catalogLoading) {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen flex flex-col items-center justify-center">
+        <Loader2 size={48} className="text-gray-900 animate-spin mb-4" />
+        <p className="text-lg text-gray-600">Loading catalog...</p>
+      </div>
+    );
+  }
+
+  // ERROR STATE
+  if (catalogError) {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="w-16 h-16 mb-4 rounded-full bg-red-100 flex items-center justify-center">
+          <X size={32} className="text-red-600" />
+        </div>
+        <p className="text-xl text-gray-900 mb-2">Failed to load catalog</p>
+        <p className="text-sm text-gray-600 mb-6 text-center">{catalogError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-gray-900 text-white rounded-lg"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // SCREEN 0: HOME
+  if (currentScreen === 'home') {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-12">
+          <div className="w-24 h-24 mb-8 rounded-2xl bg-gray-900 flex items-center justify-center shadow-xl">
+            <ShoppingBag size={48} className="text-white" strokeWidth={2} />
+          </div>
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
+              <MapPin size={16} className="text-white" strokeWidth={2.5} />
+            </div>
+            <span className="text-xl font-semibold text-gray-900">LocalLoops</span>
+          </div>
+          <div className="text-center space-y-4">
+            <p className="text-3xl font-normal text-gray-900 leading-tight">
+              Track your shopping,<br />split with neighbors
+            </p>
+            <p className="text-lg text-gray-600 mt-6">
+              Simple lists that work alone or together
+            </p>
+          </div>
+        </div>
+
+        <div className="fixed bottom-8 right-8 z-40">
+          {showPlusMenu && (
+            <div className="absolute bottom-20 right-0 bg-white rounded-lg shadow-xl border border-gray-300 overflow-hidden mb-3 w-48">
+              <button
+                onClick={() => { setShowPlusMenu(false); setCurrentScreen('host-create'); }}
+                className="w-full px-5 py-4 text-left hover:bg-gray-50 border-b border-gray-200"
+              >
+                <p className="text-base text-gray-900">New run</p>
+              </button>
+              <button
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  setSignUpContext('past-runs');
+                  setShowSignUpModal(true);
+                }}
+                className="w-full px-5 py-4 text-left hover:bg-gray-50 border-b border-gray-200"
+              >
+                <p className="text-base text-gray-900">Past runs</p>
+              </button>
+              <button
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  setSignUpContext('pro');
+                  setShowSignUpModal(true);
+                }}
+                className="w-full px-5 py-4 text-left hover:bg-gray-50"
+              >
+                <p className="text-base text-gray-900">Go Pro</p>
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowPlusMenu(!showPlusMenu)}
+            className={`w-16 h-16 bg-gray-900 rounded-full shadow-lg flex items-center justify-center transition-transform ${
+              showPlusMenu ? 'rotate-45' : ''
+            }`}
+          >
+            <Plus size={32} className="text-white" strokeWidth={2} />
+          </button>
+        </div>
+
+        {showPlusMenu && (
+          <div onClick={() => setShowPlusMenu(false)} className="fixed inset-0 z-30" />
+        )}
+
+        {/* Sign up modal */}
+        {showSignUpModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
+            <div className="bg-white rounded-lg max-w-sm w-full p-6 relative">
+              <button
+                onClick={() => setShowSignUpModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+
+              <p className="text-xl text-gray-900 mb-4">
+                {signUpContext === 'past-runs' ? 'Sign up to view history' : 'Sign up for Pro'}
+              </p>
+              <p className="text-sm text-gray-600 mb-6">
+                {signUpContext === 'past-runs'
+                  ? 'Create an account to save and view your shopping history across all devices.'
+                  : 'Unlock unlimited participants, vendor confirmations, and advanced analytics.'}
+              </p>
+
+              <div className="space-y-3 mb-6">
+                <button className="w-full py-3 bg-gray-900 text-white rounded-lg text-base flex items-center justify-center gap-2">
+                  <Users size={18} />
+                  Sign up with Phone
+                </button>
+                <button className="w-full py-3 border-2 border-gray-300 text-gray-900 rounded-lg text-base">
+                  Log in
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowSignUpModal(false)}
+                className="w-full text-sm text-gray-600 hover:text-gray-900"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // SCREEN 1: CREATE SESSION
+  if (currentScreen === 'host-create') {
+    const totalWeight = getTotalWeight(hostItems);
+    const filteredItems = VEGETABLES.filter(v => {
+      const matchesCategory = v.category === selectedCategory;
+      const matchesSearch = searchQuery === '' ||
+        v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.name_gu.includes(searchQuery) ||
+        v.name_hi.includes(searchQuery);
+      return matchesCategory && matchesSearch;
+    });
+
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+        <div className="p-6">
+          <button onClick={() => setCurrentScreen('home')} className="text-base text-gray-600 mb-4">← Back</button>
+
+          <div className="mb-6">
+            <p className="text-2xl text-gray-900 mb-2">New run</p>
+            <p className="text-base text-gray-600">{totalWeight}kg of 10kg</p>
+          </div>
+
+          {/* Category circles */}
+          <div className="mb-6 -mx-2">
+            <div className="flex gap-4 overflow-x-auto pb-4 px-2">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setSearchQuery('');
+                  }}
+                  className="flex flex-col items-center flex-shrink-0"
+                >
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                    selectedCategory === cat.id
+                      ? 'border-4 border-gray-900 ' + cat.color
+                      : 'border-2 border-gray-300 bg-gray-50'
+                  }`}>
+                    <span className="text-2xl">{cat.emoji}</span>
+                  </div>
+                  <p className={`text-xs ${selectedCategory === cat.id ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                    {cat.name}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items..."
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none"
+            />
+          </div>
+
+          {/* Items */}
+          <div className="divide-y divide-gray-200">
+            {filteredItems.map(veg => {
+              const quantity = hostItems[veg.id] || 0;
+              const isSelected = quantity > 0;
+
+              return (
+                <div
+                  key={veg.id}
+                  className={`flex items-center gap-3 py-3 px-2 ${
+                    isSelected ? 'bg-gray-50' : ''
+                  }`}
+                >
+                  <img src={veg.img} alt={veg.name} loading="lazy" className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base text-gray-900">{veg.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{veg.name_gu} • {veg.name_hi}</p>
+                  </div>
+
+                  {isSelected ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const newVal = Math.max(0, quantity - 0.5);
+                          if (newVal === 0) {
+                            const { [veg.id]: _, ...rest } = hostItems;
+                            setHostItems(rest);
+                          } else {
+                            setHostItems({ ...hostItems, [veg.id]: newVal });
+                          }
+                        }}
+                        className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
+                      >
+                        <Minus size={16} strokeWidth={2} />
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.25"
+                          min="0.25"
+                          max="10"
+                          value={quantity}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val > 0) {
+                              const otherItemsWeight = getTotalWeight(hostItems) - quantity;
+                              if (otherItemsWeight + val <= 10) {
+                                setHostItems({ ...hostItems, [veg.id]: val });
+                              }
+                            } else if (e.target.value === '') {
+                              // Allow empty for editing
+                              setHostItems({ ...hostItems, [veg.id]: 0.25 });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Ensure valid value on blur
+                            const val = parseFloat(e.target.value);
+                            if (isNaN(val) || val <= 0) {
+                              setHostItems({ ...hostItems, [veg.id]: 0.25 });
+                            }
+                          }}
+                          className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
+                        />
+                        <span className="text-sm text-gray-600">kg</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (totalWeight < 10) {
+                            setHostItems({ ...hostItems, [veg.id]: quantity + 0.5 });
+                          }
+                        }}
+                        disabled={totalWeight >= 10}
+                        className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center disabled:bg-gray-400 flex-shrink-0"
+                      >
+                        <Plus size={16} className="text-white" strokeWidth={2} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (totalWeight < 10) {
+                          setHostItems({ ...hostItems, [veg.id]: 0.5 });
+                        }
+                      }}
+                      disabled={totalWeight >= 10}
+                      className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm disabled:bg-gray-400"
+                    >
+                      Add
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {Object.keys(hostItems).length > 0 && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
+              <button
+                onClick={handleCreateSession}
+                disabled={creatingSession}
+                className="w-full bg-gray-900 text-white py-4 rounded-lg text-base flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {creatingSession ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" strokeWidth={2} />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check size={20} strokeWidth={2} />
+                    Create session
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Handle share functionality
+  const handleShare = async () => {
+    if (!session) return;
+
+    const shareUrl = `${window.location.origin}/join/${session.session_id}`;
+    const shareText = `Join my shopping session!\n\nSession: ${session.session_id}\nLink: ${shareUrl}`;
+
+    // Try native share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'LocalLoops Shopping Session',
+          text: shareText,
+          url: shareUrl
+        });
+        console.log('✅ Shared successfully');
+      } catch (error) {
+        console.log('Share cancelled');
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+      } catch (error) {
+        // Fallback for older browsers
+        alert(`Share this link:\n${shareUrl}`);
+      }
+    }
+  };
+
+  // SCREEN 2: SESSION ACTIVE (with avatar circles)
+  if (currentScreen === 'session-active') {
+    const allItems = { ...hostItems };
+    participants.forEach(p => {
+      Object.entries(p.items || {}).forEach(([id, qty]) => {
+        allItems[id] = (allItems[id] || 0) + qty;
+      });
+    });
+
+    const selectedItems = selectedParticipant === 'host'
+      ? hostItems
+      : (participants.find(p => p.name === selectedParticipant)?.items || {});
+
+    // Get session info
+    const sessionCode = session?.session_id || 'loading...';
+    const hostNickname = currentParticipant?.nickname || 'You';
+
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+        <div className="p-6">
+          <button onClick={() => setCurrentScreen('home')} className="text-base text-gray-600 mb-4">← Back</button>
+          <div className="mb-6">
+            <p className="text-2xl text-gray-900 mb-2">Session active</p>
+            <div className="flex items-center gap-3">
+              <p className="text-base text-gray-600 font-mono">
+                {session ? `minibag.in/${sessionCode}` : 'Loading...'}
+              </p>
+              <button
+                onClick={handleShare}
+                disabled={!session}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Share2 size={18} className="text-gray-600" />
+              </button>
+            </div>
+            {currentParticipant && (
+              <p className="text-sm text-gray-500 mt-2">
+                You're joined as <span className="font-medium">{currentParticipant.avatar_emoji} {hostNickname}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Avatar circles with gradient */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">{participants.length + 1} of 4 people</p>
+            <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
+              <button
+                onClick={() => setSelectedParticipant('host')}
+                className="flex flex-col items-center flex-shrink-0"
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                  selectedParticipant === 'host'
+                    ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]'
+                    : Object.keys(hostItems).length > 0
+                    ? 'border-2 border-gray-900'
+                    : 'border-2 border-gray-300'
+                } bg-white`}>
+                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                    <span className="text-sm font-medium text-gray-900">You</span>
+                  </div>
+                </div>
+                <p className={`text-xs ${selectedParticipant === 'host' ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                  Host
+                </p>
+              </button>
+
+              {participants.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => setSelectedParticipant(p.name)}
+                  className="flex flex-col items-center flex-shrink-0"
+                >
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                    selectedParticipant === p.name
+                      ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 p-[2px]'
+                      : Object.keys(p.items || {}).length > 0
+                      ? 'border-2 border-gray-900'
+                      : 'border-2 border-gray-300'
+                  } bg-white`}>
+                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {p.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <p className={`text-xs ${selectedParticipant === p.name ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                    {p.name}
+                  </p>
+                </button>
+              ))}
+
+              {[...Array(3 - participants.length)].map((_, idx) => (
+                <div key={`empty-${idx}`} className="flex flex-col items-center flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 bg-white mb-2"></div>
+                  <p className="text-xs text-gray-400">Empty</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Selected participant's items */}
+          <div className="mb-6">
+            <p className="text-base text-gray-900 mb-4">
+              {selectedParticipant === 'host' ? 'Your items' : `${selectedParticipant}'s items`}
+            </p>
+
+            {Object.keys(selectedItems).length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {Object.entries(selectedItems).map(([itemId, qty]) => {
+                  const veg = VEGETABLES.find(v => v.id === itemId);
+                  return (
+                    <div key={itemId} className="flex items-center gap-3 py-3 px-2">
+                      <img src={veg.img} alt={veg.name} loading="lazy" className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base text-gray-900">{veg.name}</p>
+                        <p className="text-sm text-gray-600">{qty}kg</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+                <p className="text-gray-500">
+                  {selectedParticipant === 'host' ? 'No items added' : 'Selecting items...'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Group total */}
+          <div className="border-t-2 border-gray-900 pt-4 mb-6">
+            <div className="flex justify-between items-center">
+              <p className="text-base text-gray-900">Group total</p>
+              <p className="text-2xl text-gray-900">{getTotalWeight(allItems)}kg</p>
+            </div>
+          </div>
+
+          {/* Test button */}
+          <button
+            onClick={() => {
+              if (participants.length < 4) {
+                const nickname = INDIAN_NAMES[participants.length];
+                setParticipants([...participants, { name: nickname, items: { v1: 1, v2: 0.5 } }]);
+                setSelectedParticipant(nickname);
+              }
+            }}
+            className="w-full border-2 border-gray-900 py-4 rounded-lg text-base text-gray-900 mb-4"
+            disabled={participants.length >= 4}
+          >
+            + Test add participant
+          </button>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
+          <button
+            onClick={() => setCurrentScreen('shopping')}
+            className="w-full bg-gray-900 text-white py-4 rounded-lg text-base"
+          >
+            Start shopping
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 3: SHOPPING (Payment Recording)
+  if (currentScreen === 'shopping') {
+    const allItems = { ...hostItems };
+    participants.forEach(p => {
+      Object.entries(p.items || {}).forEach(([id, qty]) => {
+        allItems[id] = (allItems[id] || 0) + qty;
+      });
+    });
+
+    const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
+    const allItemsPaid = Object.keys(allItems).every(id => itemPayments[id]);
+
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
+        <div className="p-6">
+          <button onClick={() => setCurrentScreen('session-active')} className="text-base text-gray-600 mb-4">
+            ← Back
+          </button>
+
+          <div className="mb-6">
+            <p className="text-2xl text-gray-900 mb-4">Shopping</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total spent</p>
+                <div className="flex items-center gap-1">
+                  <IndianRupee size={24} className="text-gray-900" strokeWidth={2.5} />
+                  <p className="text-3xl font-bold text-gray-900">{totalPaid}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Items paid</p>
+                <p className="text-base text-gray-900">
+                  {Object.keys(itemPayments).length}/{Object.keys(allItems).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-200 mb-6">
+            {Object.entries(allItems).map(([itemId, totalQty]) => {
+              const veg = VEGETABLES.find(v => v.id === itemId);
+              const payment = itemPayments[itemId];
+              const isPaid = !!payment;
+
+              // Calculate participant breakdown
+              const breakdown = [];
+              if (hostItems[itemId]) {
+                breakdown.push({ name: 'You', qty: hostItems[itemId] });
+              }
+              participants.forEach(p => {
+                if (p.items && p.items[itemId]) {
+                  breakdown.push({ name: p.name, qty: p.items[itemId] });
+                }
+              });
+
+              return (
+                <div
+                  key={itemId}
+                  className={`flex items-start gap-3 py-3 px-2 ${
+                    isPaid ? 'bg-gray-50' : ''
+                  }`}
+                >
+                  <img src={veg.img} alt={veg.name} loading="lazy" className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0 mt-1" />
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base text-gray-900 mb-1">{veg.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {breakdown.map((b, idx) => (
+                        <span key={idx}>
+                          {b.name}: {b.qty}kg{idx < breakdown.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </p>
+                    {isPaid && (
+                      <p className="text-sm text-gray-900 mt-1">
+                        ✓ ₹{payment.amount} • {payment.method === 'upi' ? 'UPI' : 'Cash'}
+                      </p>
+                    )}
+                  </div>
+
+                  {isPaid ? (
+                    <button
+                      onClick={() => {
+                        setSelectedItemForPayment(itemId);
+                        setShowPaymentModal(true);
+                      }}
+                      className="text-sm text-gray-600 px-4 py-2 flex-shrink-0"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedItemForPayment(itemId);
+                        setShowPaymentModal(true);
+                      }}
+                      className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm flex-shrink-0 mt-1"
+                    >
+                      Pay
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Payment Modal */}
+        {showPaymentModal && selectedItemForPayment && (
+          <PaymentModal
+            itemId={selectedItemForPayment}
+            items={VEGETABLES}
+            onClose={() => {
+              setShowPaymentModal(false);
+              setSelectedItemForPayment(null);
+            }}
+            onConfirm={(method, amount) => {
+              setItemPayments({
+                ...itemPayments,
+                [selectedItemForPayment]: { method, amount: parseFloat(amount) }
+              });
+              setShowPaymentModal(false);
+              setSelectedItemForPayment(null);
+            }}
+          />
+        )}
+
+        {/* Done button */}
+        {allItemsPaid && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
+            <button
+              onClick={() => setCurrentScreen('payment-split')}
+              className="w-full bg-gray-900 text-white py-4 rounded-lg text-base flex items-center justify-center gap-2"
+            >
+              <Check size={20} strokeWidth={2} />
+              Done shopping
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // SCREEN 5: PAYMENT SPLIT (Host View)
+  if (currentScreen === 'payment-split') {
+    const allItems = { ...hostItems };
+    participants.forEach(p => {
+      Object.entries(p.items || {}).forEach(([id, qty]) => {
+        allItems[id] = (allItems[id] || 0) + qty;
+      });
+    });
+
+    const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
+
+    // Calculate host cost
+    let hostCost = 0;
+    Object.entries(hostItems).forEach(([itemId, qty]) => {
+      const payment = itemPayments[itemId];
+      if (payment) {
+        const totalQty = allItems[itemId];
+        const pricePerKg = payment.amount / totalQty;
+        hostCost += pricePerKg * qty;
+      }
+    });
+
+    // Calculate participant costs
+    const participantCosts = {};
+    participants.forEach(p => {
+      let cost = 0;
+      Object.entries(p.items || {}).forEach(([itemId, qty]) => {
+        const payment = itemPayments[itemId];
+        if (payment) {
+          const totalQty = allItems[itemId];
+          const pricePerKg = payment.amount / totalQty;
+          cost += pricePerKg * qty;
+        }
+      });
+      participantCosts[p.name] = cost;
+    });
+
+    const totalToReceive = Object.values(participantCosts).reduce((sum, cost) => sum + cost, 0);
+
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+        <div className="p-6">
+          <button onClick={() => setCurrentScreen('home')} className="text-base text-gray-600 mb-4">← Home</button>
+
+          <p className="text-2xl text-gray-900 mb-6">Split costs</p>
+
+          <div className="border-2 border-gray-900 rounded-lg p-6 mb-6 text-center">
+            <p className="text-sm text-gray-600 mb-2">Total spent</p>
+            <p className="text-4xl text-gray-900">₹{totalPaid.toFixed(0)}</p>
+          </div>
+
+          <div className="mb-6 py-4 border-t border-b border-gray-300">
+            <div className="flex justify-between items-center">
+              <p className="text-base text-gray-900">Your cost</p>
+              <p className="text-2xl text-gray-900">₹{hostCost.toFixed(0)}</p>
+            </div>
+          </div>
+
+          <p className="text-base text-gray-900 mb-4">Collect from others</p>
+          <div className="space-y-3 mb-6">
+            {participants.map(p => {
+              const owes = participantCosts[p.name];
+              return (
+                <div key={p.name} className="border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-900 text-xs flex-shrink-0">
+                        {p.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <p className="text-base text-gray-900">{p.name}</p>
+                    </div>
+                    <p className="text-xl text-gray-900">₹{owes.toFixed(0)}</p>
+                  </div>
+
+                  <div className="text-sm text-gray-600 space-y-1 pt-3 border-t border-gray-200 mb-4">
+                    {Object.entries(p.items || {}).map(([itemId, qty]) => {
+                      const veg = VEGETABLES.find(v => v.id === itemId);
+                      const payment = itemPayments[itemId];
+                      if (!payment) return null;
+                      const totalQty = allItems[itemId];
+                      const pricePerKg = payment.amount / totalQty;
+                      const itemCost = pricePerKg * qty;
+                      return (
+                        <div key={itemId} className="flex justify-between">
+                          <span>{veg.name} {qty}kg @ ₹{pricePerKg.toFixed(0)}/kg</span>
+                          <span>₹{itemCost.toFixed(0)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const itemsList = Object.entries(p.items || {})
+                        .map(([itemId, qty]) => {
+                          const veg = VEGETABLES.find(v => v.id === itemId);
+                          const payment = itemPayments[itemId];
+                          if (!payment) return null;
+                          const totalQty = allItems[itemId];
+                          const pricePerKg = payment.amount / totalQty;
+                          const itemCost = pricePerKg * qty;
+                          return `${veg.name} ${qty}kg - ₹${itemCost.toFixed(0)}`;
+                        })
+                        .filter(Boolean)
+                        .join('%0A');
+
+                      const message = `Hi ${p.name}! Shopping done 🛍️%0A%0AYour bill:%0A${itemsList}%0A%0ATotal: ₹${owes.toFixed(0)}%0A%0AView & pay: minibag.in/bill/abc123-${p.name.toLowerCase()}`;
+
+                      window.open(`https://wa.me/?text=${message}`, '_blank');
+                    }}
+                    className="w-full py-3 bg-gray-900 text-white rounded-lg text-sm"
+                  >
+                    Send payment request
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600">You'll receive</p>
+              <p className="text-2xl text-gray-900">₹{totalToReceive.toFixed(0)}</p>
+            </div>
+            <button
+              onClick={() => setCurrentScreen('home')}
+              className="bg-gray-900 text-white px-6 py-3 rounded-lg text-base"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 6: PARTICIPANT BILL (accessed via WhatsApp link)
+  if (currentScreen === 'participant-bill') {
+    if (participants.length === 0) {
+      return (
+        <div className="max-w-md mx-auto bg-white min-h-screen flex items-center justify-center p-8">
+          <div className="text-center">
+            <p className="text-base text-gray-600 mb-4">No bill data. Create a session first.</p>
+            <button
+              onClick={() => setCurrentScreen('home')}
+              className="bg-gray-900 text-white px-6 py-3 rounded-lg"
+            >
+              Go home
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const participant = participants[0];
+    const allItems = { ...hostItems };
+    participants.forEach(p => {
+      Object.entries(p.items || {}).forEach(([id, qty]) => {
+        allItems[id] = (allItems[id] || 0) + qty;
+      });
+    });
+
+    let participantCost = 0;
+    const billItems = [];
+
+    Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
+      const veg = VEGETABLES.find(v => v.id === itemId);
+      const payment = itemPayments[itemId];
+      if (payment) {
+        const totalQty = allItems[itemId];
+        const pricePerKg = payment.amount / totalQty;
+        const itemCost = pricePerKg * qty;
+        participantCost += itemCost;
+        billItems.push({
+          name: veg.name,
+          qty,
+          pricePerKg: pricePerKg.toFixed(0),
+          itemCost: itemCost.toFixed(0)
+        });
+      }
+    });
+
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+        <div className="p-6">
+          <p className="text-2xl text-gray-900 mb-6">Your bill</p>
+
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
+            <p className="text-sm text-gray-600 mb-1">Shopping completed by Host</p>
+            <p className="text-base text-gray-900">You are: {participant.name}</p>
+          </div>
+
+          <div className="border border-gray-300 rounded-lg overflow-hidden mb-6">
+            <div className="bg-gray-50 px-4 py-3 border-b border-gray-300">
+              <p className="text-sm text-gray-900">Items purchased</p>
+            </div>
+
+            <div className="divide-y divide-gray-200">
+              {billItems.map((item, idx) => (
+                <div key={idx} className="py-3 px-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="text-base text-gray-900">{item.name}</p>
+                    <p className="text-base text-gray-900">₹{item.itemCost}</p>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>{item.qty}kg × ₹{item.pricePerKg}/kg</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-gray-50 px-4 py-4 border-t-2 border-gray-900">
+              <div className="flex justify-between items-center">
+                <p className="text-base text-gray-900">Total amount due</p>
+                <p className="text-3xl text-gray-900">₹{participantCost.toFixed(0)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                alert(`Opening UPI payment for ₹${participantCost.toFixed(0)}\n\nIn real app: Deep-link to PhonePe/GPay`);
+              }}
+              className="w-full bg-gray-900 text-white py-4 rounded-lg text-base"
+            >
+              Pay ₹{participantCost.toFixed(0)} via UPI
+            </button>
+
+            <button
+              onClick={() => {
+                alert('Marked as paid via cash.\n\nIn real app: Notify host');
+              }}
+              className="w-full border-2 border-gray-900 py-4 rounded-lg text-base text-gray-900"
+            >
+              Paid in cash
+            </button>
+          </div>
+
+          <p className="text-sm text-gray-600 text-center mt-6">
+            Payment will be sent to Host's UPI
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function PaymentModal({ itemId, items, onClose, onConfirm }) {
+  const [method, setMethod] = useState('upi');
+  const [amount, setAmount] = useState('');
+  const veg = items.find(v => v.id === itemId);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
+      <div className="bg-white rounded-lg max-w-sm w-full p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+        >
+          <X size={20} />
+        </button>
+
+        <p className="text-xl text-gray-900 mb-2">Record payment</p>
+        <p className="text-sm text-gray-600 mb-6">for {veg?.name}</p>
+
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-3">Payment method</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setMethod('upi')}
+              className={`flex-1 py-3 rounded-lg border-2 text-base ${
+                method === 'upi'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-900 border-gray-300'
+              }`}
+            >
+              UPI
+            </button>
+            <button
+              onClick={() => setMethod('cash')}
+              className={`flex-1 py-3 rounded-lg border-2 text-base ${
+                method === 'cash'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-900 border-gray-300'
+              }`}
+            >
+              Cash
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-3">Amount paid</p>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+              <IndianRupee size={20} className="text-gray-600" strokeWidth={2.5} />
+            </div>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg text-lg focus:border-gray-900 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => amount && onConfirm(method, amount)}
+            disabled={!amount}
+            className="flex-1 py-3 bg-gray-900 text-white rounded-lg text-base disabled:bg-gray-400 flex items-center justify-center gap-2"
+          >
+            <Check size={18} />
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

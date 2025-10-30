@@ -1,0 +1,13 @@
+Restore Point: 2025-10-25_join-session-flow-and-naming-updates
+Date: 2025-10-25
+Time: 16:19:39
+Description: join-session-flow-and-naming-updates
+
+Files backed up:
+- minibag-ui-prototype.tsx
+
+To restore:
+  cp RESTORE_POINTS/2025-10-25_join-session-flow-and-naming-updates.tsx.bak minibag-ui-prototype.tsx
+
+Or use:
+  ./restore.sh 2025-10-25_join-session-flow-and-naming-updates

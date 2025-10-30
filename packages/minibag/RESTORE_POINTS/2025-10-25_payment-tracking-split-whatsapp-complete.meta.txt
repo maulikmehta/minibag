@@ -1,0 +1,13 @@
+Restore Point: 2025-10-25_payment-tracking-split-whatsapp-complete
+Date: 2025-10-25
+Time: 16:44:07
+Description: payment-tracking-split-whatsapp-complete
+
+Files backed up:
+- minibag-ui-prototype.tsx
+
+To restore:
+  cp RESTORE_POINTS/2025-10-25_payment-tracking-split-whatsapp-complete.tsx.bak minibag-ui-prototype.tsx
+
+Or use:
+  ./restore.sh 2025-10-25_payment-tracking-split-whatsapp-complete

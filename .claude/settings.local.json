@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(./snapshot.sh:*)",
+      "Bash(python3:*)",
+      "Bash(lsof:*)",
+      "Bash(brew install:*)",
+      "Bash(tar:*)",
+      "Bash(chmod:*)",
+      "Bash(./check.sh:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm audit:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(./start.sh:*)",
+      "Bash(find:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

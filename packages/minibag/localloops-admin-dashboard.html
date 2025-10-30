@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalLoops Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    body {
+      background: #fafafa;
+      color: #1a1a1a;
+      min-width: 1280px;
+    }
+    .metric-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: all 0.2s ease;
+    }
+    .metric-card:hover {
+      box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+      transform: translateY(-2px);
+    }
+    .insight-card {
+      border-left-width: 4px;
+      transition: all 0.2s ease;
+    }
+    .insight-card:hover {
+      transform: translateX(4px);
+    }
+  </style>
+</head>
+<body class="font-sans">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+  <div class="max-w-[1600px] mx-auto px-12 py-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-gray-900">LocalLoops Admin</h1>
+      <p class="text-base text-gray-500 mt-1">Multi-Product Business Intelligence</p>
+    </div>
+    <div class="flex items-center gap-8">
+      <div class="text-right">
+        <p class="text-sm text-gray-500">Last updated</p>
+        <p class="text-base text-gray-700 font-medium">Oct 13, 2025 • 14:32</p>
+      </div>
+      <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg shadow-lg">
+        F
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1600px] mx-auto px-12 py-10">
+  
+  <!-- Platform Health Overview -->
+  <section class="mb-12">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-6">Platform Overview</h2>
+    <div class="grid grid-cols-4 gap-6">
+      
+      <div class="metric-card rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-base text-gray-600">Monthly Active Users</p>
+          <span class="text-sm text-green-600 font-semibold bg-green-50 px-3 py-1 rounded-full">↑ 12%</span>
+        </div>
+        <p class="text-5xl font-bold text-gray-900 mb-3">1,247</p>
+        <div class="flex items-center gap-2 text-sm">
+          <div class="flex-1 bg-gray-200 rounded-full h-2">
+            <div class="bg-green-500 h-2 rounded-full" style="width: 83%"></div>
+          </div>
+          <span class="text-gray-500">83%</span>
+        </div>
+        <p class="text-sm text-gray-500 mt-2">Target: 1,500</p>
+      </div>
+
+      <div class="metric-card rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-base text-gray-600">Weekly Sessions</p>
+          <span class="text-sm text-green-600 font-semibold bg-green-50 px-3 py-1 rounded-full">↑ 8%</span>
+        </div>
+        <p class="text-5xl font-bold text-gray-900 mb-3">342</p>
+        <div class="flex gap-2 mt-2">
+          <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">298 Minibag</span>
+          <span class="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded">32 Party</span>
+          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">12 Fit</span>
+        </div>
+      </div>
+
+      <div class="metric-card rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-base text-gray-600">Completion Rate</p>
+          <span class="text-sm text-gray-600 font-semibold bg-gray-100 px-3 py-1 rounded-full">→ 0%</span>
+        </div>
+        <p class="text-5xl font-bold text-gray-900 mb-3">73%</p>
+        <p class="text-sm text-gray-600 mt-2">Sessions where vendor arrived</p>
+        <p class="text-xs text-gray-500 mt-1">Critical quality metric</p>
+      </div>
+
+      <div class="metric-card rounded-xl p-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-base text-gray-600">Monthly Revenue</p>
+          <span class="text-sm text-green-600 font-semibold bg-green-50 px-3 py-1 rounded-full">↑ 15%</span>
+        </div>
+        <p class="text-5xl font-bold text-gray-900 mb-3">₹48,200</p>
+        <div class="flex items-center gap-2 text-sm mt-2">
+          <div class="flex-1 bg-gray-200 rounded-full h-2">
+            <div class="bg-blue-500 h-2 rounded-full" style="width: 88%"></div>
+          </div>
+          <span class="text-gray-500">88%</span>
+        </div>
+        <p class="text-sm text-gray-500 mt-2">Break-even: ₹55,000</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Product Comparison Table -->
+  <section class="mb-12">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Product Performance</h2>
+      <p class="text-sm text-gray-500">Comparing health across all three products</p>
+    </div>
+    <div class="metric-card rounded-xl overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Product</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Users</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Sessions/Week</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Completion</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Pro Conv.</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">MRR</th>
+            <th class="text-right px-8 py-5 text-sm font-semibold text-gray-600 uppercase tracking-wide">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-8 py-6">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl shadow-md">
+                  🛒
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-900 text-lg">Minibag</p>
+                  <p class="text-sm text-gray-500">Shopping coordination</p>
+                </div>
+              </div>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">1,050</p>
+              <p class="text-xs text-gray-500">84% of total</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">298</p>
+              <p class="text-xs text-gray-500">87% of sessions</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-green-600">76%</span>
+              <p class="text-xs text-gray-500">Above target</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-gray-900">8.2%</span>
+              <p class="text-xs text-gray-500">86 Pro users</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">₹42,140</p>
+              <p class="text-xs text-gray-500">87% of revenue</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="inline-flex px-4 py-2 rounded-full text-sm font-semibold bg-green-100 text-green-700">
+                Healthy
+              </span>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-8 py-6">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xl shadow-md">
+                  🎉
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-900 text-lg">Partybag</p>
+                  <p class="text-sm text-gray-500">Party coordination</p>
+                </div>
+              </div>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">142</p>
+              <p class="text-xs text-gray-500">11% of total</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">32</p>
+              <p class="text-xs text-gray-500">9% of sessions</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-yellow-600">68%</span>
+              <p class="text-xs text-gray-500">Needs work</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-gray-900">5.6%</span>
+              <p class="text-xs text-gray-500">8 Pro users</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">₹3,920</p>
+              <p class="text-xs text-gray-500">8% of revenue</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="inline-flex px-4 py-2 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-700">
+                Growing
+              </span>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-8 py-6">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xl shadow-md">
+                  💪
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-900 text-lg">Fitbag</p>
+                  <p class="text-sm text-gray-500">Fitness coordination</p>
+                </div>
+              </div>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">55</p>
+              <p class="text-xs text-gray-500">4% of total</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">12</p>
+              <p class="text-xs text-gray-500">4% of sessions</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-red-600">58%</span>
+              <p class="text-xs text-gray-500">Critical issue</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="text-2xl font-bold text-gray-900">3.6%</span>
+              <p class="text-xs text-gray-500">2 Pro users</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <p class="text-2xl font-bold text-gray-900">₹2,140</p>
+              <p class="text-xs text-gray-500">4% of revenue</p>
+            </td>
+            <td class="text-right px-8 py-6">
+              <span class="inline-flex px-4 py-2 rounded-full text-sm font-semibold bg-orange-100 text-orange-700">
+                Early Stage
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Two Column Section -->
+  <div class="grid grid-cols-2 gap-8 mb-12">
+    
+    <!-- Cross-Product Usage -->
+    <div class="metric-card rounded-xl p-8">
+      <h3 class="text-xl font-semibold text-gray-900 mb-6">Cross-Product Behavior</h3>
+      <p class="text-sm text-gray-600 mb-6">Network effects depend on users trying multiple products</p>
+      
+      <div class="mb-8">
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-base text-gray-700">Using 2+ products</span>
+          <span class="text-3xl font-bold text-gray-900">18%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-4">
+          <div class="bg-gradient-to-r from-green-500 via-pink-500 to-blue-500 h-4 rounded-full" style="width: 18%"></div>
+        </div>
+        <p class="text-sm text-gray-500 mt-2">224 users • Target: 25% by Q2</p>
+      </div>
+      
+      <div class="space-y-4">
+        <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">Conversion Paths</p>
+        
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🛒</span>
+            <span class="text-gray-400">→</span>
+            <span class="text-2xl">🎉</span>
+            <span class="text-base text-gray-700 ml-2">Minibag → Partybag</span>
+          </div>
+          <span class="text-2xl font-bold text-gray-900">12.4%</span>
+        </div>
+        
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🛒</span>
+            <span class="text-gray-400">→</span>
+            <span class="text-2xl">💪</span>
+            <span class="text-base text-gray-700 ml-2">Minibag → Fitbag</span>
+          </div>
+          <span class="text-2xl font-bold text-gray-900">4.2%</span>
+        </div>
+        
+        <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🎉</span>
+            <span class="text-gray-400">→</span>
+            <span class="text-2xl">🛒</span>
+            <span class="text-base text-gray-700 ml-2 font-medium">Partybag → Minibag</span>
+          </div>
+          <span class="text-2xl font-bold text-blue-600">38.7%</span>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 rounded-lg p-5 mt-6">
+        <p class="text-sm font-semibold text-blue-900 mb-2">💡 High-Value Insight</p>
+        <p class="text-base text-blue-800">Partybag users are 3x more likely to adopt Minibag. Add cross-promo banner in Partybag app immediately after successful session completion.</p>
+      </div>
+    </div>
+
+    <!-- Geographic Clusters -->
+    <div class="metric-card rounded-xl p-8">
+      <h3 class="text-xl font-semibold text-gray-900 mb-6">Geographic Distribution</h3>
+      <p class="text-sm text-gray-600 mb-6">Density drives vendor availability and completion rates</p>
+      
+      <div class="space-y-6">
+        <div class="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+          <div class="flex justify-between items-start mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl">📍</span>
+              <div>
+                <p class="text-xl font-semibold text-gray-900">Vadodara</p>
+                <p class="text-sm text-gray-600">Core market • 8 high-density neighborhoods</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-3xl font-bold text-gray-900">850</p>
+              <p class="text-sm text-green-600 font-semibold">68% market share</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-4">
+            <div class="bg-white border-2 border-green-200 rounded-lg p-4 text-center">
+              <p class="text-sm text-gray-600 mb-1">Minibag</p>
+              <p class="text-2xl font-bold text-gray-900">720</p>
+            </div>
+            <div class="bg-white border-2 border-pink-200 rounded-lg p-4 text-center">
+              <p class="text-sm text-gray-600 mb-1">Partybag</p>
+              <p class="text-2xl font-bold text-gray-900">98</p>
+            </div>
+            <div class="bg-white border-2 border-blue-200 rounded-lg p-4 text-center">
+              <p class="text-sm text-gray-600 mb-1">Fitbag</p>
+              <p class="text-2xl font-bold text-gray-900">32</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📍</span>
+              <div>
+                <p class="text-lg font-semibold text-gray-900">Ahmedabad</p>
+                <p class="text-sm text-gray-600">Expansion city</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold text-gray-900">220</p>
+              <p class="text-sm text-gray-600">18% share</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 bg-gray-50 rounded-xl border border-gray-200">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📍</span>
+              <div>
+                <p class="text-lg font-semibold text-gray-900">Surat</p>
+                <p class="text-sm text-gray-600">Early stage</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold text-gray-900">95</p>
+              <p class="text-sm text-gray-600">8% share</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 rounded-lg p-5 mt-6">
+        <p class="text-sm font-semibold text-purple-900 mb-2">🎯 Vendor Opportunity</p>
+        <p class="text-base text-purple-800">8 high-density neighborhoods in Vadodara (150+ users each) are ready for dedicated vendor partnerships. This would boost completion rates from 76% to 85%+.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Growth Trends Chart -->
+  <section class="mb-12">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-6">Weekly Active Users Trend</h2>
+    <div class="metric-card rounded-xl p-8">
+      <canvas id="weeklyChart" height="60"></canvas>
+    </div>
+  </section>
+
+  <!-- Vendor Network Status -->
+  <section class="mb-12">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-6">Vendor Network Status</h2>
+    <div class="grid grid-cols-3 gap-8">
+      
+      <div class="metric-card rounded-xl p-8">
+        <p class="text-base text-gray-600 mb-3">Active Vendors</p>
+        <p class="text-5xl font-bold text-gray-900 mb-4">34</p>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600">Minibag</span>
+            <span class="text-gray-900 font-semibold">28</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Partybag</span>
+            <span class="text-gray-900 font-semibold">4</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Fitbag</span>
+            <span class="text-gray-900 font-semibold">2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card rounded-xl p-8">
+        <p class="text-base text-gray-600 mb-3">Avg Response Time</p>
+        <p class="text-5xl font-bold text-gray-900 mb-4">2.3h</p>
+        <p class="text-sm text-gray-600">Time to confirm sessions</p>
+        <p class="text-xs text-gray-500 mt-1">Target: Under 2 hours</p>
+      </div>
+
+      <div class="metric-card rounded-xl p-8">
+        <p class="text-base text-gray-600 mb-3">30-Day Retention</p>
+        <p class="text-5xl font-bold text-gray-900 mb-4">82%</p>
+        <p class="text-sm text-gray-600">Vendors still active</p>
+        <p class="text-xs text-gray-500 mt-1">Industry benchmark: 65%</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Key Insights -->
+  <section class="mb-12">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-6">Key Insights & Recommended Actions</h2>
+    <div class="grid grid-cols-2 gap-6">
+      
+      <div class="metric-card insight-card rounded-xl p-6 border-l-green-500">
+        <div class="flex items-start gap-4">
+          <span class="text-4xl">✅</span>
+          <div class="flex-1">
+            <p class="text-lg font-semibold text-gray-900 mb-2">Minibag completion rate improving</p>
+            <p class="text-base text-gray-600 leading-relaxed">76% completion (up from 71% last week). New vendor onboarding in Alkapuri neighborhood showing strong results. Consider replicating this playbook in 3 more high-density areas.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card insight-card rounded-xl p-6 border-l-amber-500">
+        <div class="flex items-start gap-4">
+          <span class="text-4xl">⚠️</span>
+          <div class="flex-1">
+            <p class="text-lg font-semibold text-gray-900 mb-2">Fitbag needs strategic decision</p>
+            <p class="text-base text-gray-600 leading-relaxed">Only 58% completion rate is concerning. Options: 1) Guarantee instructors for Pro users only, 2) Require pre-confirmation, 3) Pivot to on-demand model, or 4) Pause and focus on Minibag/Partybag.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card insight-card rounded-xl p-6 border-l-blue-500">
+        <div class="flex items-start gap-4">
+          <span class="text-4xl">💡</span>
+          <div class="flex-1">
+            <p class="text-lg font-semibold text-gray-900 mb-2">High-value cross-sell opportunity</p>
+            <p class="text-base text-gray-600 leading-relaxed">38.7% of Partybag users naturally adopt Minibag. This is your strongest conversion path. Add prominent in-app banner after Partybag session: "Your neighbors used Minibag for groceries. Try it?"</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card insight-card rounded-xl p-6 border-l-purple-500">
+        <div class="flex items-start gap-4">
+          <span class="text-4xl">📈</span>
+          <div class="flex-1">
+            <p class="text-lg font-semibold text-gray-900 mb-2">Ahmedabad ready for growth push</p>
+            <p class="text-base text-gray-600 leading-relaxed">220 users generating 45 sessions/week with limited vendor support. Invest in onboarding 3-5 vendors in Satellite/Vastrapur areas. This could unlock 2x growth in that city within 60 days.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Revenue Analysis -->
+  <section class="mb-12">
+    <h2 class="text-2xl font-semibold text-gray-900 mb-6">Revenue Analysis & Path to Sustainability</h2>
+    <div class="metric-card rounded-xl p-8">
+      <div class="grid grid-cols-2 gap-12">
+        <div>
+          <canvas id="revenueChart" height="300"></canvas>
+        </div>
+        <div class="space-y-6">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-base text-gray-600">Minibag Pro</span>
+              <span class="text-2xl font-bold text-gray-900">₹42,140</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-green-500 h-3 rounded-full" style="width: 87%"></div>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">86 subscribers • ₹490/month avg</p>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-base text-gray-600">Partybag Pro</span>
+              <span class="text-2xl font-bold text-gray-900">₹3,920</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-pink-500 h-3 rounded-full" style="width: 8%"></div>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">8 subscribers • ₹490/month avg</p>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-base text-gray-600">Fitbag Pro</span>
+              <span class="text-2xl font-bold text-gray-900">₹2,140</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-blue-500 h-3 rounded-full" style="width: 4%"></div>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">2 subscribers • ₹1,070/month avg</p>
+          </div>
+
+          <div class="border-t-2 border-gray-200 pt-6 mt-6">
+            <p class="text-base font-semibold text-gray-700 mb-4">Break-even Analysis</p>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-base text-gray-600">Current MRR</span>
+                <span class="text-xl font-bold text-gray-900">₹48,200</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-base text-gray-600">Target MRR</span>
+                <span class="text-xl font-bold text-gray-900">₹55,000</span>
+              </div>
+              <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                <span class="text-base font-semibold text-gray-700">Gap to break-even</span>
+                <span class="text-2xl font-bold text-amber-600">₹6,800</span>
+              </div>
+              <p class="text-sm text-gray-500 mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                ≈ 14 new Pro subscribers needed (at ₹490/month avg) to reach sustainability
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// Weekly Active Users Trend
+const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+new Chart(weeklyCtx, {
+  type: 'line',
+  data: {
+    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'],
+    datasets: [
+      {
+        label: 'Minibag',
+        data: [620, 680, 750, 820, 890, 950, 1010, 1050],
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.4,
+        borderWidth: 3,
+        pointRadius: 5,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
+      },
+      {
+        label: 'Partybag',
+        data: [25, 35, 48, 62, 78, 95, 118, 142],
+        borderColor: '#ec4899',
+        backgroundColor: 'rgba(236, 72, 153, 0.1)',
+        tension: 0.4,
+        borderWidth: 3,
+        pointRadius: 5,
+        pointBackgroundColor: '#ec4899',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
+      },
+      {
+        label: 'Fitbag',
+        data: [8, 12, 18, 22, 28, 35, 45, 55],
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        borderWidth: 3,
+        pointRadius: 5,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: { 
+          color: '#4b5563',
+          padding: 20,
+          font: { size: 14, weight: '600' },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        backgroundColor: '#1f2937',
+        padding: 12,
+        titleFont: { size: 14, weight: 'bold' },
+        bodyFont: { size: 13 },
+        cornerRadius: 8
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { 
+          color: '#e5e7eb',
+          drawBorder: false
+        },
+        ticks: { 
+          color: '#6b7280',
+          font: { size: 13 },
+          padding: 10
+        }
+      },
+      x: {
+        grid: { 
+          color: '#f3f4f6',
+          drawBorder: false
+        },
+        ticks: { 
+          color: '#6b7280',
+          font: { size: 13 },
+          padding: 10
+        }
+      }
+    }
+  }
+});
+
+// Revenue Breakdown
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Minibag', 'Partybag', 'Fitbag'],
+    datasets: [{
+      data: [42140, 3920, 2140],
+      backgroundColor: [
+        '#10b981',
+        '#ec4899',
+        '#3b82f6'
+      ],
+      borderWidth: 4,
+      borderColor: '#ffffff',
+      hoverOffset: 10
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { 
+          color: '#4b5563',
+          padding: 20,
+          font: { size: 14, weight: '600' },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      },
+      tooltip: {
+        backgroundColor: '#1f2937',
+        padding: 12,
+        titleFont: { size: 14, weight: 'bold' },
+        bodyFont: { size: 13 },
+        cornerRadius: 8,
+        callbacks: {
+          label: function(context) {
+            let label = context.label || '';
+            if (label) {
+              label += ': ';
+            }
+            label += '₹' + context.parsed.toLocaleString('en-IN');
+            return label;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
