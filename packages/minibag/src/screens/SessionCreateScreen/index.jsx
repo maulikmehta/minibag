@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
 import LanguageSwitcher from '../../components/LanguageSwitcher.jsx';
+import AppHeader from '../../components/layout/AppHeader.jsx';
 
 export default function SessionCreateScreen({
   categories,
@@ -160,6 +161,7 @@ export default function SessionCreateScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+      <AppHeader />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">
