@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Plus, Minus } from 'lucide-react';
+import AppHeader from '../../components/layout/AppHeader.jsx';
 
 export default function ParticipantAddItemsScreen({
   participants,
@@ -46,6 +47,7 @@ export default function ParticipantAddItemsScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
+      <AppHeader />
       <div className="p-6">
         {/* Header */}
         <div className="mb-6" data-tour="participant-catalog-info">

@@ -85,6 +85,7 @@ function PaymentSplitScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+      <AppHeader />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">

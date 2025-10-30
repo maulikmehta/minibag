@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, MapPin, Clock, ShoppingBag, Users, Loader2 } from 'lucide-react';
+import AppHeader from '../../components/layout/AppHeader.jsx';
 
 export default function JoinSessionScreen({
   session,
@@ -101,6 +102,7 @@ export default function JoinSessionScreen({
   if (sessionNotFound) {
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
+        <AppHeader />
         <div className="p-6 flex flex-col items-center justify-center min-h-screen">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
             <X size={32} className="text-red-600" strokeWidth={2.5} />
@@ -131,6 +133,7 @@ export default function JoinSessionScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
+      <AppHeader />
       <div className="p-6">
         {/* Header */}
         <div className="text-center mb-8">

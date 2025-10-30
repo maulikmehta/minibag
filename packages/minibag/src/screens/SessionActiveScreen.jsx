@@ -5,6 +5,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher.jsx';
 import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
+import AppHeader from '../components/layout/AppHeader.jsx';
 
 export default function SessionActiveScreen({
   session,
@@ -58,6 +59,7 @@ export default function SessionActiveScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+      <AppHeader />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">

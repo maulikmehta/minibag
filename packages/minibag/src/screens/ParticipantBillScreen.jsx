@@ -1,4 +1,5 @@
 import React from 'react';
+import AppHeader from '../components/layout/AppHeader.jsx';
 
 /**
  * ParticipantBillScreen Component
@@ -25,8 +26,10 @@ function ParticipantBillScreen({
   // Empty state - no participants
   if (participants.length === 0) {
     return (
-      <div className="max-w-md mx-auto bg-white min-h-screen flex items-center justify-center p-8">
-        <div className="text-center">
+      <div className="max-w-md mx-auto bg-white min-h-screen flex flex-col">
+        <AppHeader />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
           <p className="text-base text-gray-600 mb-4">No bill data. Create a session first.</p>
           <button
             onClick={onGoHome}
@@ -73,6 +76,7 @@ function ParticipantBillScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
+      <AppHeader />
       <div className="p-6">
         <p className="text-2xl text-gray-900 mb-6">Your bill</p>
 

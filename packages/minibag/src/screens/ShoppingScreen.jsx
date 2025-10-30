@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
+import AppHeader from '../components/layout/AppHeader.jsx';
 
 /**
  * ShoppingScreen Component
@@ -49,6 +50,7 @@ function ShoppingScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
+      <AppHeader />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">
