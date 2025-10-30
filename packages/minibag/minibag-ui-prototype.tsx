@@ -310,7 +310,14 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         getItemName={getItemName}
         getItemSubtitles={getItemSubtitles}
         getTotalWeight={getTotalWeight}
-        onSessionCreated={() => setCurrentScreen('session-active')}
+        onSessionCreated={(items) => {
+          if (items) {
+            setHostItems(items);
+          }
+          setCurrentScreen('session-active');
+        }}
+        onLanguageChange={handleLanguageChange}
+        onHelpClick={handleHelpClick}
       />
     );
   }

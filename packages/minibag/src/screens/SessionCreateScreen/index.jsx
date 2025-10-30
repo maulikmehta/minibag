@@ -3,7 +3,6 @@ import { Plus, Minus, Check, X, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
-import LanguageSwitcher from '../../components/LanguageSwitcher.jsx';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 
 export default function SessionCreateScreen({
@@ -16,7 +15,9 @@ export default function SessionCreateScreen({
   getItemName,
   getItemSubtitles,
   getTotalWeight,
-  onSessionCreated
+  onSessionCreated,
+  onLanguageChange,
+  onHelpClick
 }) {
   const { i18n } = useTranslation();
 
@@ -81,6 +82,13 @@ export default function SessionCreateScreen({
 
   // Show host nickname selection modal
   const handleCreateSessionClick = async () => {
+    // If session already exists, just navigate (don't ask for name again)
+    if (session && currentParticipant) {
+      // Pass the current hostItems to parent
+      onSessionCreated(hostItems);
+      return;
+    }
+
     // Fetch nickname options for host
     setLoadingHostNicknames(true);
     setShowHostNicknameModal(true);
@@ -149,8 +157,8 @@ export default function SessionCreateScreen({
 
       console.log('✅ Session created:', result);
 
-      // Navigate to session-active screen
-      onSessionCreated();
+      // Navigate to session-active screen and pass hostItems
+      onSessionCreated(hostItems);
     } catch (error) {
       console.error('❌ Failed to create session:', error);
       alert('Unable to start list. Please try again.');
@@ -161,21 +169,17 @@ export default function SessionCreateScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
-      <AppHeader />
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={onLanguageChange || handleLanguageChange}
+        onHelpClick={onHelpClick}
+      />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-gray-900">Step 1 of 4</p>
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-gray-600">{totalWeight}kg added</p>
-              {i18n && i18n.language && (
-                <>
-                  <span className="text-gray-300">•</span>
-                  <LanguageSwitcher currentLanguage={i18n.language} onLanguageChange={handleLanguageChange} />
-                </>
-              )}
-            </div>
+            <p className="text-sm text-gray-600">{totalWeight}kg added</p>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div className="bg-green-600 h-1.5 rounded-full" style={{width: '25%'}}></div>
