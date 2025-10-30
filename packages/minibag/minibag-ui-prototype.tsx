@@ -11,6 +11,8 @@ import ItemCard from './src/components/performance/ItemCard.jsx';
 import LanguageSwitcher from './src/components/LanguageSwitcher.jsx';
 import PaymentModal from './src/components/PaymentModal.jsx';
 import ParticipantAvatar from './src/components/session/ParticipantAvatar.jsx';
+import ItemList from './src/components/items/ItemList.jsx';
+import ItemRow from './src/components/items/ItemRow.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -1460,42 +1462,21 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
               {selectedParticipant === 'host' ? 'Your items' : `${selectedParticipant}'s items`}
             </p>
 
-            {Object.keys(selectedItems).length > 0 ? (
-              <div className="divide-y divide-gray-200">
-                {Object.entries(selectedItems).map(([itemId, qty]) => {
-                  const veg = VEGETABLES.find(v => v.id === itemId);
-                  return (
-                    <div key={itemId} className="flex items-center gap-3 py-3 px-2">
-                      {veg.thumbnail_url || veg.img ? (
-                        <img
-                          src={veg.thumbnail_url || veg.img}
-                          alt={veg.name}
-                          loading="lazy"
-                          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextElementSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                        🥬
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                        <p className="text-sm text-gray-600">{qty}kg</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
-                <p className="text-gray-500">
-                  {selectedParticipant === 'host' ? 'No items added' : 'Selecting items...'}
-                </p>
-              </div>
-            )}
+            <ItemList
+              emptyMessage={selectedParticipant === 'host' ? 'No items added' : 'Selecting items...'}
+            >
+              {Object.entries(selectedItems).map(([itemId, qty]) => {
+                const veg = VEGETABLES.find(v => v.id === itemId);
+                return (
+                  <ItemRow
+                    key={itemId}
+                    imageUrl={veg.thumbnail_url || veg.img}
+                    name={getItemName(veg)}
+                    subtitle={`${qty}kg`}
+                  />
+                );
+              })}
+            </ItemList>
 
             {/* Add Items button - for participants to add from host's catalog */}
             {selectedParticipant === 'host' && currentParticipant?.is_creator && Object.keys(hostItems).length === 0 && (
