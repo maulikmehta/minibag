@@ -39,6 +39,7 @@ function ParticipantBillScreen({
           </button>
         </div>
       </div>
+      </div>
     );
   }
 

@@ -1,7 +1,6 @@
 import React from 'react';
-import { Plus, X, Clock, Users, Share2, Copy, MoreVertical } from 'lucide-react';
+import { Plus, Clock, Users, Share2, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import LanguageSwitcher from '../components/LanguageSwitcher.jsx';
 import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
@@ -25,7 +24,8 @@ export default function SessionActiveScreen({
   getItemName,
   getTotalWeight,
   handleShare,
-  handleLanguageChange
+  handleLanguageChange,
+  onHelpClick
 }) {
   const { t, i18n } = useTranslation();
 
@@ -59,7 +59,15 @@ export default function SessionActiveScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
-      <AppHeader />
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={handleLanguageChange}
+        showEndSessionMenu={currentParticipant?.is_creator}
+        endSessionMenuOpen={showSessionMenu}
+        onEndSessionMenuToggle={onShowSessionMenuChange}
+        onEndSession={onEndSession}
+        onHelpClick={onHelpClick}
+      />
       <div className="p-6">
         {/* Progress indicator */}
         <div className="mb-4">
@@ -71,52 +79,9 @@ export default function SessionActiveScreen({
             >
               ← Step 2 of 4
             </button>
-            <div className="flex items-center gap-3 relative">
-              <div className="flex items-center gap-1.5" data-tour="live-indicator">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <p className="text-sm text-green-600 font-medium">Live</p>
-              </div>
-              {i18n && i18n.language && (
-                <>
-                  <span className="text-gray-300">•</span>
-                  <LanguageSwitcher currentLanguage={i18n.language} onLanguageChange={handleLanguageChange} />
-                </>
-              )}
-              {/* Three-dot menu - Host only */}
-              {currentParticipant?.is_creator && (
-                <div className="relative">
-                  <button
-                    onClick={() => onShowSessionMenuChange(!showSessionMenu)}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <MoreVertical size={18} className="text-gray-600" />
-                  </button>
-
-                  {showSessionMenu && (
-                    <>
-                      {/* Backdrop to close menu */}
-                      <div
-                        onClick={() => onShowSessionMenuChange(false)}
-                        className="fixed inset-0 z-30"
-                      />
-
-                      {/* Menu dropdown */}
-                      <div className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-40 w-48">
-                        <button
-                          onClick={() => {
-                            onShowSessionMenuChange(false);
-                            onEndSession();
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600 hover:text-red-700"
-                        >
-                          <X size={16} />
-                          <span className="font-medium">End Session</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+            <div className="flex items-center gap-1.5" data-tour="live-indicator">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <p className="text-sm text-green-600 font-medium">Live</p>
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">

@@ -1,11 +1,13 @@
 /**
  * useSession Hook
- * Manages session state and real-time updates
+ * Manages session state and real-time updates with localStorage persistence
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createSession, getSession, joinSession, updateSessionStatus } from '../services/api.js';
 import socketService from '../services/socket.js';
+
+const SESSION_STORAGE_KEY = 'minibag_active_session';
 
 /**
  * Hook to manage a shopping session
@@ -20,19 +22,95 @@ export function useSession(sessionId = null) {
   const [connected, setConnected] = useState(false);
 
   const socketConnectedRef = useRef(false);
+  const restoredRef = useRef(false);
 
-  // Initialize WebSocket connection
+  /**
+   * Persist session to localStorage
+   */
+  const persistSession = useCallback((sessionData, participantData) => {
+    try {
+      const dataToStore = {
+        session: sessionData,
+        currentParticipant: participantData,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(dataToStore));
+    } catch (err) {
+      console.error('Failed to persist session:', err);
+    }
+  }, []);
+
+  /**
+   * Clear persisted session from localStorage
+   */
+  const clearPersistedSession = useCallback(() => {
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (err) {
+      console.error('Failed to clear persisted session:', err);
+    }
+  }, []);
+
+  /**
+   * Restore session from localStorage
+   */
+  const restoreSession = useCallback(async () => {
+    try {
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (!stored) return false;
+
+      const { session: storedSession, currentParticipant: storedParticipant, timestamp } = JSON.parse(stored);
+
+      // Check if session is still valid (less than 4 hours old)
+      const fourHours = 4 * 60 * 60 * 1000;
+      if (Date.now() - timestamp > fourHours) {
+        clearPersistedSession();
+        return false;
+      }
+
+      // Try to reload the session from the server to verify it's still active
+      const data = await getSession(storedSession.session_id);
+
+      if (data.session && data.session.status !== 'completed' && data.session.status !== 'cancelled') {
+        setSession(data.session);
+        setParticipants(data.participants || []);
+        setCurrentParticipant(storedParticipant);
+
+        // Join WebSocket room
+        socketService.joinSessionRoom(storedSession.session_id);
+        setConnected(true);
+
+        return true;
+      } else {
+        // Session is no longer active
+        clearPersistedSession();
+        return false;
+      }
+    } catch (err) {
+      console.error('Failed to restore session:', err);
+      clearPersistedSession();
+      return false;
+    }
+  }, [clearPersistedSession]);
+
+  // Initialize WebSocket connection and restore session
   useEffect(() => {
     if (!socketConnectedRef.current) {
       socketService.connect();
       socketConnectedRef.current = true;
     }
 
+    // Try to restore session on mount (only once)
+    if (!restoredRef.current && !sessionId) {
+      restoredRef.current = true;
+      restoreSession();
+    }
+
     return () => {
       // Cleanup on unmount
       socketService.leaveSessionRoom();
     };
-  }, []);
+  }, [restoreSession, sessionId]);
 
   // Load session if sessionId is provided
   useEffect(() => {
@@ -78,6 +156,9 @@ export function useSession(sessionId = null) {
       setCurrentParticipant(result.participant);
       setParticipants([result.participant]);
 
+      // Persist session to localStorage
+      persistSession(result.session, result.participant);
+
       // Join WebSocket room
       socketService.joinSessionRoom(result.session.session_id);
       setConnected(true);
@@ -104,6 +185,9 @@ export function useSession(sessionId = null) {
 
       setSession(result.session);
       setCurrentParticipant(result.participant);
+
+      // Persist session to localStorage
+      persistSession(result.session, result.participant);
 
       // Notify others via WebSocket
       socketService.emitParticipantJoined(result.participant);
@@ -155,7 +239,8 @@ export function useSession(sessionId = null) {
     setParticipants([]);
     setCurrentParticipant(null);
     setConnected(false);
-  }, []);
+    clearPersistedSession();
+  }, [clearPersistedSession]);
 
   // Set up real-time listeners
   useEffect(() => {

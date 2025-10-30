@@ -55,6 +55,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     create: createSession,
     join: joinSession,
     loadSession,
+    leave: leaveSession,
     connected
   } = useSession();
 
@@ -96,11 +97,18 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       setCurrentScreen('participant-bill');
       // Load session details for bill
       loadSession(billSessionId).catch(err => {
-        console.error('Failed to load session for bill:', err);
+        console.error('Failed to load session:', err);
       });
     }
   }, [billSessionId, billParticipantId, currentScreen, loadSession]);
 
+  // Redirect to session-active if session is restored from localStorage
+  React.useEffect(() => {
+    if (session && currentParticipant && currentScreen === 'home' && !joinSessionId && !billSessionId) {
+      console.log('Session restored from localStorage, redirecting to session-active');
+      setCurrentScreen('session-active');
+    }
+  }, [session, currentParticipant, currentScreen, joinSessionId, billSessionId]);
 
   // Load payments when session is active
   React.useEffect(() => {
@@ -144,87 +152,36 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [session?.session_id]);
 
-  // Guided Tour: Home screen
-  useEffect(() => {
-    console.log('🎯 Tour Check - Home:', {
-      currentScreen,
-      completedTooltips,
-      tourHomeCompleted: completedTooltips.includes('tour-home')
-    });
-
-    // Show tour if not completed (don't rely on isFirstVisit)
-    if (currentScreen === 'home' && !completedTooltips.includes('tour-home')) {
-      console.log('✅ Starting home tour in 1.5s...');
-      // Wait for all elements to be ready
-      const timer = setTimeout(() => {
-        console.log('🚀 Launching home tour now!');
-        const fabButton = document.querySelector('[data-tour="fab-menu"]');
-        console.log('FAB button found?', !!fabButton, fabButton);
+  // On-demand tour handler - triggered by help icon
+  const handleHelpClick = useCallback(() => {
+    // Determine which tour to show based on current screen
+    switch (currentScreen) {
+      case 'home':
         showScreenTour(GUIDED_TOUR_STEPS, 'home');
-      }, 1500); // Increased to 1.5s
-
-      return () => clearTimeout(timer);
-    } else {
-      console.log('❌ Not showing tour - already completed');
-    }
-  }, [currentScreen, completedTooltips, showScreenTour]);
-
-  // Guided Tour: Host Create screen
-  useEffect(() => {
-    if (currentScreen === 'host-create' && !completedTooltips.includes('tour-host-create')) {
-      // Quick delay for screen transition
-      const timer = setTimeout(() => {
+        break;
+      case 'host-create':
         showScreenTour(HOST_CREATE_TOUR_STEPS, 'host-create');
-      }, 1000); // Reduced to 1 second
-
-      return () => clearTimeout(timer);
-    }
-  }, [currentScreen, completedTooltips, showScreenTour]);
-
-  // Guided Tour: Session Active screen (for HOST)
-  useEffect(() => {
-    if (currentScreen === 'session-active' && !completedTooltips.includes('tour-session-active') && currentParticipant?.is_creator) {
-      // Quick delay for session to load
-      const timer = setTimeout(() => {
-        showScreenTour(SESSION_ACTIVE_TOUR_STEPS, 'session-active');
-      }, 1000); // Reduced to 1 second
-
-      return () => clearTimeout(timer);
-    }
-  }, [currentScreen, completedTooltips, showScreenTour, currentParticipant]);
-
-  // Participant Tour: Join Screen
-  useEffect(() => {
-    if (currentScreen === 'join' && !completedTooltips.includes('tour-participant-join')) {
-      const timer = setTimeout(() => {
+        break;
+      case 'session-active':
+        if (currentParticipant?.is_creator) {
+          showScreenTour(SESSION_ACTIVE_TOUR_STEPS, 'session-active');
+        } else {
+          showScreenTour(PARTICIPANT_SESSION_TOUR_STEPS, 'participant-session');
+        }
+        break;
+      case 'join':
         showScreenTour(PARTICIPANT_JOIN_TOUR_STEPS, 'participant-join');
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [currentScreen, completedTooltips, showScreenTour]);
-
-  // Participant Tour: Session Active Screen (for PARTICIPANTS)
-  useEffect(() => {
-    if (currentScreen === 'session-active' && !completedTooltips.includes('tour-participant-session') && currentParticipant && !currentParticipant.is_creator) {
-      const timer = setTimeout(() => {
-        showScreenTour(PARTICIPANT_SESSION_TOUR_STEPS, 'participant-session');
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [currentScreen, completedTooltips, showScreenTour, currentParticipant]);
-
-  // Participant Tour: Add Items Screen
-  useEffect(() => {
-    if (currentScreen === 'participant-add-items' && !completedTooltips.includes('tour-participant-add-items')) {
-      const timer = setTimeout(() => {
+        break;
+      case 'participant-add-items':
         showScreenTour(PARTICIPANT_ADD_ITEMS_TOUR_STEPS, 'participant-add-items');
-      }, 800);
-
-      return () => clearTimeout(timer);
+        break;
+      default:
+        console.log('No tour available for screen:', currentScreen);
     }
-  }, [currentScreen, completedTooltips, showScreenTour]);
+  }, [currentScreen, currentParticipant, showScreenTour]);
+
+  // AUTO-LOAD TOURS REMOVED - Now using on-demand help icon instead
+  // All tours are now triggered by clicking the help (?) icon in the header
 
   // Fallback data for offline/error state
   // Show all categories but only enable vegetables for field testing
@@ -428,6 +385,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onNavigateToParticipantAddItems={() => setCurrentScreen('participant-add-items')}
         onNavigateToShopping={() => setCurrentScreen('shopping')}
         onEndSession={() => {
+          leaveSession(); // Clear session from state and localStorage
           setCurrentScreen('home');
           setHostItems({});
           setParticipants([]);
@@ -438,6 +396,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         getTotalWeight={getTotalWeight}
         handleShare={handleShare}
         handleLanguageChange={handleLanguageChange}
+        onHelpClick={handleHelpClick}
       />
     );
   }
