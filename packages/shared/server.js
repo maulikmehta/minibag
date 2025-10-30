@@ -238,16 +238,12 @@ app.use((err, req, res, next) => {
 });
 
 // Start servers
-const API_PORT = process.env.API_PORT || 3000;
-const WS_PORT = process.env.WEBSOCKET_PORT || 3001;
+const PORT = process.env.API_PORT || 3000;
 
-server.listen(WS_PORT, () => {
-  console.log(`WebSocket server running on port ${WS_PORT}`);
-});
-
-app.listen(API_PORT, () => {
-  console.log(`API server running on port ${API_PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+server.listen(PORT, () => {
+  console.log(`✓ API server running on port ${PORT}`);
+  console.log(`✓ WebSocket server running on port ${PORT}`);
+  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export { app, io };

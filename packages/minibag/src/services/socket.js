@@ -5,7 +5,8 @@
 
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+// Use empty string to connect to same origin (works with Vite proxy)
+const SOCKET_URL = import.meta.env.VITE_WS_URL || '';
 
 class SocketService {
   constructor() {

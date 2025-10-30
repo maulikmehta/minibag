@@ -85,8 +85,7 @@ check_port() {
 
 echo ""
 echo -e "${BLUE}Checking ports...${NC}"
-check_port 3000 "Backend API"
-check_port 3001 "WebSocket"
+check_port 3000 "Backend API & WebSocket"
 check_port 5173 "Frontend"
 
 # Start the servers
@@ -95,9 +94,9 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${GREEN}🚀 Starting development servers...${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════════════${NC}"
 echo ""
-echo -e "${GREEN}Frontend:${NC}  http://localhost:5173"
-echo -e "${GREEN}Backend:${NC}   http://localhost:3000"
-echo -e "${GREEN}WebSocket:${NC} http://localhost:3001"
+echo -e "${GREEN}Frontend:${NC}    http://localhost:5173"
+echo -e "${GREEN}Backend API:${NC} http://localhost:3000"
+echo -e "${GREEN}WebSocket:${NC}   http://localhost:3000"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the servers${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════════════════════════${NC}"
