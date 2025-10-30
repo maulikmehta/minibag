@@ -15,6 +15,8 @@ import ItemList from './src/components/items/ItemList.jsx';
 import ItemRow from './src/components/items/ItemRow.jsx';
 import HomeScreen from './src/screens/HomeScreen.jsx';
 import ParticipantBillScreen from './src/screens/ParticipantBillScreen.jsx';
+import ShoppingScreen from './src/screens/ShoppingScreen.jsx';
+import PaymentSplitScreen from './src/screens/PaymentSplitScreen.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -1471,368 +1473,62 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
   // SCREEN 3: SHOPPING (Payment Recording)
   if (currentScreen === 'shopping') {
-    const allItems = { ...hostItems };
-    participants.forEach(p => {
-      Object.entries(p.items || {}).forEach(([id, qty]) => {
-        allItems[id] = (allItems[id] || 0) + qty;
-      });
-    });
-
-    const hostNickname = currentParticipant?.nickname || 'You';
-    const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
-    const allItemsPaid = Object.keys(allItems).every(id => itemPayments[id]);
-
     return (
-      <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
-        <div className="p-6">
-          {/* Progress indicator */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-900">Step 3 of 4</p>
-              <p className="text-sm text-gray-600">₹{totalPaid} paid</p>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div className="bg-green-600 h-1.5 rounded-full" style={{width: '75%'}}></div>
-            </div>
-          </div>
+      <ShoppingScreen
+        hostItems={hostItems}
+        participants={participants}
+        itemPayments={itemPayments}
+        items={items}
+        getItemName={getItemName}
+        currentParticipant={currentParticipant}
+        showPaymentModal={showPaymentModal}
+        setShowPaymentModal={setShowPaymentModal}
+        selectedItemForPayment={selectedItemForPayment}
+        setSelectedItemForPayment={setSelectedItemForPayment}
+        onRecordPayment={async (itemId, method, amount) => {
+          try {
+            // Record payment to backend
+            const payment = await recordPayment(session.session_id, {
+              item_id: itemId,
+              amount: parseFloat(amount),
+              method: method,
+              recorded_by: currentParticipant?.id || null
+            });
 
-          <div className="mb-6">
-            <p className="text-lg font-semibold text-gray-900 mb-3">Record Payments</p>
-            <div className="flex justify-between items-center text-sm">
-              <p className="text-gray-600">Items paid: {Object.keys(itemPayments).length}/{Object.keys(allItems).length}</p>
-            </div>
-          </div>
-
-          <div className="divide-y divide-gray-200 mb-6">
-            {Object.entries(allItems).map(([itemId, totalQty]) => {
-              const veg = VEGETABLES.find(v => v.id === itemId);
-              const payment = itemPayments[itemId];
-              const isPaid = !!payment;
-
-              // Skip if vegetable not found
-              if (!veg) return null;
-
-              // Calculate participant breakdown
-              const breakdown = [];
-              if (hostItems[itemId]) {
-                breakdown.push({ name: hostNickname, qty: hostItems[itemId] });
+            // Update local state
+            setItemPayments({
+              ...itemPayments,
+              [itemId]: {
+                id: payment.id,
+                method: payment.method,
+                amount: payment.amount
               }
-              participants.forEach(p => {
-                if (p.items && p.items[itemId]) {
-                  breakdown.push({ name: p.name, qty: p.items[itemId] });
-                }
-              });
+            });
 
-              return (
-                <div
-                  key={itemId}
-                  className={`flex items-start gap-3 py-3 px-2 ${
-                    isPaid ? 'bg-gray-50' : ''
-                  }`}
-                >
-                  {veg.thumbnail_url || veg.img ? (
-                    <img
-                      src={veg.thumbnail_url || veg.img}
-                      alt={veg.name}
-                      loading="lazy"
-                      className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0 mt-1"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextElementSibling.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl mt-1" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                    🥬
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base text-gray-900 mb-1">{getItemName(veg)}</p>
-                    <p className="text-sm text-gray-500">
-                      {breakdown.map((b, idx) => (
-                        <span key={idx}>
-                          {b.name}: {b.qty}kg{idx < breakdown.length - 1 ? ', ' : ''}
-                        </span>
-                      ))}
-                    </p>
-                    {isPaid && (
-                      <p className="text-sm text-gray-900 mt-1">
-                        ✓ ₹{payment.amount} • {payment.method === 'upi' ? 'UPI' : 'Cash'}
-                      </p>
-                    )}
-                  </div>
-
-                  {isPaid ? (
-                    <button
-                      onClick={() => {
-                        setSelectedItemForPayment(itemId);
-                        setShowPaymentModal(true);
-                      }}
-                      className="text-sm text-gray-600 px-4 py-2 flex-shrink-0"
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedItemForPayment(itemId);
-                        setShowPaymentModal(true);
-                      }}
-                      className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex-shrink-0 mt-1 transition-colors"
-                    >
-                      Pay
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Payment Modal */}
-        {showPaymentModal && selectedItemForPayment && (
-          <PaymentModal
-            itemId={selectedItemForPayment}
-            items={VEGETABLES}
-            onClose={() => {
-              setShowPaymentModal(false);
-              setSelectedItemForPayment(null);
-            }}
-            onConfirm={async (method, amount) => {
-              try {
-                // Record payment to backend
-                const payment = await recordPayment(session.session_id, {
-                  item_id: selectedItemForPayment,
-                  amount: parseFloat(amount),
-                  method: method,
-                  recorded_by: currentParticipant?.id || null
-                });
-
-                // Update local state
-                setItemPayments({
-                  ...itemPayments,
-                  [selectedItemForPayment]: {
-                    id: payment.id,
-                    method: payment.method,
-                    amount: payment.amount
-                  }
-                });
-
-                // Emit WebSocket event for real-time sync
-                socketService.emitPaymentUpdate(session.session_id, payment);
-
-                setShowPaymentModal(false);
-                setSelectedItemForPayment(null);
-              } catch (error) {
-                console.error('Failed to record payment:', error);
-                alert('Failed to record payment. Please try again.');
-              }
-            }}
-          />
-        )}
-
-        {/* Done button */}
-        {allItemsPaid && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-            <button
-              onClick={() => setCurrentScreen('payment-split')}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2 transition-colors"
-            >
-              <Check size={20} strokeWidth={2.5} />
-              Done shopping
-            </button>
-          </div>
-        )}
-      </div>
+            // Emit WebSocket event for real-time sync
+            socketService.emitPaymentUpdate(session.session_id, payment);
+          } catch (error) {
+            console.error('Failed to record payment:', error);
+            alert('Failed to record payment. Please try again.');
+          }
+        }}
+        onDoneShopping={() => setCurrentScreen('payment-split')}
+      />
     );
   }
 
   // SCREEN 5: PAYMENT SPLIT (Host View)
   if (currentScreen === 'payment-split') {
-    const allItems = { ...hostItems };
-    participants.forEach(p => {
-      Object.entries(p.items || {}).forEach(([id, qty]) => {
-        allItems[id] = (allItems[id] || 0) + qty;
-      });
-    });
-
-    const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
-
-    // Calculate host cost
-    let hostCost = 0;
-    Object.entries(hostItems).forEach(([itemId, qty]) => {
-      const payment = itemPayments[itemId];
-      if (payment) {
-        const totalQty = allItems[itemId];
-        const pricePerKg = payment.amount / totalQty;
-        hostCost += pricePerKg * qty;
-      }
-    });
-
-    // Calculate participant costs
-    const participantCosts = {};
-    participants.forEach(p => {
-      let cost = 0;
-      Object.entries(p.items || {}).forEach(([itemId, qty]) => {
-        const payment = itemPayments[itemId];
-        if (payment) {
-          const totalQty = allItems[itemId];
-          const pricePerKg = payment.amount / totalQty;
-          cost += pricePerKg * qty;
-        }
-      });
-      participantCosts[p.name] = cost;
-    });
-
-    const totalToReceive = Object.values(participantCosts).reduce((sum, cost) => sum + cost, 0);
-
     return (
-      <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
-        <div className="p-6">
-          {/* Progress indicator */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-900">Step 4 of 4</p>
-              <p className="text-sm text-green-600 font-medium">Complete</p>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div className="bg-green-600 h-1.5 rounded-full" style={{width: '100%'}}></div>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <p className="text-lg font-semibold text-gray-900">Split Costs</p>
-          </div>
-
-          <div className="border-2 border-gray-900 rounded-lg p-6 mb-6 text-center">
-            <p className="text-sm text-gray-600 mb-2">Total spent</p>
-            <p className="text-4xl text-gray-900">₹{totalPaid.toFixed(0)}</p>
-          </div>
-
-          <div className="mb-6 py-4 border-t border-b border-gray-300">
-            <div className="flex justify-between items-center">
-              <p className="text-base text-gray-900">Your cost</p>
-              <p className="text-2xl text-gray-900">₹{hostCost.toFixed(0)}</p>
-            </div>
-          </div>
-
-          {/* Show different text for solo vs group shopping */}
-          <p className="text-base text-gray-900 mb-4">
-            {participants.length === 0 ? 'Your shopping summary' : 'Collect from others'}
-          </p>
-
-          {/* Solo shopper summary */}
-          {participants.length === 0 && (
-            <div className="border border-gray-300 rounded-lg p-4 mb-6">
-              <div className="text-sm text-gray-600 space-y-2">
-                {Object.entries(hostItems).map(([itemId, qty]) => {
-                  const veg = VEGETABLES.find(v => v.id === itemId);
-                  const payment = itemPayments[itemId];
-                  if (!payment) {
-                    return (
-                      <div key={itemId} className="flex justify-between items-center py-2">
-                        <div>
-                          <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                          <p className="text-xs text-gray-500">{qty}kg</p>
-                        </div>
-                        <p className="text-sm text-gray-400">-</p>
-                      </div>
-                    );
-                  }
-                  const totalQty = allItems[itemId];
-                  const pricePerKg = payment.amount / totalQty;
-                  const itemCost = pricePerKg * qty;
-                  return (
-                    <div key={itemId} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <div>
-                        <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                        <p className="text-xs text-gray-500">{qty}kg × ₹{pricePerKg.toFixed(0)}/kg</p>
-                      </div>
-                      <p className="text-base text-gray-900 font-medium">₹{itemCost.toFixed(0)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3 mb-6">
-            {participants.map(p => {
-              const owes = participantCosts[p.name];
-              return (
-                <div key={p.name} className="border border-gray-300 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-900 text-xs flex-shrink-0">
-                        {p.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <p className="text-base text-gray-900">{p.name}</p>
-                    </div>
-                    <p className="text-xl text-gray-900">₹{owes.toFixed(0)}</p>
-                  </div>
-
-                  <div className="text-sm text-gray-600 space-y-1 pt-3 border-t border-gray-200 mb-4">
-                    {Object.entries(p.items || {}).map(([itemId, qty]) => {
-                      const veg = VEGETABLES.find(v => v.id === itemId);
-                      const payment = itemPayments[itemId];
-                      if (!payment) return null;
-                      const totalQty = allItems[itemId];
-                      const pricePerKg = payment.amount / totalQty;
-                      const itemCost = pricePerKg * qty;
-                      return (
-                        <div key={itemId} className="flex justify-between">
-                          <span>{getItemName(veg)} {qty}kg @ ₹{pricePerKg.toFixed(0)}/kg</span>
-                          <span>₹{itemCost.toFixed(0)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const itemsList = Object.entries(p.items || {})
-                        .map(([itemId, qty]) => {
-                          const veg = VEGETABLES.find(v => v.id === itemId);
-                          const payment = itemPayments[itemId];
-                          if (!payment) return null;
-                          const totalQty = allItems[itemId];
-                          const pricePerKg = payment.amount / totalQty;
-                          const itemCost = pricePerKg * qty;
-                          return `${getItemName(veg)} ${qty}kg - ₹${Math.round(itemCost)}`;
-                        })
-                        .filter(Boolean)
-                        .join('%0A');
-
-                      const billUrl = `${window.location.origin}/bill/${session.session_id}/${p.id || p.name.toLowerCase()}`;
-                      const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${p.name}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(owes)}\n\nView & pay: ${billUrl}`);
-
-                      window.open(`https://wa.me/?text=${message}`, '_blank');
-                    }}
-                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    Send payment request
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-600">You'll receive</p>
-              <p className="text-2xl text-gray-900">₹{totalToReceive.toFixed(0)}</p>
-            </div>
-            <button
-              onClick={() => setCurrentScreen('home')}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
+      <PaymentSplitScreen
+        hostItems={hostItems}
+        participants={participants}
+        itemPayments={itemPayments}
+        items={items}
+        getItemName={getItemName}
+        session={session}
+        onDone={() => setCurrentScreen('home')}
+      />
     );
   }
 
