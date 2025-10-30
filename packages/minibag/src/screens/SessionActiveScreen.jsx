@@ -69,39 +69,41 @@ export default function SessionActiveScreen({
                   <LanguageSwitcher currentLanguage={i18n.language} onLanguageChange={handleLanguageChange} />
                 </>
               )}
-              {/* Three-dot menu */}
-              <div className="relative">
-                <button
-                  onClick={() => onShowSessionMenuChange(!showSessionMenu)}
-                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <MoreVertical size={18} className="text-gray-600" />
-                </button>
+              {/* Three-dot menu - Host only */}
+              {currentParticipant?.is_creator && (
+                <div className="relative">
+                  <button
+                    onClick={() => onShowSessionMenuChange(!showSessionMenu)}
+                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <MoreVertical size={18} className="text-gray-600" />
+                  </button>
 
-                {showSessionMenu && (
-                  <>
-                    {/* Backdrop to close menu */}
-                    <div
-                      onClick={() => onShowSessionMenuChange(false)}
-                      className="fixed inset-0 z-30"
-                    />
+                  {showSessionMenu && (
+                    <>
+                      {/* Backdrop to close menu */}
+                      <div
+                        onClick={() => onShowSessionMenuChange(false)}
+                        className="fixed inset-0 z-30"
+                      />
 
-                    {/* Menu dropdown */}
-                    <div className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-40 w-48">
-                      <button
-                        onClick={() => {
-                          onShowSessionMenuChange(false);
-                          onEndSession();
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600 hover:text-red-700"
-                      >
-                        <X size={16} />
-                        <span className="font-medium">End Session</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                      {/* Menu dropdown */}
+                      <div className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-40 w-48">
+                        <button
+                          onClick={() => {
+                            onShowSessionMenuChange(false);
+                            onEndSession();
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600 hover:text-red-700"
+                        >
+                          <X size={16} />
+                          <span className="font-medium">End Session</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -130,7 +132,7 @@ export default function SessionActiveScreen({
         {/* Avatar circles with gradient - 4 slots total */}
         <div className="mb-6" data-tour="participants-list">
           <p className="text-sm text-gray-600 mb-4">
-            {participants.length === 0 ? 'Shopping solo' : `${participants.length + 1} of 4 people`}
+            {`${participants.length + 1} of 4 people`}
           </p>
           <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
             {/* Host slot */}

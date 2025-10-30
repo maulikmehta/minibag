@@ -110,14 +110,6 @@ export default function SessionCreateScreen({
 
   // Handle session creation with nickname selection
   const handleCreateSession = async () => {
-    // Check if a session already exists and user is the creator
-    // If so, navigate back to that session instead of creating a new one
-    if (session && currentParticipant?.is_creator) {
-      console.log('✅ Session already exists, navigating back to it');
-      onSessionCreated();
-      return;
-    }
-
     if (!hostName.trim()) {
       alert('Please enter your name');
       return;
