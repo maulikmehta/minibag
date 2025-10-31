@@ -354,11 +354,29 @@ export async function createSession(req, res) {
       if (itemsError) throw itemsError;
     }
 
+    // Re-fetch participant with items to return complete data
+    const { data: participantWithItems, error: refetchError } = await supabase
+      .from('participants')
+      .select(`
+        *,
+        items:participant_items(
+          *,
+          catalog_item:catalog_items(*)
+        )
+      `)
+      .eq('id', participant.id)
+      .single();
+
+    if (refetchError) {
+      console.error('Error refetching participant with items:', refetchError);
+      // Fall back to participant without items if refetch fails
+    }
+
     res.json({
       success: true,
       data: {
         session: session,
-        participant: participant,
+        participant: participantWithItems || participant,
         session_url: `/session/${session_id}`,
         host_token: host_token // Return host token for creator to store locally
       }
