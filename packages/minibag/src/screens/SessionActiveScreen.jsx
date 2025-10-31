@@ -85,7 +85,11 @@ export default function SessionActiveScreen({
   const activeParticipants = participants.filter(p => !p.marked_not_coming);
   const confirmedParticipants = activeParticipants.filter(p => p.items_confirmed).length;
   const hasConfirmedParticipants = confirmedParticipants > 0;
-  const allParticipantsConfirmed = activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed);
+
+  // Check if ALL participants (including host) have confirmed their lists
+  const hostConfirmed = currentParticipant?.items_confirmed || false;
+  const otherParticipantsConfirmed = activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed);
+  const allParticipantsConfirmed = hostConfirmed && otherParticipantsConfirmed;
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
