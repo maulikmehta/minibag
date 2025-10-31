@@ -215,6 +215,40 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [session?.session_id, currentParticipant?.is_creator]);
 
+  // Listen for participant joins (all users, but notification only for host)
+  React.useEffect(() => {
+    if (session?.session_id) {
+      const handleParticipantJoined = (participant) => {
+        console.log('Participant joined:', participant);
+
+        // Update participants state - add new participant if not already present
+        setParticipants(prevParticipants => {
+          // Check if participant already exists
+          if (prevParticipants.some(p => p.id === participant.id)) {
+            return prevParticipants;
+          }
+          // Add new participant with transformed data
+          return [...prevParticipants, {
+            id: participant.id,
+            name: participant.nickname || participant.real_name || 'Participant',
+            nickname: participant.nickname,
+            real_name: participant.real_name,
+            avatar_emoji: participant.avatar_emoji,
+            is_creator: participant.is_creator,
+            items: {}, // Will be updated when they add items
+            items_confirmed: participant.items_confirmed || false
+          }];
+        });
+      };
+
+      socketService.onParticipantJoined(handleParticipantJoined);
+
+      return () => {
+        socketService.off('participant-joined', handleParticipantJoined);
+      };
+    }
+  }, [session?.session_id]);
+
   // Load payments when session is active
   React.useEffect(() => {
     if (session?.session_id) {

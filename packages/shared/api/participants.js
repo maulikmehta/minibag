@@ -109,3 +109,66 @@ export async function updateParticipantItems(req, res) {
     });
   }
 }
+
+/**
+ * PATCH /api/participants/:participant_id/status
+ * Update participant status (items_confirmed, marked_not_coming)
+ */
+export async function updateParticipantStatus(req, res) {
+  try {
+    const { participant_id } = req.params;
+    const { items_confirmed, marked_not_coming } = req.body;
+
+    // Build update object with only provided fields
+    const updates = {};
+
+    if (typeof items_confirmed === 'boolean') {
+      updates.items_confirmed = items_confirmed;
+    }
+
+    if (typeof marked_not_coming === 'boolean') {
+      updates.marked_not_coming = marked_not_coming;
+      if (marked_not_coming) {
+        updates.marked_not_coming_at = new Date().toISOString();
+      } else {
+        updates.marked_not_coming_at = null;
+      }
+    }
+
+    // Validate at least one field is being updated
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields to update'
+      });
+    }
+
+    // Update participant
+    const { data: participant, error: updateError } = await supabase
+      .from('participants')
+      .update(updates)
+      .eq('id', participant_id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    if (!participant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Participant not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: participant
+    });
+  } catch (error) {
+    console.error('Error updating participant status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}

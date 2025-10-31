@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Plus, Minus, Clock, Users, Share2, Copy } from 'lucide-react';
+import { Plus, Minus, Clock, Users, Share2, Copy, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
@@ -7,6 +7,8 @@ import ItemRow from '../components/items/ItemRow.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import { extractFirstName } from '../utils/sessionTransformers.js';
+import socketService from '../services/socket.js';
+import { updateParticipantStatus } from '../services/api.js';
 
 export default function SessionActiveScreen({
   session,
@@ -49,6 +51,63 @@ export default function SessionActiveScreen({
     }
   }, [notification]);
 
+  // Listen for participant joins and show notification (host only)
+  useEffect(() => {
+    if (!session?.session_id || !currentParticipant?.is_creator) return;
+
+    // Ensure socket is connected before adding listeners
+    if (!socketService.socket) {
+      socketService.connect();
+    }
+
+    const handleParticipantJoinNotification = (participant) => {
+      // Show notification with identity reveal format
+      const firstName = participant.real_name?.split(' ')[0] || participant.nickname;
+      const displayName = participant.real_name
+        ? `${firstName} @ ${participant.nickname}`
+        : participant.nickname;
+
+      setNotification(`${displayName} joined the session`);
+    };
+
+    socketService.onParticipantJoined(handleParticipantJoinNotification);
+
+    return () => {
+      socketService.off('participant-joined', handleParticipantJoinNotification);
+    };
+  }, [session?.session_id, currentParticipant?.is_creator]);
+
+  // Listen for participant status updates (marked as not coming)
+  useEffect(() => {
+    if (!session?.session_id) return;
+
+    // Ensure socket is connected before adding listeners
+    if (!socketService.socket) {
+      socketService.connect();
+    }
+
+    const handleParticipantStatusUpdate = (updatedParticipant) => {
+      // Update local participant state
+      const updatedParticipants = participants.map(p =>
+        p.id === updatedParticipant.id ? { ...p, ...updatedParticipant } : p
+      );
+      onUpdateParticipants(updatedParticipants);
+
+      // Show notification (host only)
+      if (currentParticipant?.is_creator && updatedParticipant.marked_not_coming !== undefined) {
+        const participantName = updatedParticipant.nickname || updatedParticipant.name;
+        const status = updatedParticipant.marked_not_coming ? 'marked as not coming' : 'marked as coming';
+        setNotification(`${participantName} ${status}`);
+      }
+    };
+
+    socketService.on('participant-status-updated', handleParticipantStatusUpdate);
+
+    return () => {
+      socketService.off('participant-status-updated', handleParticipantStatusUpdate);
+    };
+  }, [session?.session_id, participants, currentParticipant?.is_creator, onUpdateParticipants]);
+
   // Compute all items from host + participants
   const allItems = { ...hostItems };
   participants.forEach(p => {
@@ -71,6 +130,13 @@ export default function SessionActiveScreen({
   // Check how many participants have confirmed their lists
   const confirmedParticipants = participants.filter(p => p.items_confirmed).length;
   const hasConfirmedParticipants = confirmedParticipants > 0;
+
+  // Checkpoint logic - count participants who have responded
+  const joinedCount = participants.filter(p => !p.marked_not_coming).length;
+  const notComingCount = participants.filter(p => p.marked_not_coming).length;
+  const expectedCount = session?.expected_participants || 0;
+  const checkpointComplete = expectedCount === 0 || (joinedCount + notComingCount) >= expectedCount;
+  const waitingCount = expectedCount - joinedCount - notComingCount;
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -116,6 +182,41 @@ export default function SessionActiveScreen({
       return p;
     });
     onUpdateParticipants(updatedParticipants);
+  };
+
+  // Handle marking participant as not coming (host only)
+  const handleMarkAsNotComing = async (participant) => {
+    if (!isHost || !participant?.id) return;
+
+    try {
+      const isCurrentlyMarked = participant.marked_not_coming;
+
+      // Update via API
+      await updateParticipantStatus(participant.id, {
+        marked_not_coming: !isCurrentlyMarked
+      });
+
+      // Emit WebSocket event to update all clients
+      socketService.emit('participant-status-updated', {
+        sessionId: session.session_id,
+        participant: {
+          ...participant,
+          marked_not_coming: !isCurrentlyMarked,
+          marked_not_coming_at: !isCurrentlyMarked ? new Date().toISOString() : null
+        }
+      });
+
+      // Update local state optimistically
+      const updatedParticipants = participants.map(p =>
+        p.id === participant.id
+          ? { ...p, marked_not_coming: !isCurrentlyMarked, marked_not_coming_at: !isCurrentlyMarked ? new Date().toISOString() : null }
+          : p
+      );
+      onUpdateParticipants(updatedParticipants);
+    } catch (error) {
+      console.error('Failed to update participant status:', error);
+      alert('Failed to update participant status. Please try again.');
+    }
   };
 
   // PARTICIPANT VIEW - Simplified, locked to their own items
@@ -479,6 +580,29 @@ export default function SessionActiveScreen({
             })}
           </ItemList>
 
+          {/* Mark as Not Coming button - Host only, for participants */}
+          {isHost && selectedParticipant !== 'host' && (() => {
+            const participant = participants.find(p => (p.nickname || p.name) === selectedParticipant);
+            if (!participant) return null;
+
+            const isMarked = participant.marked_not_coming;
+            return (
+              <button
+                onClick={() => handleMarkAsNotComing(participant)}
+                className={`mt-4 w-full border-2 ${
+                  isMarked
+                    ? 'border-green-600 bg-white hover:bg-green-50 text-green-700'
+                    : 'border-red-600 bg-white hover:bg-red-50 text-red-700'
+                } py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+              >
+                <UserX size={18} />
+                <span className="font-semibold">
+                  {isMarked ? 'Mark as Coming' : 'Mark as Not Coming'}
+                </span>
+              </button>
+            );
+          })()}
+
           {/* Add Items button - for participants to add from host's catalog */}
           {selectedParticipant === 'host' && currentParticipant?.is_creator && Object.keys(hostItems).length === 0 && (
             <button
@@ -569,21 +693,36 @@ export default function SessionActiveScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
-        {/* Show confirmation status if participants exist */}
-        {participants.length > 0 && (
+        {/* Checkpoint status indicator */}
+        {expectedCount > 0 && !checkpointComplete && (
+          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-900 font-medium mb-1">
+              ⏳ Waiting for participants
+            </p>
+            <p className="text-xs text-amber-700">
+              {joinedCount} joined, {notComingCount} not coming • {waitingCount} more {waitingCount === 1 ? 'person' : 'people'} expected
+            </p>
+          </div>
+        )}
+
+        {/* Show confirmation status if participants exist and checkpoint complete */}
+        {participants.length > 0 && checkpointComplete && (
           <p className="text-xs text-gray-600 mb-2 text-center">
             {confirmedParticipants > 0
               ? `${confirmedParticipants} of ${participants.length} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
               : 'Waiting for participants to confirm their lists...'}
           </p>
         )}
+
         <button
           onClick={onNavigateToShopping}
-          disabled={Object.keys(allItems).length === 0 || (participants.length > 0 && !hasConfirmedParticipants)}
+          disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (participants.length > 0 && !hasConfirmedParticipants)}
           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          title={participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : ''}
+          title={!checkpointComplete ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}` : (participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : '')}
         >
-          Start shopping
+          {!checkpointComplete
+            ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}...`
+            : 'Start shopping'}
         </button>
       </div>
     </div>

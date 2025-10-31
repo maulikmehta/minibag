@@ -163,6 +163,7 @@ app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.u
 
 // Participants API routes
 app.put('/api/participants/:participant_id/items', participantsAPI.updateParticipantItems);
+app.patch('/api/participants/:participant_id/status', participantsAPI.updateParticipantStatus);
 
 // Payments API routes
 app.post('/api/sessions/:session_id/payments', validatePayment, paymentsAPI.recordPayment);

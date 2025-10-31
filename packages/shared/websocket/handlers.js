@@ -69,6 +69,18 @@ export function setupSocketHandlers(socket, io) {
   });
 
   /**
+   * PARTICIPANT STATUS UPDATED
+   * Broadcast when participant status changes (items_confirmed, marked_not_coming)
+   * Used for checkpoint logic and UI updates
+   */
+  socket.on('participant-status-updated', (data) => {
+    const { sessionId, participant } = data;
+    console.log(`Participant ${participant.id} status updated in session ${sessionId}`);
+    // Broadcast to all clients in the session room
+    io.to(sessionId).emit('participant-status-updated', participant);
+  });
+
+  /**
    * SESSION STATUS UPDATED
    * Broadcast when session status changes (active → shopping → completed)
    * Used for participant tracking screen updates

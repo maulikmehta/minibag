@@ -243,6 +243,20 @@ export async function updateParticipant(participantId, metadata) {
 }
 
 /**
+ * Update participant status (items_confirmed, marked_not_coming)
+ * @param {string} participantId - Participant ID (UUID)
+ * @param {Object} status - Status to update {items_confirmed, marked_not_coming}
+ * @returns {Promise<Object>} Updated participant data
+ */
+export async function updateParticipantStatus(participantId, status) {
+  const response = await apiFetch(`/api/participants/${participantId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(status),
+  });
+  return response.data;
+}
+
+/**
  * Update all items for a participant (bulk update)
  * @param {string} participantId - Participant ID (UUID)
  * @param {Object} items - Object map of {item_id: quantity}
@@ -359,6 +373,7 @@ export default {
 
   // Participant Items
   updateParticipant,
+  updateParticipantStatus,
   updateParticipantItems,
   addParticipantItem,
   updateParticipantItem,

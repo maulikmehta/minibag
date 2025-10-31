@@ -195,6 +195,7 @@ export async function createSession(req, res) {
       title,
       description,
       items = [], // Array of {item_id, quantity, unit}
+      expected_participants = 0, // Number of participants host expects (for checkpoint)
       // New fields for nickname selection
       real_name,
       selected_nickname_id,
@@ -277,6 +278,8 @@ export async function createSession(req, res) {
         title,
         description,
         status: 'open',
+        expected_participants, // Number of participants expected (for checkpoint)
+        checkpoint_complete: expected_participants === 0, // Auto-complete if no participants expected
         host_token // Store host token for creator authentication
       })
       .select()
