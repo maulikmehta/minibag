@@ -42,7 +42,12 @@ export default function SessionActiveScreen({
   const [notification, setNotification] = useState(null);
 
   // Local state for expected participants (for optimistic UI updates)
-  const [localExpectedCount, setLocalExpectedCount] = useState(session?.expected_participants || 0);
+  // null = not set (button disabled), 0 = go solo (no wait), 1-3 = wait for N participants
+  const [localExpectedCount, setLocalExpectedCount] = useState(
+    session?.expected_participants !== undefined && session?.expected_participants !== null
+      ? session.expected_participants
+      : null
+  );
 
   // Auto-dismiss notifications after 3 seconds
   useEffect(() => {
@@ -56,7 +61,11 @@ export default function SessionActiveScreen({
 
   // Sync local expected count with session data
   useEffect(() => {
-    setLocalExpectedCount(session?.expected_participants || 0);
+    setLocalExpectedCount(
+      session?.expected_participants !== undefined && session?.expected_participants !== null
+        ? session.expected_participants
+        : null
+    );
   }, [session?.expected_participants]);
 
   // Listen for participant joins and show notification (host only)
@@ -143,8 +152,17 @@ export default function SessionActiveScreen({
   const joinedCount = participants.filter(p => !p.marked_not_coming).length;
   const notComingCount = participants.filter(p => p.marked_not_coming).length;
   const expectedCount = localExpectedCount; // Use local state for instant checkpoint updates
-  const checkpointComplete = expectedCount === 0 || (joinedCount + notComingCount) >= expectedCount;
-  const waitingCount = expectedCount - joinedCount - notComingCount;
+
+  // Three states: null (not set, disabled), 0 (solo mode, enabled), 1-3 (wait for N people)
+  const checkpointComplete = expectedCount === null
+    ? false // Not set yet - button disabled
+    : expectedCount === 0
+      ? true // Go solo - button enabled immediately
+      : (joinedCount + notComingCount) >= expectedCount; // Wait for expected count
+
+  const waitingCount = expectedCount !== null && expectedCount > 0
+    ? expectedCount - joinedCount - notComingCount
+    : 0;
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -654,8 +672,117 @@ export default function SessionActiveScreen({
                   : 'Invite more friends'}
             </p>
 
+            {/* Expected Participants Input - Item list style with +/- buttons */}
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-base font-medium text-gray-900 mb-1">
+                    How many friends joining?
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {localExpectedCount === null
+                      ? "Set to 0 for solo mode or 1-3 to wait"
+                      : localExpectedCount === 0
+                        ? "Solo mode - Start shopping right away"
+                        : `Wait for ${localExpectedCount} ${localExpectedCount === 1 ? 'friend' : 'friends'} to join/respond`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const newValue = localExpectedCount === null || localExpectedCount === 0
+                        ? null
+                        : localExpectedCount - 1;
+                      setLocalExpectedCount(newValue);
+
+                      if (session?.session_id) {
+                        try {
+                          await fetch(`/api/sessions/${session.session_id}/expected`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ expected_participants: newValue })
+                          });
+                        } catch (error) {
+                          console.error('Failed to update expected participants:', error);
+                          setLocalExpectedCount(
+                            session?.expected_participants !== undefined && session?.expected_participants !== null
+                              ? session.expected_participants
+                              : null
+                          );
+                        }
+                      }
+                    }}
+                    className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
+                  >
+                    <Minus size={16} strokeWidth={2} />
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={localExpectedCount === null ? '' : localExpectedCount}
+                      onChange={async (e) => {
+                        const value = e.target.value === '' ? null : parseInt(e.target.value);
+                        if (value === null || (!isNaN(value) && value >= 0 && value <= 3)) {
+                          setLocalExpectedCount(value);
+
+                          if (session?.session_id) {
+                            try {
+                              await fetch(`/api/sessions/${session.session_id}/expected`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ expected_participants: value })
+                              });
+                            } catch (error) {
+                              console.error('Failed to update expected participants:', error);
+                              setLocalExpectedCount(
+                                session?.expected_participants !== undefined && session?.expected_participants !== null
+                                  ? session.expected_participants
+                                  : null
+                              );
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="-"
+                      className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
+                    />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newValue = localExpectedCount === null
+                        ? 0
+                        : Math.min(3, localExpectedCount + 1);
+                      setLocalExpectedCount(newValue);
+
+                      if (session?.session_id) {
+                        try {
+                          await fetch(`/api/sessions/${session.session_id}/expected`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ expected_participants: newValue })
+                          });
+                        } catch (error) {
+                          console.error('Failed to update expected participants:', error);
+                          setLocalExpectedCount(
+                            session?.expected_participants !== undefined && session?.expected_participants !== null
+                              ? session.expected_participants
+                              : null
+                          );
+                        }
+                      }
+                    }}
+                    disabled={localExpectedCount >= 3}
+                    className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 transition-colors disabled:bg-gray-400 disabled:hover:bg-gray-400"
+                  >
+                    <Plus size={16} className="text-white" strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Invite buttons - WhatsApp + Copy Link */}
-            <div className="flex gap-3 mb-3">
+            <div className="flex gap-3">
               {/* WhatsApp Share Button */}
               <button
                 onClick={handleShare}
@@ -694,49 +821,6 @@ export default function SessionActiveScreen({
                 <Copy size={20} />
               </button>
             </div>
-
-            {/* Expected Participants Input - Show after host has shared/can share */}
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                How many friends joining?
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={localExpectedCount}
-                onChange={async (e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  if (value >= 0 && value <= 20) {
-                    // Update local state immediately for instant UI feedback
-                    setLocalExpectedCount(value);
-
-                    // Sync with API in background
-                    if (session?.session_id) {
-                      try {
-                        await fetch(`/api/sessions/${session.session_id}/expected`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ expected_participants: value })
-                        });
-                      } catch (error) {
-                        console.error('Failed to update expected participants:', error);
-                        // Rollback on error
-                        setLocalExpectedCount(session?.expected_participants || 0);
-                      }
-                    }
-                  }
-                }}
-                placeholder="0"
-                min="0"
-                max="20"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-600 focus:outline-none text-base"
-              />
-              <p className="text-xs text-gray-600 mt-2">
-                {localExpectedCount === 0
-                  ? "Start shopping right away (no waiting)"
-                  : `Shopping starts when ${localExpectedCount} ${localExpectedCount === 1 ? 'friend joins' : 'friends join'}/respond`}
-              </p>
-            </div>
           </div>
         )}
 
@@ -744,18 +828,6 @@ export default function SessionActiveScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
-        {/* Checkpoint status indicator */}
-        {expectedCount > 0 && !checkpointComplete && (
-          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-900 font-medium mb-1">
-              ⏳ Waiting for participants
-            </p>
-            <p className="text-xs text-amber-700">
-              {joinedCount} joined, {notComingCount} not coming • {waitingCount} more {waitingCount === 1 ? 'person' : 'people'} expected
-            </p>
-          </div>
-        )}
-
         {/* Show confirmation status if participants exist and checkpoint complete */}
         {participants.length > 0 && checkpointComplete && (
           <p className="text-xs text-gray-600 mb-2 text-center">
@@ -769,11 +841,19 @@ export default function SessionActiveScreen({
           onClick={onNavigateToShopping}
           disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (participants.length > 0 && !hasConfirmedParticipants)}
           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          title={!checkpointComplete ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}` : (participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : '')}
+          title={
+            expectedCount === null
+              ? 'Choose solo (0) or waiting mode (1-3)'
+              : !checkpointComplete
+                ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}`
+                : (participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : '')
+          }
         >
-          {!checkpointComplete
-            ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}...`
-            : 'Start shopping'}
+          {expectedCount === null
+            ? 'Choose solo or waiting mode above'
+            : !checkpointComplete
+              ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}...`
+              : 'Start shopping'}
         </button>
       </div>
     </div>
