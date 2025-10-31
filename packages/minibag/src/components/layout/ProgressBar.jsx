@@ -30,56 +30,58 @@ function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
   };
 
   return (
-    <div className="flex items-center justify-between mb-6">
-      {steps.map((step, index) => {
-        const isCompleted = step.number < currentStep;
-        const isCurrent = step.number === currentStep;
-        const isFuture = step.number > currentStep;
-        const canTap = canNavigate && !isFuture;
+    <div className="mb-6">
+      <div className="flex items-center">
+        {steps.map((step, index) => {
+          const isCompleted = step.number < currentStep;
+          const isCurrent = step.number === currentStep;
+          const isFuture = step.number > currentStep;
+          const canTap = canNavigate && !isFuture;
 
-        return (
-          <React.Fragment key={step.number}>
-            {/* Step Circle */}
-            <button
-              onClick={() => handleStepClick(step.number)}
-              disabled={!canTap}
-              className={`flex flex-col items-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-            >
-              {/* Circle */}
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                  isCompleted
-                    ? 'bg-green-600 text-white'
-                    : isCurrent
-                    ? 'bg-green-600 text-white ring-4 ring-green-100'
-                    : 'bg-gray-200 text-gray-500'
-                }`}
+          return (
+            <React.Fragment key={step.number}>
+              {/* Step Circle and Label */}
+              <button
+                onClick={() => handleStepClick(step.number)}
+                disabled={!canTap}
+                className={`flex flex-col items-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
               >
-                {isCompleted ? '✓' : step.number}
-              </div>
-              {/* Label */}
-              <p
-                className={`text-xs mt-1.5 font-medium ${
-                  isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
-                }`}
-              >
-                {step.label}
-              </p>
-            </button>
-
-            {/* Connector Line */}
-            {index < steps.length - 1 && (
-              <div className="flex-1 h-1 mx-2 relative top-[-12px]">
+                {/* Circle */}
                 <div
-                  className={`h-full rounded-full transition-all ${
-                    step.number < currentStep ? 'bg-green-600' : 'bg-gray-200'
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                    isCompleted
+                      ? 'bg-green-600 text-white'
+                      : isCurrent
+                      ? 'bg-green-600 text-white ring-4 ring-green-100'
+                      : 'bg-gray-200 text-gray-500'
                   }`}
-                />
-              </div>
-            )}
-          </React.Fragment>
-        );
-      })}
+                >
+                  {isCompleted ? '✓' : step.number}
+                </div>
+                {/* Label */}
+                <p
+                  className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
+                    isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                  }`}
+                >
+                  {step.label}
+                </p>
+              </button>
+
+              {/* Connector Line - thin and touching circles */}
+              {index < steps.length - 1 && (
+                <div className="flex-1 h-0.5 relative">
+                  <div
+                    className={`h-full transition-all ${
+                      step.number < currentStep ? 'bg-green-600' : 'bg-gray-300'
+                    }`}
+                  />
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
