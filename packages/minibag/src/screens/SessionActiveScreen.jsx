@@ -686,6 +686,43 @@ export default function SessionActiveScreen({
                 <Copy size={20} />
               </button>
             </div>
+
+            {/* Expected Participants Input - Show after host has shared/can share */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                How many people are you expecting?
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={expectedCount}
+                onChange={async (e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  if (value >= 0 && value <= 20 && session?.session_id) {
+                    try {
+                      // Update session via API
+                      await fetch(`/api/sessions/${session.session_id}/expected`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ expected_participants: value })
+                      });
+                      // Update local session state would be handled by parent component
+                    } catch (error) {
+                      console.error('Failed to update expected participants:', error);
+                    }
+                  }
+                }}
+                placeholder="0"
+                min="0"
+                max="20"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-600 focus:outline-none text-base"
+              />
+              <p className="text-xs text-gray-600 mt-2">
+                {expectedCount === 0
+                  ? "Set to 0 to start shopping immediately"
+                  : `Shopping will wait for ${expectedCount} ${expectedCount === 1 ? 'person' : 'people'} to respond`}
+              </p>
+            </div>
           </div>
         )}
 

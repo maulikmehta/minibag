@@ -33,7 +33,6 @@ export default function SessionCreateScreen({
 
   // Nickname modal state
   const [hostName, setHostName] = useState('');
-  const [expectedParticipants, setExpectedParticipants] = useState(0);
   const [showHostNicknameModal, setShowHostNicknameModal] = useState(false);
   const [hostNicknameOptions, setHostNicknameOptions] = useState([]);
   const [selectedHostNickname, setSelectedHostNickname] = useState(null);
@@ -163,7 +162,7 @@ export default function SessionCreateScreen({
         title: 'Shopping Run',
         description: 'Group shopping session',
         items: formattedItems,
-        expected_participants: expectedParticipants, // Number of participants expected
+        expected_participants: 0, // Host sets this later on SessionActiveScreen after sharing invite
         // Add nickname selection data
         real_name: hostName,
         selected_nickname_id: selectedHostNickname.id,
@@ -437,33 +436,6 @@ export default function SessionCreateScreen({
                 required
               />
               <p className="text-xs text-gray-500 mt-1">For payment tracking & receipts</p>
-            </div>
-
-            {/* Expected Participants Input */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                How many people are you inviting?
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={expectedParticipants}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (value >= 0 && value <= 20) {
-                    setExpectedParticipants(value);
-                  }
-                }}
-                placeholder="0"
-                min="0"
-                max="20"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {expectedParticipants === 0
-                  ? "You can start shopping immediately"
-                  : `Shopping will wait for ${expectedParticipants} ${expectedParticipants === 1 ? 'person' : 'people'} to join`}
-              </p>
             </div>
 
             {/* Nickname Selection */}

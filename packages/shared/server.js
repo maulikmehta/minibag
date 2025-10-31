@@ -160,6 +160,7 @@ app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, 
 app.get('/api/sessions/:session_id', sessionsAPI.getSession);
 app.post('/api/sessions/:session_id/join', validateJoinSession, sessionsAPI.joinSession);
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
+app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
 
 // Participants API routes
 app.put('/api/participants/:participant_id/items', participantsAPI.updateParticipantItems);

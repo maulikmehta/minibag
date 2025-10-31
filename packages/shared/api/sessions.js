@@ -674,6 +674,56 @@ export async function updateSessionStatus(req, res) {
 }
 
 /**
+ * PATCH /api/sessions/:session_id/expected
+ * Update expected participants count (host-only action)
+ */
+export async function updateExpectedParticipants(req, res) {
+  try {
+    const { session_id } = req.params;
+    const { expected_participants } = req.body;
+
+    // Validation
+    if (typeof expected_participants !== 'number' || expected_participants < 0 || expected_participants > 20) {
+      return res.status(400).json({
+        success: false,
+        error: 'expected_participants must be a number between 0 and 20'
+      });
+    }
+
+    // Update session
+    const { data: session, error: updateError } = await supabase
+      .from('sessions')
+      .update({
+        expected_participants,
+        checkpoint_complete: expected_participants === 0
+      })
+      .eq('session_id', session_id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: session
+    });
+  } catch (error) {
+    console.error('Error updating expected participants:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
  * GET /api/sessions/nickname-options
  * Get 2 available nickname options (1 male, 1 female) for user selection
  */
