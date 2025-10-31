@@ -491,7 +491,7 @@ export default function SessionActiveScreen({
         isInviteExpired={isInviteExpired}
         expectedCount={expectedCount}
         onStartShopping={onNavigateToShopping}
-        disabled={!checkpointComplete || Object.keys(allItems).length === 0 || !allParticipantsConfirmed}
+        disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (expectedCount > 0 && !allParticipantsConfirmed)}
       />
     </div>
   );
