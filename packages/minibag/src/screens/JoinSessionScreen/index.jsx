@@ -85,9 +85,11 @@ export default function JoinSessionScreen({
       onJoinSuccess();
     } catch (error) {
       console.error('❌ Failed to join session:', error);
-      // Check if error is due to full session
+      // Check error type
       if (error.message && error.message.includes('full')) {
         alert('This list is full! Maximum 4 people can shop together.');
+      } else if (error.message && error.message.includes('expired')) {
+        alert('This invite link has expired. The host set a 20-minute timeout. Please ask for a new link.');
       } else {
         alert('Unable to join list. Please check the link and try again.');
       }
@@ -98,6 +100,9 @@ export default function JoinSessionScreen({
 
   // Check if session failed to load or doesn't exist
   const sessionNotFound = !sessionLoading && !session && joinSessionId;
+
+  // Check if invite link has expired
+  const isInviteExpired = session?.is_invite_expired || false;
 
   if (sessionNotFound) {
     return (
@@ -110,6 +115,38 @@ export default function JoinSessionScreen({
           <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Session not found</h1>
           <p className="text-sm text-gray-600 mb-8 text-center max-w-sm">
             This shopping list has expired or doesn't exist anymore.
+          </p>
+
+          <div className="space-y-3 w-full">
+            <button
+              onClick={onNavigateToCreate}
+              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
+            >
+              Start your own list
+            </button>
+            <button
+              onClick={onNavigateToHome}
+              className="w-full py-4 border-2 border-gray-300 hover:border-green-600 text-gray-900 hover:text-green-600 rounded-xl text-base font-medium transition-colors"
+            >
+              Go to home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isInviteExpired) {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen">
+        <AppHeader />
+        <div className="p-6 flex flex-col items-center justify-center min-h-screen">
+          <div className="w-16 h-16 mb-4 rounded-2xl bg-amber-100 flex items-center justify-center">
+            <Clock size={32} className="text-amber-600" strokeWidth={2.5} />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Invite link expired</h1>
+          <p className="text-sm text-gray-600 mb-8 text-center max-w-sm">
+            This invite link expired 20 minutes after the host set their expectations. Please ask the host to send a new invite link.
           </p>
 
           <div className="space-y-3 w-full">

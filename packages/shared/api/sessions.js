@@ -431,10 +431,19 @@ export async function getSession(req, res) {
 
     if (participantsError) throw participantsError;
 
+    // Calculate if invite link has expired (20 minutes after expected_participants_set_at)
+    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
+    const is_invite_expired = session.expected_participants_set_at
+      ? (new Date() - new Date(session.expected_participants_set_at)) >= TIMEOUT_MS
+      : false;
+
     res.json({
       success: true,
       data: {
-        session,
+        session: {
+          ...session,
+          is_invite_expired
+        },
         participants
       }
     });
@@ -485,6 +494,19 @@ export async function joinSession(req, res) {
         success: false,
         error: 'Session is not accepting new participants'
       });
+    }
+
+    // Check if invite link has expired (20 minutes after expected_participants_set_at)
+    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
+    if (session.expected_participants_set_at) {
+      const elapsed = new Date() - new Date(session.expected_participants_set_at);
+      if (elapsed >= TIMEOUT_MS) {
+        return res.status(410).json({
+          success: false,
+          error: 'This invite link has expired. The host set a 20-minute timeout for participants to join.',
+          error_code: 'INVITE_EXPIRED'
+        });
+      }
     }
 
     // Check participant limit (max 20 participants)
@@ -682,19 +704,27 @@ export async function updateExpectedParticipants(req, res) {
     const { session_id } = req.params;
     const { expected_participants } = req.body;
 
-    // Validation
-    if (typeof expected_participants !== 'number' || expected_participants < 0 || expected_participants > 20) {
+    // Validation - allow null, or number between 0 and 3
+    if (expected_participants !== null &&
+        (typeof expected_participants !== 'number' || expected_participants < 0 || expected_participants > 3)) {
       return res.status(400).json({
         success: false,
-        error: 'expected_participants must be a number between 0 and 20'
+        error: 'expected_participants must be null or a number between 0 and 3'
       });
     }
+
+    // Determine expected_participants_set_at timestamp
+    // Timer starts when host sets to 1-3, clears when set to null or 0
+    const expected_participants_set_at = (expected_participants >= 1 && expected_participants <= 3)
+      ? new Date().toISOString()
+      : null;
 
     // Update session
     const { data: session, error: updateError } = await supabase
       .from('sessions')
       .update({
         expected_participants,
+        expected_participants_set_at,
         checkpoint_complete: expected_participants === 0
       })
       .eq('session_id', session_id)

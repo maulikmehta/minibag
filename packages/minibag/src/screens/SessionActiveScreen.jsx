@@ -49,6 +49,9 @@ export default function SessionActiveScreen({
       : null
   );
 
+  // Track if invite has expired (20 minutes after expected_participants_set_at)
+  const [isInviteExpired, setIsInviteExpired] = useState(false);
+
   // Auto-dismiss notifications after 3 seconds
   useEffect(() => {
     if (notification) {
@@ -58,6 +61,31 @@ export default function SessionActiveScreen({
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Check for invite timeout every 30 seconds
+  useEffect(() => {
+    const checkTimeout = () => {
+      if (!session?.expected_participants_set_at) {
+        setIsInviteExpired(false);
+        return;
+      }
+
+      const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
+      const setAt = new Date(session.expected_participants_set_at);
+      const now = new Date();
+      const elapsed = now - setAt;
+
+      setIsInviteExpired(elapsed >= TIMEOUT_MS);
+    };
+
+    // Check immediately
+    checkTimeout();
+
+    // Check every 30 seconds
+    const interval = setInterval(checkTimeout, 30000);
+
+    return () => clearInterval(interval);
+  }, [session?.expected_participants_set_at]);
 
   // Sync local expected count with session data
   useEffect(() => {
@@ -153,14 +181,20 @@ export default function SessionActiveScreen({
   const notComingCount = participants.filter(p => p.marked_not_coming).length;
   const expectedCount = localExpectedCount; // Use local state for instant checkpoint updates
 
+  // Calculate auto-timed-out slots (unfilled expected slots after 20 minutes)
+  const autoTimedOutCount = isInviteExpired && expectedCount > 0
+    ? Math.max(0, expectedCount - joinedCount - notComingCount)
+    : 0;
+
   // Three states: null (not set, disabled), 0 (solo mode, enabled), 1-3 (wait for N people)
+  // After timeout, unfilled slots count as "timed out" to complete checkpoint
   const checkpointComplete = expectedCount === null
     ? false // Not set yet - button disabled
     : expectedCount === 0
       ? true // Go solo - button enabled immediately
-      : (joinedCount + notComingCount) >= expectedCount; // Wait for expected count
+      : (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount; // Wait for expected count or timeout
 
-  const waitingCount = expectedCount !== null && expectedCount > 0
+  const waitingCount = expectedCount !== null && expectedCount > 0 && !isInviteExpired
     ? expectedCount - joinedCount - notComingCount
     : 0;
 
@@ -828,12 +862,16 @@ export default function SessionActiveScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
-        {/* Show confirmation status if participants exist and checkpoint complete */}
-        {participants.length > 0 && checkpointComplete && (
+        {/* Show confirmation status or timeout message */}
+        {checkpointComplete && (
           <p className="text-xs text-gray-600 mb-2 text-center">
-            {confirmedParticipants > 0
-              ? `${confirmedParticipants} of ${participants.length} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
-              : 'Waiting for participants to confirm their lists...'}
+            {isInviteExpired && autoTimedOutCount > 0
+              ? `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`
+              : participants.length > 0
+                ? confirmedParticipants > 0
+                  ? `${confirmedParticipants} of ${participants.length} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
+                  : 'Waiting for participants to confirm their lists...'
+                : ''}
           </p>
         )}
 
