@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingCart, CreditCard, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
@@ -53,28 +53,25 @@ export default function ParticipantTrackingScreen({
   const myTotalWeight = getTotalWeight(myItems);
   const itemCount = Object.keys(myItems).length;
 
-  // Tracking steps - descriptions will use UserIdentity component inline
+  // Tracking steps - using numbers to match main progress bar
   const steps = [
     {
-      id: 1,
+      number: 1,
       label: 'List shared with host',
       descriptionTemplate: 'has your list',
       showIdentity: true,
-      icon: Package,
       status: 'completed', // Always completed if we're on this screen
     },
     {
-      id: 2,
+      number: 2,
       label: 'Shopping in progress',
       description: 'Picking up your items',
-      icon: ShoppingCart,
       status: sessionStatus === 'shopping' || sessionStatus === 'completed' ? 'completed' : 'pending',
     },
     {
-      id: 3,
+      number: 3,
       label: 'All done!',
       description: 'Ready to collect & pay',
-      icon: CreditCard,
       status: sessionStatus === 'completed' ? 'completed' : 'pending',
     },
   ];
@@ -98,16 +95,15 @@ export default function ParticipantTrackingScreen({
           </p>
         </div>
 
-        {/* Progress Tracker - Courier Style */}
+        {/* Progress Tracker - Courier Style with Numbers */}
         <div className="mb-8">
           <div className="relative">
             {steps.map((step, index) => {
-              const Icon = step.icon;
               const isCompleted = step.status === 'completed';
               const isLast = index === steps.length - 1;
 
               return (
-                <div key={step.id} className="relative">
+                <div key={step.number} className="relative">
                   {/* Timeline line */}
                   {!isLast && (
                     <div className={`absolute left-6 top-12 w-0.5 h-16 ${
@@ -117,16 +113,16 @@ export default function ParticipantTrackingScreen({
 
                   {/* Step row */}
                   <div className="flex items-start gap-4 pb-6">
-                    {/* Icon circle */}
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                    {/* Number circle */}
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-base font-semibold ${
                       isCompleted
                         ? 'bg-green-600 text-white'
-                        : 'bg-gray-200 text-gray-400'
+                        : 'bg-gray-200 text-gray-500'
                     }`}>
                       {isCompleted ? (
                         <Check size={24} strokeWidth={3} />
                       ) : (
-                        <Icon size={24} />
+                        step.number
                       )}
                     </div>
 
