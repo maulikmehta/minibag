@@ -1,12 +1,17 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Plus, Minus, Clock, Users, Share2, Copy, UserX } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Plus, Minus, Clock, Users, UserX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
-import { extractFirstName } from '../utils/sessionTransformers.js';
+import SessionParticipantList from '../components/session/SessionParticipantList.jsx';
+import ExpectedParticipantsInput from '../components/session/ExpectedParticipantsInput.jsx';
+import SessionInviteControls from '../components/session/SessionInviteControls.jsx';
+import CheckpointStatus from '../components/session/CheckpointStatus.jsx';
+import { useSessionNotifications } from '../hooks/useSessionNotifications.js';
+import { useParticipantSync } from '../hooks/useParticipantSync.js';
+import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
 import socketService from '../services/socket.js';
 import { updateParticipantStatus } from '../services/api.js';
 
@@ -38,120 +43,25 @@ export default function SessionActiveScreen({
 }) {
   const { t, i18n } = useTranslation();
 
-  // Notification state for join/submission events
-  const [notification, setNotification] = useState(null);
+  // Use custom hooks for state management
+  const { notification, showNotification } = useSessionNotifications();
 
-  // Local state for expected participants (for optimistic UI updates)
-  // null = not set (button disabled), 0 = go solo (no wait), 1-3 = wait for N participants
-  const [localExpectedCount, setLocalExpectedCount] = useState(
-    session?.expected_participants !== undefined && session?.expected_participants !== null
-      ? session.expected_participants
-      : null
-  );
+  useParticipantSync({
+    session,
+    currentParticipant,
+    participants,
+    onUpdateParticipants,
+    onShowNotification: showNotification
+  });
 
-  // Track if invite has expired (20 minutes after expected_participants_set_at)
-  const [isInviteExpired, setIsInviteExpired] = useState(false);
-
-  // Auto-dismiss notifications after 3 seconds
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  // Check for invite timeout every 30 seconds
-  useEffect(() => {
-    const checkTimeout = () => {
-      if (!session?.expected_participants_set_at) {
-        setIsInviteExpired(false);
-        return;
-      }
-
-      const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
-      const setAt = new Date(session.expected_participants_set_at);
-      const now = new Date();
-      const elapsed = now - setAt;
-
-      setIsInviteExpired(elapsed >= TIMEOUT_MS);
-    };
-
-    // Check immediately
-    checkTimeout();
-
-    // Check every 30 seconds
-    const interval = setInterval(checkTimeout, 30000);
-
-    return () => clearInterval(interval);
-  }, [session?.expected_participants_set_at]);
-
-  // Sync local expected count with session data
-  useEffect(() => {
-    setLocalExpectedCount(
-      session?.expected_participants !== undefined && session?.expected_participants !== null
-        ? session.expected_participants
-        : null
-    );
-  }, [session?.expected_participants]);
-
-  // Listen for participant joins and show notification (host only)
-  useEffect(() => {
-    if (!session?.session_id || !currentParticipant?.is_creator) return;
-
-    // Ensure socket is connected before adding listeners
-    if (!socketService.socket) {
-      socketService.connect();
-    }
-
-    const handleParticipantJoinNotification = (participant) => {
-      // Show notification with identity reveal format
-      const firstName = participant.real_name?.split(' ')[0] || participant.nickname;
-      const displayName = participant.real_name
-        ? `${firstName} @ ${participant.nickname}`
-        : participant.nickname;
-
-      setNotification(`${displayName} joined the session`);
-    };
-
-    socketService.onParticipantJoined(handleParticipantJoinNotification);
-
-    return () => {
-      socketService.off('participant-joined', handleParticipantJoinNotification);
-    };
-  }, [session?.session_id, currentParticipant?.is_creator]);
-
-  // Listen for participant status updates (marked as not coming)
-  useEffect(() => {
-    if (!session?.session_id) return;
-
-    // Ensure socket is connected before adding listeners
-    if (!socketService.socket) {
-      socketService.connect();
-    }
-
-    const handleParticipantStatusUpdate = (updatedParticipant) => {
-      // Update local participant state
-      const updatedParticipants = participants.map(p =>
-        p.id === updatedParticipant.id ? { ...p, ...updatedParticipant } : p
-      );
-      onUpdateParticipants(updatedParticipants);
-
-      // Show notification (host only)
-      if (currentParticipant?.is_creator && updatedParticipant.marked_not_coming !== undefined) {
-        const participantName = updatedParticipant.nickname || updatedParticipant.name;
-        const status = updatedParticipant.marked_not_coming ? 'marked as not coming' : 'marked as coming';
-        setNotification(`${participantName} ${status}`);
-      }
-    };
-
-    socketService.on('participant-status-updated', handleParticipantStatusUpdate);
-
-    return () => {
-      socketService.off('participant-status-updated', handleParticipantStatusUpdate);
-    };
-  }, [session?.session_id, participants, currentParticipant?.is_creator, onUpdateParticipants]);
+  const {
+    expectedCount,
+    setExpectedCount,
+    checkpointComplete,
+    waitingCount,
+    autoTimedOutCount,
+    isInviteExpired
+  } = useExpectedParticipants(session, participants);
 
   // Compute all items from host + participants
   const allItems = { ...hostItems };
@@ -175,28 +85,7 @@ export default function SessionActiveScreen({
   // Check how many participants have confirmed their lists
   const confirmedParticipants = participants.filter(p => p.items_confirmed).length;
   const hasConfirmedParticipants = confirmedParticipants > 0;
-
-  // Checkpoint logic - count participants who have responded
-  const joinedCount = participants.filter(p => !p.marked_not_coming).length;
-  const notComingCount = participants.filter(p => p.marked_not_coming).length;
-  const expectedCount = localExpectedCount; // Use local state for instant checkpoint updates
-
-  // Calculate auto-timed-out slots (unfilled expected slots after 20 minutes)
-  const autoTimedOutCount = isInviteExpired && expectedCount > 0
-    ? Math.max(0, expectedCount - joinedCount - notComingCount)
-    : 0;
-
-  // Three states: null (not set, disabled), 0 (solo mode, enabled), 1-3 (wait for N people)
-  // After timeout, unfilled slots count as "timed out" to complete checkpoint
-  const checkpointComplete = expectedCount === null
-    ? false // Not set yet - button disabled
-    : expectedCount === 0
-      ? true // Go solo - button enabled immediately
-      : (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount; // Wait for expected count or timeout
-
-  const waitingCount = expectedCount !== null && expectedCount > 0 && !isInviteExpired
-    ? expectedCount - joinedCount - notComingCount
-    : 0;
+  const allParticipantsConfirmed = participants.length === 0 || participants.every(p => p.items_confirmed);
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -310,59 +199,17 @@ export default function SessionActiveScreen({
           </div>
 
           {/* Avatar circles - Read-only for participants */}
-          <div className="mb-6">
-            <p className="text-sm text-gray-600 mb-4">
-              {`${participants.length + 1} of 4 people`}
-            </p>
-            <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
-              {/* Host slot */}
-              <ParticipantAvatar
-                displayText={session?.creator_nickname || 'Host'}
-                label="Host"
-                isSelected={false}
-                hasItems={Object.keys(hostItems).length > 0}
-                onClick={() => {}} // Non-interactive for participants
-                realName={session?.creator_real_name || null}
-              />
-
-              {/* Participant slots - show 3 slots total */}
-              {[0, 1, 2].map((slotIndex) => {
-                const participant = participants[slotIndex];
-
-                if (participant) {
-                  // Active participant slot
-                  const participantName = participant.nickname || participant.name || `P${slotIndex + 1}`;
-                  const isMe = participant.id === currentParticipant?.id;
-
-                  return (
-                    <ParticipantAvatar
-                      key={participant.id || participantName}
-                      displayText={participantName.slice(0, 2).toUpperCase()}
-                      label={isMe ? `You (${participantName})` : participantName}
-                      isSelected={isMe}
-                      hasItems={Object.keys(participant.items || {}).length > 0}
-                      onClick={() => {}} // Non-interactive for participants
-                      realName={participant.real_name || null}
-                      isConfirmed={participant.items_confirmed || false}
-                    />
-                  );
-                } else {
-                  // Empty slot
-                  return (
-                    <div
-                      key={`empty-${slotIndex}`}
-                      className="flex flex-col items-center flex-shrink-0 opacity-30"
-                    >
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-2 border-2 border-dashed border-gray-300 bg-gray-50">
-                        <Users size={24} className="text-gray-400" />
-                      </div>
-                      <p className="text-xs text-gray-400">Empty</p>
-                    </div>
-                  );
-                }
-              })}
-            </div>
-          </div>
+          <SessionParticipantList
+            participants={participants}
+            hostItems={hostItems}
+            hostNickname={session?.creator_nickname || 'Host'}
+            hostRealName={session?.creator_real_name || null}
+            selectedParticipant={null}
+            onParticipantSelect={() => {}}
+            isHost={false}
+            currentParticipantId={currentParticipant?.id}
+            readOnly={true}
+          />
 
           {/* Weight indicator */}
           <div className="mb-4 flex justify-between items-center">
@@ -565,57 +412,18 @@ export default function SessionActiveScreen({
         </div>
 
         {/* Avatar circles with gradient - 4 slots total */}
-        <div className="mb-6" data-tour="participants-list">
-          <p className="text-sm text-gray-600 mb-4">
-            {`${participants.length + 1} of 4 people`}
-          </p>
-          <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
-            {/* Host slot */}
-            <ParticipantAvatar
-              displayText={actualHostNickname}
-              label={isHost ? "You (Host)" : "Host"}
-              isSelected={selectedParticipant === 'host'}
-              hasItems={Object.keys(hostItems).length > 0}
-              onClick={() => onSelectedParticipantChange('host')}
-              realName={currentParticipant?.real_name || null}
-            />
-
-            {/* Participant slots - show 3 slots total */}
-            {[0, 1, 2].map((slotIndex) => {
-              const participant = participants[slotIndex];
-
-              if (participant) {
-                // Active participant slot
-                // Use nickname property from API, fallback to name
-                const participantName = participant.nickname || participant.name || `P${slotIndex + 1}`;
-                return (
-                  <ParticipantAvatar
-                    key={participant.id || participantName}
-                    displayText={participantName.slice(0, 2).toUpperCase()}
-                    label={participantName}
-                    isSelected={selectedParticipant === participantName}
-                    hasItems={Object.keys(participant.items || {}).length > 0}
-                    onClick={() => onSelectedParticipantChange(participantName)}
-                    realName={participant.real_name || null}
-                    isConfirmed={participant.items_confirmed || false}
-                  />
-                );
-              } else {
-                // Empty slot
-                return (
-                  <div
-                    key={`empty-${slotIndex}`}
-                    className="flex flex-col items-center flex-shrink-0 opacity-30"
-                  >
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center mb-2 border-2 border-dashed border-gray-300 bg-gray-50">
-                      <Users size={24} className="text-gray-400" />
-                    </div>
-                    <p className="text-xs text-gray-400">Empty</p>
-                  </div>
-                );
-              }
-            })}
-          </div>
+        <div data-tour="participants-list">
+          <SessionParticipantList
+            participants={participants}
+            hostItems={hostItems}
+            hostNickname={actualHostNickname}
+            hostRealName={currentParticipant?.real_name || null}
+            selectedParticipant={selectedParticipant}
+            onParticipantSelect={onSelectedParticipantChange}
+            isHost={isHost}
+            currentParticipantId={currentParticipant?.id}
+            readOnly={false}
+          />
         </div>
 
         {/* Selected participant's items */}
@@ -707,190 +515,38 @@ export default function SessionActiveScreen({
             </p>
 
             {/* Expected Participants Input - Item list style with +/- buttons */}
-            <div className="flex items-center gap-3 py-3 px-2">
-              {/* User icon */}
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                <Users size={20} className="text-green-600" />
-              </div>
-
-              {/* Title */}
-              <div className="flex-1 min-w-0">
-                <p className="text-base text-gray-900">How many friends joining?</p>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      const newValue = localExpectedCount === null || localExpectedCount === 0
-                        ? null
-                        : localExpectedCount - 1;
-                      setLocalExpectedCount(newValue);
-
-                      if (session?.session_id) {
-                        try {
-                          await fetch(`/api/sessions/${session.session_id}/expected`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ expected_participants: newValue })
-                          });
-                        } catch (error) {
-                          console.error('Failed to update expected participants:', error);
-                          setLocalExpectedCount(
-                            session?.expected_participants !== undefined && session?.expected_participants !== null
-                              ? session.expected_participants
-                              : null
-                          );
-                        }
-                      }
-                    }}
-                    className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
-                  >
-                    <Minus size={16} strokeWidth={2} />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={localExpectedCount === null ? '' : localExpectedCount}
-                      onChange={async (e) => {
-                        const value = e.target.value === '' ? null : parseInt(e.target.value);
-                        if (value === null || (!isNaN(value) && value >= 0 && value <= 3)) {
-                          setLocalExpectedCount(value);
-
-                          if (session?.session_id) {
-                            try {
-                              await fetch(`/api/sessions/${session.session_id}/expected`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ expected_participants: value })
-                              });
-                            } catch (error) {
-                              console.error('Failed to update expected participants:', error);
-                              setLocalExpectedCount(
-                                session?.expected_participants !== undefined && session?.expected_participants !== null
-                                  ? session.expected_participants
-                                  : null
-                              );
-                            }
-                          }
-                        }
-                      }}
-                      placeholder="-"
-                      className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
-                    />
-                  </div>
-                  <button
-                    onClick={async () => {
-                      const newValue = localExpectedCount === null
-                        ? 0
-                        : Math.min(3, localExpectedCount + 1);
-                      setLocalExpectedCount(newValue);
-
-                      if (session?.session_id) {
-                        try {
-                          await fetch(`/api/sessions/${session.session_id}/expected`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ expected_participants: newValue })
-                          });
-                        } catch (error) {
-                          console.error('Failed to update expected participants:', error);
-                          setLocalExpectedCount(
-                            session?.expected_participants !== undefined && session?.expected_participants !== null
-                              ? session.expected_participants
-                              : null
-                          );
-                        }
-                      }
-                    }}
-                    disabled={localExpectedCount >= 3}
-                    className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 transition-colors disabled:bg-gray-400 disabled:hover:bg-gray-400"
-                  >
-                    <Plus size={16} className="text-white" strokeWidth={2.5} />
-                  </button>
-                </div>
-            </div>
+            <ExpectedParticipantsInput
+              sessionId={session?.session_id}
+              expectedCount={expectedCount}
+              onChange={setExpectedCount}
+            />
 
             {/* Invite buttons - WhatsApp + Copy Link */}
-            <div className="flex gap-3">
-              {/* WhatsApp Share Button */}
-              <button
-                onClick={handleShare}
-                disabled={!session || participants.length >= 3}
-                data-tour="share-button"
-                className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3.5 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <Share2 size={18} strokeWidth={2} />
-                  <span className="font-semibold">Invite friends</span>
-                </div>
-              </button>
-
-              {/* Copy Link Icon Button */}
-              <button
-                onClick={async () => {
-                  if (!session || participants.length >= 3) return;
-                  const shareUrl = `${window.location.origin}/join/${session.session_id}`;
-                  // Use the same message as WhatsApp share
-                  const shareText = t('whatsapp.invitation', {
-                    url: shareUrl,
-                    defaultValue: `Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you.\n\nJoin here: ${shareUrl}`
-                  });
-                  try {
-                    await navigator.clipboard.writeText(shareText);
-                    alert('✓ Invitation copied to clipboard!');
-                  } catch (error) {
-                    // Fallback for browsers that don't support clipboard API
-                    alert(`Copy this message:\n\n${shareText}`);
-                  }
-                }}
-                disabled={!session || participants.length >= 3}
-                className="w-14 h-14 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                title="Copy invite message"
-              >
-                <Copy size={20} />
-              </button>
-            </div>
+            <SessionInviteControls
+              session={session}
+              participantCount={participants.length}
+              onShare={handleShare}
+              disabled={!session || participants.length >= 3}
+            />
           </div>
         )}
 
         {/* Test button removed for field testing */}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
-        {/* Show confirmation status or timeout message */}
-        {checkpointComplete && (
-          <p className="text-xs text-gray-600 mb-2 text-center">
-            {isInviteExpired && autoTimedOutCount > 0
-              ? `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`
-              : participants.length > 0
-                ? confirmedParticipants > 0
-                  ? `${confirmedParticipants} of ${participants.length} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
-                  : 'Waiting for participants to confirm their lists...'
-                : ''}
-          </p>
-        )}
-
-        <button
-          onClick={onNavigateToShopping}
-          disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (participants.length > 0 && !hasConfirmedParticipants)}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          title={
-            expectedCount === null
-              ? 'Set how many friends joining above'
-              : !checkpointComplete
-                ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to join`
-                : (participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : '')
-          }
-        >
-          {expectedCount === null
-            ? 'Start shopping'
-            : !checkpointComplete
-              ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
-              : 'Start shopping'}
-        </button>
-      </div>
+      <CheckpointStatus
+        checkpointComplete={checkpointComplete}
+        waitingCount={waitingCount}
+        participantCount={participants.length}
+        confirmedParticipants={confirmedParticipants}
+        hasConfirmedParticipants={hasConfirmedParticipants}
+        allParticipantsConfirmed={allParticipantsConfirmed}
+        autoTimedOutCount={autoTimedOutCount}
+        isInviteExpired={isInviteExpired}
+        expectedCount={expectedCount}
+        onStartShopping={onNavigateToShopping}
+        disabled={!checkpointComplete || Object.keys(allItems).length === 0 || !allParticipantsConfirmed}
+      />
     </div>
   );
 }
