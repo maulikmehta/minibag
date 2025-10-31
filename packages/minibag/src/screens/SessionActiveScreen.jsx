@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Plus, Minus, Clock, Users, UserX } from 'lucide-react';
+import { Plus, Minus, Clock, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
@@ -12,8 +12,6 @@ import CheckpointStatus from '../components/session/CheckpointStatus.jsx';
 import { useSessionNotifications } from '../hooks/useSessionNotifications.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
-import socketService from '../services/socket.js';
-import { updateParticipantStatus } from '../services/api.js';
 
 export default function SessionActiveScreen({
   session,
@@ -131,41 +129,6 @@ export default function SessionActiveScreen({
       return p;
     });
     onUpdateParticipants(updatedParticipants);
-  };
-
-  // Handle marking participant as not coming (host only)
-  const handleMarkAsNotComing = async (participant) => {
-    if (!isHost || !participant?.id) return;
-
-    try {
-      const isCurrentlyMarked = participant.marked_not_coming;
-
-      // Update via API
-      await updateParticipantStatus(participant.id, {
-        marked_not_coming: !isCurrentlyMarked
-      });
-
-      // Emit WebSocket event to update all clients
-      socketService.emit('participant-status-updated', {
-        sessionId: session.session_id,
-        participant: {
-          ...participant,
-          marked_not_coming: !isCurrentlyMarked,
-          marked_not_coming_at: !isCurrentlyMarked ? new Date().toISOString() : null
-        }
-      });
-
-      // Update local state optimistically
-      const updatedParticipants = participants.map(p =>
-        p.id === participant.id
-          ? { ...p, marked_not_coming: !isCurrentlyMarked, marked_not_coming_at: !isCurrentlyMarked ? new Date().toISOString() : null }
-          : p
-      );
-      onUpdateParticipants(updatedParticipants);
-    } catch (error) {
-      console.error('Failed to update participant status:', error);
-      alert('Failed to update participant status. Please try again.');
-    }
   };
 
   // PARTICIPANT VIEW - Simplified, locked to their own items
@@ -447,29 +410,6 @@ export default function SessionActiveScreen({
               );
             })}
           </ItemList>
-
-          {/* Mark as Not Coming button - Host only, for participants */}
-          {isHost && selectedParticipant !== 'host' && (() => {
-            const participant = participants.find(p => (p.nickname || p.name) === selectedParticipant);
-            if (!participant) return null;
-
-            const isMarked = participant.marked_not_coming;
-            return (
-              <button
-                onClick={() => handleMarkAsNotComing(participant)}
-                className={`mt-4 w-full border-2 ${
-                  isMarked
-                    ? 'border-green-600 bg-white hover:bg-green-50 text-green-700'
-                    : 'border-red-600 bg-white hover:bg-red-50 text-red-700'
-                } py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
-              >
-                <UserX size={18} />
-                <span className="font-semibold">
-                  {isMarked ? 'Mark as Coming' : 'Mark as Not Coming'}
-                </span>
-              </button>
-            );
-          })()}
 
           {/* Add Items button - for participants to add from host's catalog */}
           {selectedParticipant === 'host' && currentParticipant?.is_creator && Object.keys(hostItems).length === 0 && (
