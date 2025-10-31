@@ -878,16 +878,16 @@ export default function SessionActiveScreen({
           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           title={
             expectedCount === null
-              ? 'Choose solo (0) or waiting mode (1-3)'
+              ? 'Set how many friends joining above'
               : !checkpointComplete
-                ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}`
+                ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to join`
                 : (participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : '')
           }
         >
           {expectedCount === null
-            ? 'Choose solo or waiting mode above'
+            ? 'Set how many friends above'
             : !checkpointComplete
-              ? `Waiting for ${waitingCount} more ${waitingCount === 1 ? 'person' : 'people'}...`
+              ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
               : 'Start shopping'}
         </button>
       </div>
