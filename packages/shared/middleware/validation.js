@@ -114,7 +114,7 @@ export const validateSessionStatus = [
     .isLength({ min: 6, max: 8 })
     .withMessage('Invalid session ID format'),
   body('status')
-    .isIn(['pending', 'active', 'completed', 'archived'])
+    .isIn(['open', 'active', 'shopping', 'completed', 'expired', 'cancelled'])
     .withMessage('Invalid session status'),
   validate
 ];
