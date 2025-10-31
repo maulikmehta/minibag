@@ -229,6 +229,20 @@ export async function deletePayment(paymentId) {
 // ============================================================================
 
 /**
+ * Update participant metadata (confirmation status, etc.)
+ * @param {string} participantId - Participant ID (UUID)
+ * @param {Object} metadata - Metadata to update {items_confirmed, etc.}
+ * @returns {Promise<Object>} Updated participant data
+ */
+export async function updateParticipant(participantId, metadata) {
+  const response = await apiFetch(`/api/participants/${participantId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(metadata),
+  });
+  return response.data;
+}
+
+/**
  * Update all items for a participant (bulk update)
  * @param {string} participantId - Participant ID (UUID)
  * @param {Object} items - Object map of {item_id: quantity}
@@ -344,6 +358,7 @@ export default {
   deletePayment,
 
   // Participant Items
+  updateParticipant,
   updateParticipantItems,
   addParticipantItem,
   updateParticipantItem,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 
@@ -15,6 +15,7 @@ import ProgressBar from '../components/layout/ProgressBar.jsx';
  * @param {function} getItemName - Function to get localized item name
  * @param {Object} session - Session object with session_id
  * @param {Object} currentParticipant - Current participant object
+ * @param {function} onUpdateSessionStatus - Update session status callback
  * @param {boolean} showSessionMenu - Whether session menu is open
  * @param {function} onShowSessionMenuChange - Toggle session menu
  * @param {function} onEndSession - End session handler
@@ -32,6 +33,7 @@ function PaymentSplitScreen({
   getItemName,
   session,
   currentParticipant,
+  onUpdateSessionStatus,
   showSessionMenu,
   onShowSessionMenuChange,
   onEndSession,
@@ -41,6 +43,12 @@ function PaymentSplitScreen({
   onLogoClick,
   onDone
 }) {
+  // Update session status to 'completed' when component mounts
+  useEffect(() => {
+    if (session?.session_id && onUpdateSessionStatus) {
+      onUpdateSessionStatus('completed');
+    }
+  }, [session?.session_id, onUpdateSessionStatus]);
   // Calculate total quantities for all items
   const allItems = { ...hostItems };
   participants.forEach(p => {

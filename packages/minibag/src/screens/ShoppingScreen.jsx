@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
@@ -10,6 +10,7 @@ import ProgressBar from '../components/layout/ProgressBar.jsx';
  * Screen for recording payments for purchased items.
  * Host records payment method (UPI/Cash) and amount for each item.
  *
+ * @param {Object} session - Session object
  * @param {Object} hostItems - Items added by host with quantities
  * @param {Array} participants - List of participants with their items
  * @param {Object} itemPayments - Payment information for each item {itemId: {id, method, amount}}
@@ -22,6 +23,7 @@ import ProgressBar from '../components/layout/ProgressBar.jsx';
  * @param {function} setSelectedItemForPayment - Set selected item for payment
  * @param {function} onRecordPayment - Callback when payment is recorded (itemId, payment) => void
  * @param {function} onDoneShopping - Callback when done button clicked
+ * @param {function} onUpdateSessionStatus - Update session status callback
  * @param {boolean} showSessionMenu - Whether session menu is open
  * @param {function} onShowSessionMenuChange - Toggle session menu
  * @param {function} onEndSession - End session handler
@@ -31,6 +33,7 @@ import ProgressBar from '../components/layout/ProgressBar.jsx';
  * @param {function} onLogoClick - Logo click handler
  */
 function ShoppingScreen({
+  session,
   hostItems,
   participants,
   itemPayments,
@@ -43,6 +46,7 @@ function ShoppingScreen({
   setSelectedItemForPayment,
   onRecordPayment,
   onDoneShopping,
+  onUpdateSessionStatus,
   showSessionMenu,
   onShowSessionMenuChange,
   onEndSession,
@@ -51,6 +55,12 @@ function ShoppingScreen({
   onHelpClick,
   onLogoClick
 }) {
+  // Update session status to 'shopping' when component mounts
+  useEffect(() => {
+    if (session?.session_id && onUpdateSessionStatus) {
+      onUpdateSessionStatus('shopping');
+    }
+  }, [session?.session_id, onUpdateSessionStatus]);
   // Calculate total quantities for all items
   const allItems = { ...hostItems };
   participants.forEach(p => {

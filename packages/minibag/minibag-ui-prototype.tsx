@@ -3,7 +3,7 @@ import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRu
 import { useTranslation } from 'react-i18next';
 import useCatalog from './src/hooks/useCatalog.js';
 import useSession from './src/hooks/useSession.js';
-import { recordPayment, getSessionPayments, updateParticipantItems } from './src/services/api.js';
+import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipant, updateSessionStatus } from './src/services/api.js';
 import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
@@ -21,6 +21,7 @@ import SessionActiveScreen from './src/screens/SessionActiveScreen.jsx';
 import SessionCreateScreen from './src/screens/SessionCreateScreen/index.jsx';
 import JoinSessionScreen from './src/screens/JoinSessionScreen/index.jsx';
 import ParticipantAddItemsScreen from './src/screens/ParticipantAddItemsScreen/index.jsx';
+import ParticipantTrackingScreen from './src/screens/ParticipantTrackingScreen.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
 import {
   GUIDED_TOUR_STEPS,
@@ -252,6 +253,23 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         // Cleanup listener
         socketService.socket?.off('payment-updated', handlePaymentUpdate);
       };
+    }
+  }, [session?.session_id]);
+
+  // Handle session status updates (active → shopping → completed)
+  const handleUpdateSessionStatus = useCallback(async (status) => {
+    if (!session?.session_id) return;
+
+    try {
+      // Update status via API
+      await updateSessionStatus(session.session_id, status);
+
+      // Emit WebSocket event to notify all participants
+      socketService.emitSessionStatusUpdate(status);
+
+      console.log(`Session status updated to: ${status}`);
+    } catch (error) {
+      console.error('Failed to update session status:', error);
     }
   }, [session?.session_id]);
 
@@ -532,6 +550,27 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onNavigateToHostCreate={() => setCurrentScreen('host-create')}
         onNavigateToParticipantAddItems={() => setCurrentScreen('participant-add-items')}
         onNavigateToShopping={() => setCurrentScreen('shopping')}
+        onNavigateToTracking={async () => {
+          // Mark participant as confirmed
+          if (currentParticipant?.id) {
+            try {
+              await updateParticipant(currentParticipant.id, { items_confirmed: true });
+              // Emit WebSocket event to notify host
+              socketService.emitParticipantItemsUpdated(
+                currentParticipant.id,
+                participants.find(p => p.id === currentParticipant.id)?.items || {},
+                {
+                  real_name: currentParticipant.real_name,
+                  nickname: currentParticipant.nickname,
+                  items_confirmed: true
+                }
+              );
+            } catch (error) {
+              console.error('Failed to update participant confirmation:', error);
+            }
+          }
+          setCurrentScreen('participant-tracking');
+        }}
         onNavigateToStep={(step) => {
           // Handle progress bar step navigation
           if (step === 1) {
@@ -589,10 +628,28 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     );
   }
 
+  // SCREEN: PARTICIPANT TRACKING (Courier-style order tracking)
+  if (currentScreen === 'participant-tracking') {
+    return (
+      <ParticipantTrackingScreen
+        session={session}
+        participant={currentParticipant}
+        items={VEGETABLES}
+        getItemName={getItemName}
+        getTotalWeight={getTotalWeight}
+        onViewBill={() => setCurrentScreen('participant-bill')}
+        onLanguageChange={handleLanguageChange}
+        onHelpClick={() => {}}
+        onLogoClick={() => setCurrentScreen('home')}
+      />
+    );
+  }
+
   // SCREEN 3: SHOPPING (Payment Recording)
   if (currentScreen === 'shopping') {
     return (
       <ShoppingScreen
+        session={session}
         hostItems={hostItems}
         participants={participants}
         itemPayments={itemPayments}
@@ -631,6 +688,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           }
         }}
         onDoneShopping={() => setCurrentScreen('payment-split')}
+        onUpdateSessionStatus={handleUpdateSessionStatus}
         showSessionMenu={showSessionMenu}
         onShowSessionMenuChange={setShowSessionMenu}
         onEndSession={() => {
@@ -659,6 +717,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         getItemName={getItemName}
         session={session}
         currentParticipant={currentParticipant}
+        onUpdateSessionStatus={handleUpdateSessionStatus}
         showSessionMenu={showSessionMenu}
         onShowSessionMenuChange={setShowSessionMenu}
         onEndSession={() => {

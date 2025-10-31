@@ -69,6 +69,18 @@ export function setupSocketHandlers(socket, io) {
   });
 
   /**
+   * SESSION STATUS UPDATED
+   * Broadcast when session status changes (active → shopping → completed)
+   * Used for participant tracking screen updates
+   */
+  socket.on('session-status-updated', (data) => {
+    const { sessionId, status } = data;
+    console.log(`Session ${sessionId} status updated to: ${status}`);
+    // Broadcast to all clients in the session room
+    io.to(sessionId).emit('session-status-updated', { status });
+  });
+
+  /**
    * SESSION UPDATE
    * Broadcast general session updates (status, metadata, etc.)
    */

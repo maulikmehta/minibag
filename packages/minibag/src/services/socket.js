@@ -138,11 +138,19 @@ class SocketService {
   }
 
   /**
-   * Listen for session status changes
+   * Listen for session status changes (legacy)
    * @param {Function} callback - (status) => void
    */
   onSessionStatusChanged(callback) {
     this.on('session-status-changed', callback);
+  }
+
+  /**
+   * Listen for session status updates (active → shopping → completed)
+   * @param {Function} callback - (data) => void, data = { status }
+   */
+  onSessionStatusUpdated(callback) {
+    this.on('session-status-updated', callback);
   }
 
   /**
@@ -221,11 +229,23 @@ class SocketService {
   }
 
   /**
-   * Notify session status change
+   * Notify session status change (legacy)
    * @param {string} status - New status
    */
   emitSessionStatusChange(status) {
     this.emit('session-status-changed', status);
+  }
+
+  /**
+   * Notify session status update (active → shopping → completed)
+   * @param {string} status - New status ('active', 'shopping', 'completed')
+   */
+  emitSessionStatusUpdate(status) {
+    if (!this.currentSessionId) {
+      console.error('Cannot emit session-status-updated: no session');
+      return;
+    }
+    this.emit('session-status-updated', { status });
   }
 
   /**

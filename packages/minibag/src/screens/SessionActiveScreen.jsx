@@ -21,6 +21,7 @@ export default function SessionActiveScreen({
   onNavigateToHostCreate,
   onNavigateToParticipantAddItems,
   onNavigateToShopping,
+  onNavigateToTracking, // For participant confirmation navigation
   onNavigateToStep,
   onEndSession,
   onUpdateParticipants, // For updating participant items
@@ -66,6 +67,10 @@ export default function SessionActiveScreen({
 
   // Determine if current user is host
   const isHost = currentParticipant?.is_creator || false;
+
+  // Check how many participants have confirmed their lists
+  const confirmedParticipants = participants.filter(p => p.items_confirmed).length;
+  const hasConfirmedParticipants = confirmedParticipants > 0;
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -331,7 +336,7 @@ export default function SessionActiveScreen({
 
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
           <button
-            onClick={onNavigateToShopping}
+            onClick={onNavigateToTracking}
             disabled={Object.keys(myItems).length === 0}
             className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
@@ -564,10 +569,19 @@ export default function SessionActiveScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
+        {/* Show confirmation status if participants exist */}
+        {participants.length > 0 && (
+          <p className="text-xs text-gray-600 mb-2 text-center">
+            {confirmedParticipants > 0
+              ? `${confirmedParticipants} of ${participants.length} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
+              : 'Waiting for participants to confirm their lists...'}
+          </p>
+        )}
         <button
           onClick={onNavigateToShopping}
-          disabled={Object.keys(allItems).length === 0}
+          disabled={Object.keys(allItems).length === 0 || (participants.length > 0 && !hasConfirmedParticipants)}
           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          title={participants.length > 0 && !hasConfirmedParticipants ? 'Wait for at least one participant to confirm their list' : ''}
         >
           Start shopping
         </button>
