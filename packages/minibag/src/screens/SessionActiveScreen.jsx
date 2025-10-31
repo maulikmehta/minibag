@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Plus, Minus, Clock, Users, Share2, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ParticipantAvatar from '../components/session/ParticipantAvatar.jsx';
@@ -6,6 +6,7 @@ import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
+import { extractFirstName } from '../utils/sessionTransformers.js';
 
 export default function SessionActiveScreen({
   session,
@@ -33,6 +34,19 @@ export default function SessionActiveScreen({
   onLogoClick
 }) {
   const { t, i18n } = useTranslation();
+
+  // Notification state for join/submission events
+  const [notification, setNotification] = useState(null);
+
+  // Auto-dismiss notifications after 3 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Compute all items from host + participants
   const allItems = { ...hostItems };
@@ -142,6 +156,7 @@ export default function SessionActiveScreen({
                 isSelected={false}
                 hasItems={Object.keys(hostItems).length > 0}
                 onClick={() => {}} // Non-interactive for participants
+                realName={session?.creator_real_name || null}
               />
 
               {/* Participant slots - show 3 slots total */}
@@ -161,6 +176,8 @@ export default function SessionActiveScreen({
                       isSelected={isMe}
                       hasItems={Object.keys(participant.items || {}).length > 0}
                       onClick={() => {}} // Non-interactive for participants
+                      realName={participant.real_name || null}
+                      isConfirmed={participant.items_confirmed || false}
                     />
                   );
                 } else {
@@ -338,6 +355,21 @@ export default function SessionActiveScreen({
         onHelpClick={onHelpClick}
         onLogoClick={onLogoClick}
       />
+
+      {/* Toast Notification */}
+      {notification && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full px-6 animate-fade-in">
+          <div className="bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium">{notification}</p>
+          </div>
+        </div>
+      )}
+
       <div className="p-6 pt-20">
         {/* Progress Bar - Only show for host */}
         {currentParticipant?.is_creator && (
@@ -379,6 +411,7 @@ export default function SessionActiveScreen({
               isSelected={selectedParticipant === 'host'}
               hasItems={Object.keys(hostItems).length > 0}
               onClick={() => onSelectedParticipantChange('host')}
+              realName={currentParticipant?.real_name || null}
             />
 
             {/* Participant slots - show 3 slots total */}
@@ -397,6 +430,8 @@ export default function SessionActiveScreen({
                     isSelected={selectedParticipant === participantName}
                     hasItems={Object.keys(participant.items || {}).length > 0}
                     onClick={() => onSelectedParticipantChange(participantName)}
+                    realName={participant.real_name || null}
+                    isConfirmed={participant.items_confirmed || false}
                   />
                 );
               } else {
@@ -462,58 +497,6 @@ export default function SessionActiveScreen({
           )}
         </div>
 
-        {/* Aggregated Demand - Show all items with breakdown */}
-        {currentParticipant?.is_creator && Object.keys(allItems).length > 0 && (
-          <div className="mb-6">
-            <p className="text-lg font-semibold text-gray-900 mb-4">Shopping List (Aggregated)</p>
-            <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
-              {Object.entries(allItems).map(([itemId, totalQty]) => {
-                const veg = items.find(v => v.id === itemId);
-                const hostQty = hostItems[itemId] || 0;
-
-                // Get participant quantities for this item
-                const participantQtys = participants
-                  .filter(p => p.items && p.items[itemId])
-                  .map(p => ({
-                    name: p.nickname || p.name,
-                    qty: p.items[itemId]
-                  }));
-
-                return (
-                  <div key={itemId} className="p-3">
-                    <div className="flex items-center gap-3 mb-2">
-                      {veg?.thumbnail_url || veg?.img ? (
-                        <img
-                          src={veg.thumbnail_url || veg.img}
-                          alt={veg?.name}
-                          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
-                          🥬
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <p className="text-base font-semibold text-gray-900">{getItemName(veg)}</p>
-                        <p className="text-sm text-gray-600">Total: {totalQty}kg</p>
-                      </div>
-                    </div>
-
-                    {/* Breakdown by person */}
-                    <div className="ml-13 mt-1 text-xs text-gray-500 space-y-0.5">
-                      {hostQty > 0 && (
-                        <p>• You: {hostQty}kg</p>
-                      )}
-                      {participantQtys.map((p, idx) => (
-                        <p key={idx}>• {p.name}: {p.qty}kg</p>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Group total */}
         <div className="border-t-2 border-gray-900 pt-4 mb-6">

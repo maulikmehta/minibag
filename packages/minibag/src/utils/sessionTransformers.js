@@ -95,3 +95,14 @@ export function transformSessionData(session, apiParticipants) {
     participants: extractNonHostParticipants(apiParticipants)
   };
 }
+
+/**
+ * Extract first name from full name
+ *
+ * @param {string} real_name - Full name (e.g., "Maulik Patel")
+ * @returns {string|null} First name (e.g., "Maulik") or null if undefined
+ */
+export function extractFirstName(real_name) {
+  if (!real_name) return null;
+  return real_name.split(' ')[0];
+}

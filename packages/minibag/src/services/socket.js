@@ -182,13 +182,18 @@ class SocketService {
    * Notify that participant items have been updated
    * @param {string} participantId - Participant ID
    * @param {Object} items - Updated items map
+   * @param {Object} metadata - Optional participant metadata (real_name, nickname, items_confirmed)
    */
-  emitParticipantItemsUpdated(participantId, items) {
+  emitParticipantItemsUpdated(participantId, items, metadata = {}) {
     if (!this.currentSessionId) {
       console.error('Cannot emit participant-items-updated: no session');
       return;
     }
-    this.emit('participant-items-updated', { participantId, items });
+    this.emit('participant-items-updated', {
+      participantId,
+      items,
+      ...metadata // Include real_name, nickname, items_confirmed for notifications
+    });
   }
 
   /**
