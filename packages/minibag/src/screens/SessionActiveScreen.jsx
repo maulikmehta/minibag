@@ -885,7 +885,7 @@ export default function SessionActiveScreen({
           }
         >
           {expectedCount === null
-            ? 'Set how many friends above'
+            ? 'Start shopping'
             : !checkpointComplete
               ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
               : 'Start shopping'}
