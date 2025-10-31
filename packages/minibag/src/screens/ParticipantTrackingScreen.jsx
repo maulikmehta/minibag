@@ -3,6 +3,7 @@ import { Package, ShoppingCart, CreditCard, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
+import UserIdentity from '../components/UserIdentity.jsx';
 import { extractFirstName } from '../utils/sessionTransformers.js';
 
 /**
@@ -46,19 +47,19 @@ export default function ParticipantTrackingScreen({
   const host = participants?.find(p => p.is_creator);
   const hostFirstName = extractFirstName(host?.real_name) || host?.nickname || 'Host';
   const hostNickname = host?.nickname || 'Host';
-  const hostDisplayName = host?.real_name ? `${hostFirstName} @ ${hostNickname}` : hostNickname;
 
   // Participant's items
   const myItems = participant?.items || {};
   const myTotalWeight = getTotalWeight(myItems);
   const itemCount = Object.keys(myItems).length;
 
-  // Tracking steps
+  // Tracking steps - descriptions will use UserIdentity component inline
   const steps = [
     {
       id: 1,
       label: 'List shared with host',
-      description: `${hostDisplayName} has your list`,
+      descriptionTemplate: 'has your list',
+      showIdentity: true,
       icon: Package,
       status: 'completed', // Always completed if we're on this screen
     },
@@ -137,7 +138,18 @@ export default function ParticipantTrackingScreen({
                         {step.label}
                       </p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {step.description}
+                        {step.showIdentity ? (
+                          <>
+                            <UserIdentity
+                              realName={host?.real_name}
+                              nickname={hostNickname}
+                              className="text-sm"
+                            />{' '}
+                            {step.descriptionTemplate}
+                          </>
+                        ) : (
+                          step.description
+                        )}
                       </p>
                       {isCompleted && (
                         <div className="mt-1">
@@ -194,7 +206,11 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-blue-800">
               <span className="font-semibold">Sit tight!</span>
               <br />
-              {hostFirstName} will head to the store soon. We'll update you when shopping starts.
+              <UserIdentity
+                realName={host?.real_name}
+                nickname={hostNickname}
+                className="text-sm text-blue-900"
+              /> will head to the store soon. We'll update you when shopping starts.
             </p>
           </div>
         )}
@@ -204,7 +220,11 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-amber-800">
               <span className="font-semibold">On it!</span>
               <br />
-              {hostFirstName} is at the store picking up your items right now.
+              <UserIdentity
+                realName={host?.real_name}
+                nickname={hostNickname}
+                className="text-sm text-amber-900"
+              /> is at the store picking up your items right now.
             </p>
           </div>
         )}
