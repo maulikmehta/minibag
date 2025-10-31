@@ -81,9 +81,11 @@ export default function SessionActiveScreen({
   const isHost = currentParticipant?.is_creator || false;
 
   // Check how many participants have confirmed their lists
-  const confirmedParticipants = participants.filter(p => p.items_confirmed).length;
+  // Only count participants who are actually participating (not marked as not coming)
+  const activeParticipants = participants.filter(p => !p.marked_not_coming);
+  const confirmedParticipants = activeParticipants.filter(p => p.items_confirmed).length;
   const hasConfirmedParticipants = confirmedParticipants > 0;
-  const allParticipantsConfirmed = participants.length === 0 || participants.every(p => p.items_confirmed);
+  const allParticipantsConfirmed = activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed);
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -477,7 +479,7 @@ export default function SessionActiveScreen({
       <CheckpointStatus
         checkpointComplete={checkpointComplete}
         waitingCount={waitingCount}
-        participantCount={participants.length}
+        participantCount={activeParticipants.length}
         confirmedParticipants={confirmedParticipants}
         hasConfirmedParticipants={hasConfirmedParticipants}
         allParticipantsConfirmed={allParticipantsConfirmed}
