@@ -98,6 +98,39 @@ export default function JoinSessionScreen({
     }
   };
 
+  // Handle declining a session
+  const handleDeclineSession = async () => {
+    // If no name/nickname selected, just navigate away
+    if (!participantName.trim() || !selectedNickname) {
+      onNavigateToHome();
+      return;
+    }
+
+    try {
+      setJoiningSession(true);
+
+      // Join session with marked_not_coming: true to notify host of decline
+      await joinSession(joinSessionId, [], {
+        real_name: participantName,
+        selected_nickname_id: selectedNickname.id,
+        selected_nickname: selectedNickname.nickname,
+        selected_avatar_emoji: selectedNickname.avatar_emoji,
+        marked_not_coming: true
+      });
+
+      console.log('✅ Declined session - host notified');
+
+      // Navigate to home
+      onNavigateToHome();
+    } catch (error) {
+      console.error('❌ Failed to decline session:', error);
+      // Still navigate away even if API fails
+      onNavigateToHome();
+    } finally {
+      setJoiningSession(false);
+    }
+  };
+
   // Check if session failed to load or doesn't exist
   const sessionNotFound = !sessionLoading && !session && joinSessionId;
 
@@ -287,11 +320,11 @@ export default function JoinSessionScreen({
 
         {/* Decline Button */}
         <button
-          onClick={onNavigateToHome}
+          onClick={handleDeclineSession}
           disabled={joiningSession}
           className="w-full px-6 py-4 border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-900 text-base font-medium rounded-xl transition-all flex items-center justify-center gap-2"
         >
-          No thanks, maybe next time
+          {joiningSession ? 'Processing...' : 'No thanks, maybe next time'}
         </button>
 
         {/* Error Display */}
