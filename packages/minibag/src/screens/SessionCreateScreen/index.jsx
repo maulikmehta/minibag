@@ -162,7 +162,7 @@ export default function SessionCreateScreen({
         title: 'Shopping Run',
         description: 'Group shopping session',
         items: formattedItems,
-        expected_participants: 0, // Host sets this later on SessionActiveScreen after sharing invite
+        expected_participants: null, // Host must choose on SessionActiveScreen: null (not set) -> 0 (solo) or 1-3 (wait)
         // Add nickname selection data
         real_name: hostName,
         selected_nickname_id: selectedHostNickname.id,

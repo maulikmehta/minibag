@@ -707,21 +707,19 @@ export default function SessionActiveScreen({
             </p>
 
             {/* Expected Participants Input - Item list style with +/- buttons */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-base font-medium text-gray-900 mb-1">
-                    How many friends joining?
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {localExpectedCount === null
-                      ? "Set to 0 for solo mode or 1-3 to wait"
-                      : localExpectedCount === 0
-                        ? "Solo mode - Start shopping right away"
-                        : `Wait for ${localExpectedCount} ${localExpectedCount === 1 ? 'friend' : 'friends'} to join/respond`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 py-3 px-2">
+              {/* User icon */}
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                <Users size={20} className="text-green-600" />
+              </div>
+
+              {/* Title */}
+              <div className="flex-1 min-w-0">
+                <p className="text-base text-gray-900">How many friends joining?</p>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-2">
                   <button
                     onClick={async () => {
                       const newValue = localExpectedCount === null || localExpectedCount === 0
@@ -812,7 +810,6 @@ export default function SessionActiveScreen({
                     <Plus size={16} className="text-white" strokeWidth={2.5} />
                   </button>
                 </div>
-              </div>
             </div>
 
             {/* Invite buttons - WhatsApp + Copy Link */}

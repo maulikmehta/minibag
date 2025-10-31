@@ -195,7 +195,7 @@ export async function createSession(req, res) {
       title,
       description,
       items = [], // Array of {item_id, quantity, unit}
-      expected_participants = 0, // Number of participants host expects (for checkpoint)
+      expected_participants = null, // Number of participants host expects (null = not set, forces choice)
       // New fields for nickname selection
       real_name,
       selected_nickname_id,
