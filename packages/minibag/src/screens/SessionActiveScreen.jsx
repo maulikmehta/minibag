@@ -41,6 +41,9 @@ export default function SessionActiveScreen({
   // Notification state for join/submission events
   const [notification, setNotification] = useState(null);
 
+  // Local state for expected participants (for optimistic UI updates)
+  const [localExpectedCount, setLocalExpectedCount] = useState(session?.expected_participants || 0);
+
   // Auto-dismiss notifications after 3 seconds
   useEffect(() => {
     if (notification) {
@@ -50,6 +53,11 @@ export default function SessionActiveScreen({
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Sync local expected count with session data
+  useEffect(() => {
+    setLocalExpectedCount(session?.expected_participants || 0);
+  }, [session?.expected_participants]);
 
   // Listen for participant joins and show notification (host only)
   useEffect(() => {
@@ -134,7 +142,7 @@ export default function SessionActiveScreen({
   // Checkpoint logic - count participants who have responded
   const joinedCount = participants.filter(p => !p.marked_not_coming).length;
   const notComingCount = participants.filter(p => p.marked_not_coming).length;
-  const expectedCount = session?.expected_participants || 0;
+  const expectedCount = localExpectedCount; // Use local state for instant checkpoint updates
   const checkpointComplete = expectedCount === 0 || (joinedCount + notComingCount) >= expectedCount;
   const waitingCount = expectedCount - joinedCount - notComingCount;
 
@@ -690,25 +698,31 @@ export default function SessionActiveScreen({
             {/* Expected Participants Input - Show after host has shared/can share */}
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <label className="block text-sm font-medium text-gray-900 mb-2">
-                How many people are you expecting?
+                How many friends joining?
               </label>
               <input
                 type="number"
                 inputMode="numeric"
-                value={expectedCount}
+                value={localExpectedCount}
                 onChange={async (e) => {
                   const value = parseInt(e.target.value) || 0;
-                  if (value >= 0 && value <= 20 && session?.session_id) {
-                    try {
-                      // Update session via API
-                      await fetch(`/api/sessions/${session.session_id}/expected`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ expected_participants: value })
-                      });
-                      // Update local session state would be handled by parent component
-                    } catch (error) {
-                      console.error('Failed to update expected participants:', error);
+                  if (value >= 0 && value <= 20) {
+                    // Update local state immediately for instant UI feedback
+                    setLocalExpectedCount(value);
+
+                    // Sync with API in background
+                    if (session?.session_id) {
+                      try {
+                        await fetch(`/api/sessions/${session.session_id}/expected`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ expected_participants: value })
+                        });
+                      } catch (error) {
+                        console.error('Failed to update expected participants:', error);
+                        // Rollback on error
+                        setLocalExpectedCount(session?.expected_participants || 0);
+                      }
                     }
                   }
                 }}
@@ -718,9 +732,9 @@ export default function SessionActiveScreen({
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-600 focus:outline-none text-base"
               />
               <p className="text-xs text-gray-600 mt-2">
-                {expectedCount === 0
-                  ? "Set to 0 to start shopping immediately"
-                  : `Shopping will wait for ${expectedCount} ${expectedCount === 1 ? 'person' : 'people'} to respond`}
+                {localExpectedCount === 0
+                  ? "Start shopping right away (no waiting)"
+                  : `Shopping starts when ${localExpectedCount} ${localExpectedCount === 1 ? 'friend joins' : 'friends join'}/respond`}
               </p>
             </div>
           </div>
