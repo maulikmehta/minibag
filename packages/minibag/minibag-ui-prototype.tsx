@@ -634,6 +634,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       <ParticipantTrackingScreen
         session={session}
         participant={currentParticipant}
+        participants={apiParticipants}
         items={VEGETABLES}
         getItemName={getItemName}
         getTotalWeight={getTotalWeight}

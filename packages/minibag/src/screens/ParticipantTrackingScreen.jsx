@@ -3,6 +3,7 @@ import { Package, ShoppingCart, CreditCard, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
+import { extractFirstName } from '../utils/sessionTransformers.js';
 
 /**
  * ParticipantTrackingScreen Component
@@ -15,6 +16,7 @@ import ItemRow from '../components/items/ItemRow.jsx';
  *
  * @param {Object} session - Session data
  * @param {Object} participant - Current participant data
+ * @param {Array} participants - All participants (including host)
  * @param {Array} items - Item catalog
  * @param {Function} getItemName - Get item name helper
  * @param {Function} getTotalWeight - Calculate total weight helper
@@ -26,6 +28,7 @@ import ItemRow from '../components/items/ItemRow.jsx';
 export default function ParticipantTrackingScreen({
   session,
   participant,
+  participants,
   items,
   getItemName,
   getTotalWeight,
@@ -39,6 +42,12 @@ export default function ParticipantTrackingScreen({
   // Session status from API: 'active', 'shopping', 'completed'
   const sessionStatus = session?.status || 'active';
 
+  // Find the host participant
+  const host = participants?.find(p => p.is_creator);
+  const hostFirstName = extractFirstName(host?.real_name) || host?.nickname || 'Host';
+  const hostNickname = host?.nickname || 'Host';
+  const hostDisplayName = host?.real_name ? `${hostFirstName} @ ${hostNickname}` : hostNickname;
+
   // Participant's items
   const myItems = participant?.items || {};
   const myTotalWeight = getTotalWeight(myItems);
@@ -49,7 +58,7 @@ export default function ParticipantTrackingScreen({
     {
       id: 1,
       label: 'List shared with host',
-      description: 'Host has your list',
+      description: `${hostDisplayName} has your list`,
       icon: Package,
       status: 'completed', // Always completed if we're on this screen
     },
@@ -185,7 +194,7 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-blue-800">
               <span className="font-semibold">Sit tight!</span>
               <br />
-              Host will head to the store soon. We'll update you when shopping starts.
+              {hostFirstName} will head to the store soon. We'll update you when shopping starts.
             </p>
           </div>
         )}
@@ -195,7 +204,7 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-amber-800">
               <span className="font-semibold">On it!</span>
               <br />
-              Host is at the store picking up your items right now.
+              {hostFirstName} is at the store picking up your items right now.
             </p>
           </div>
         )}
