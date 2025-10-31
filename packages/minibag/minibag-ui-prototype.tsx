@@ -157,6 +157,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       const { hostItems: transformedHostItems, participants: transformedParticipants } =
         transformSessionData(session, apiParticipants);
 
+      // Always sync from API as source of truth
       setHostItems(transformedHostItems);
 
       // If current user is a participant, restore their items from localStorage
@@ -456,10 +457,9 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         getItemSubtitles={getItemSubtitles}
         getTotalWeight={getTotalWeight}
         initialHostItems={hostItems}
-        onSessionCreated={(items) => {
-          if (items) {
-            setHostItems(items);
-          }
+        onSessionCreated={() => {
+          // Session and items are already set by createSession in useSession hook
+          // useEffect will sync the data automatically when session state updates
           setCurrentScreen('session-active');
         }}
         onNavigateToStep={(step) => {

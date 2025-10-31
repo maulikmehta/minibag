@@ -189,12 +189,12 @@ export function useSession(sessionId = null) {
       // Persist session to localStorage
       persistSession(result.session, result.participant);
 
-      // Notify others via WebSocket
-      socketService.emitParticipantJoined(result.participant);
-
-      // Join WebSocket room
+      // Join WebSocket room first (sets currentSessionId needed for emit)
       socketService.joinSessionRoom(id);
       setConnected(true);
+
+      // Notify others via WebSocket (must be after joinSessionRoom)
+      socketService.emitParticipantJoined(result.participant);
 
       // Reload full session data
       await loadSession(id);

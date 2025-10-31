@@ -48,22 +48,22 @@ export default function ParticipantTrackingScreen({
   const steps = [
     {
       id: 1,
-      label: 'List submitted to host',
-      description: 'Your items are with the host',
+      label: 'List shared with host',
+      description: 'Host has your list',
       icon: Package,
       status: 'completed', // Always completed if we're on this screen
     },
     {
       id: 2,
-      label: 'Host is shopping now',
-      description: 'Buying items from the store',
+      label: 'Shopping in progress',
+      description: 'Picking up your items',
       icon: ShoppingCart,
       status: sessionStatus === 'shopping' || sessionStatus === 'completed' ? 'completed' : 'pending',
     },
     {
       id: 3,
-      label: 'Shopping complete',
-      description: 'Ready to pay for your items',
+      label: 'All done!',
+      description: 'Ready to collect & pay',
       icon: CreditCard,
       status: sessionStatus === 'completed' ? 'completed' : 'pending',
     },
@@ -82,9 +82,9 @@ export default function ParticipantTrackingScreen({
       <div className="p-6 pt-20">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Tracking</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Your List Status</h1>
           <p className="text-sm text-gray-600">
-            Track your shopping session progress
+            See where your items are
           </p>
         </div>
 
@@ -150,7 +150,7 @@ export default function ParticipantTrackingScreen({
         <div className="mb-6">
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-gray-900">Your Order</h2>
+              <h2 className="text-base font-semibold text-gray-900">Your Items</h2>
               <div className="text-sm text-gray-600">
                 {itemCount} {itemCount === 1 ? 'item' : 'items'}
               </div>
@@ -183,9 +183,9 @@ export default function ParticipantTrackingScreen({
         {sessionStatus === 'active' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <p className="text-sm text-blue-800">
-              <span className="font-semibold">Waiting for host</span>
+              <span className="font-semibold">Sit tight!</span>
               <br />
-              The host will start shopping soon. You'll be notified when they begin.
+              Host will head to the store soon. We'll update you when shopping starts.
             </p>
           </div>
         )}
@@ -193,9 +193,9 @@ export default function ParticipantTrackingScreen({
         {sessionStatus === 'shopping' && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
             <p className="text-sm text-amber-800">
-              <span className="font-semibold">Shopping in progress</span>
+              <span className="font-semibold">On it!</span>
               <br />
-              The host is currently at the store buying your items.
+              Host is at the store picking up your items right now.
             </p>
           </div>
         )}
@@ -203,9 +203,9 @@ export default function ParticipantTrackingScreen({
         {sessionStatus === 'completed' && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <p className="text-sm text-green-800">
-              <span className="font-semibold">Shopping completed!</span>
+              <span className="font-semibold">All set!</span>
               <br />
-              All items have been purchased. View your bill to see the total amount.
+              Your items are ready. Check your bill to see what you owe.
             </p>
           </div>
         )}
