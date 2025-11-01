@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import LocalLoopsLanding from './LocalLoopsLanding';
 import LandingPage from './LandingPage';
 import MinibagPrototype from '../minibag-ui-prototype';
-import AdminDashboard from './AdminDashboard';
+
+// Lazy load admin dashboard to reduce main bundle size (saves ~180 KB)
+const AdminDashboard = lazy(() => import('./AdminDashboard'));
 
 // Wrapper component to navigate to app on button click
 function MinibagLandingWrapper() {
@@ -39,7 +41,14 @@ function App() {
         <Route path="/app" element={<MinibagPrototype />} />
         <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
         <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route
+          path="/admin"
+          element={
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading admin...</div>}>
+              <AdminDashboard />
+            </Suspense>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
