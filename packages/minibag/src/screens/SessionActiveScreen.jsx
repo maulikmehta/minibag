@@ -9,6 +9,7 @@ import SessionParticipantList from '../components/session/SessionParticipantList
 import ExpectedParticipantsInput from '../components/session/ExpectedParticipantsInput.jsx';
 import SessionInviteControls from '../components/session/SessionInviteControls.jsx';
 import CheckpointStatus from '../components/session/CheckpointStatus.jsx';
+import IdentityBanner from '../components/session/IdentityBanner.jsx';
 import { useNotification } from '../hooks/useNotification.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
@@ -160,12 +161,11 @@ export default function SessionActiveScreen({
               </div>
             </div>
             {currentParticipant && (
-              <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
-                <span className="text-lg">{currentParticipant.avatar_emoji}</span>
-                <p className="text-sm text-green-800">
-                  You're joined as <span className="font-semibold">{myNickname}</span>
-                </p>
-              </div>
+              <IdentityBanner
+                currentParticipant={currentParticipant}
+                currentUser={currentParticipant}
+                phase="waiting"
+              />
             )}
           </div>
 
@@ -359,12 +359,11 @@ export default function SessionActiveScreen({
             </div>
           </div>
           {currentParticipant && (
-            <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 px-3 py-2 rounded-lg">
-              <span className="text-lg">{currentParticipant.avatar_emoji}</span>
-              <p className="text-sm text-green-800">
-                You're joined as <span className="font-semibold">{myNickname}</span> {isHost && '(Host)'}
-              </p>
-            </div>
+            <IdentityBanner
+              currentParticipant={currentParticipant}
+              currentUser={currentParticipant}
+              phase="waiting"
+            />
           )}
         </div>
 

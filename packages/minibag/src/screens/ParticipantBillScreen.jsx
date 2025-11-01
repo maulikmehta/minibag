@@ -1,5 +1,6 @@
 import React from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
+import UserIdentity from '../components/UserIdentity.jsx';
 import { useNotification } from '../hooks/useNotification.js';
 
 /**
@@ -86,7 +87,12 @@ function ParticipantBillScreen({
 
         <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
           <p className="text-sm text-gray-600 mb-1">Shopping completed by Host</p>
-          <p className="text-base text-gray-900">You are: {participant.nickname || participant.name || 'Participant'}</p>
+          <p className="text-base text-gray-900">
+            You are: <UserIdentity
+              realName={participant.real_name}
+              nickname={participant.nickname || participant.name || 'Participant'}
+            />
+          </p>
         </div>
 
         <div className="border border-gray-300 rounded-lg overflow-hidden mb-6">

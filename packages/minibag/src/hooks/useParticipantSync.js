@@ -12,9 +12,9 @@ export function useParticipantSync({
   onUpdateParticipants,
   onShowNotification
 }) {
-  // Listen for participant joins and show notification (host only)
+  // Listen for participant joins and show notification (privacy-aware)
   useEffect(() => {
-    if (!session?.session_id || !currentParticipant?.is_creator) return;
+    if (!session?.session_id || !currentParticipant) return;
 
     // Ensure socket is connected before adding listeners
     if (!socketService.socket) {
@@ -22,13 +22,20 @@ export function useParticipantSync({
     }
 
     const handleParticipantJoinNotification = (participant) => {
-      // Show notification with identity reveal format
-      const firstName = participant.real_name?.split(' ')[0] || participant.nickname;
-      const displayName = participant.real_name
-        ? `${firstName} @ ${participant.nickname}`
-        : participant.nickname;
+      const isHost = currentParticipant?.is_creator;
 
-      onShowNotification(`${displayName} joined the session`);
+      if (isHost) {
+        // Host sees full identity: "FirstName @ ALIAS joined"
+        const firstName = participant.real_name?.split(' ')[0] || participant.nickname;
+        const alias = (participant.nickname || '').toUpperCase();
+        const displayName = participant.real_name
+          ? `${firstName} @ ${alias}`
+          : alias;
+        onShowNotification(`${displayName} joined the session`);
+      } else {
+        // Participants see generic message (privacy)
+        onShowNotification('Someone joined the session');
+      }
     };
 
     socketService.onParticipantJoined(handleParticipantJoinNotification);
@@ -36,7 +43,7 @@ export function useParticipantSync({
     return () => {
       socketService.off('participant-joined', handleParticipantJoinNotification);
     };
-  }, [session?.session_id, currentParticipant?.is_creator, onShowNotification]);
+  }, [session?.session_id, currentParticipant, onShowNotification]);
 
   // Listen for participant status updates (marked as not coming)
   useEffect(() => {
@@ -96,11 +103,20 @@ export function useParticipantSync({
       });
       onUpdateParticipants(updatedParticipants);
 
-      // Show notification when participant confirms their list (host only)
-      if (currentParticipant?.is_creator && items_confirmed) {
-        const firstName = real_name?.split(' ')[0] || nickname;
-        const displayName = real_name ? `${firstName} @ ${nickname}` : nickname;
-        onShowNotification(`${displayName} submitted the list`);
+      // Show notification when participant confirms their list (privacy-aware)
+      if (items_confirmed) {
+        const isHost = currentParticipant?.is_creator;
+
+        if (isHost) {
+          // Host sees full identity: "FirstName @ ALIAS submitted the list"
+          const firstName = real_name?.split(' ')[0] || nickname;
+          const alias = (nickname || '').toUpperCase();
+          const displayName = real_name ? `${firstName} @ ${alias}` : alias;
+          onShowNotification(`${displayName} submitted the list`);
+        } else {
+          // Participants see generic message (privacy)
+          onShowNotification('A participant confirmed their list');
+        }
       }
     };
 

@@ -7,7 +7,7 @@ import { extractFirstName } from '../../utils/sessionTransformers';
  * Displays a circular avatar for a participant with selection states.
  * Used in session screens to show participants and allow selection.
  *
- * @param {string} displayText - Text to display (initials or nickname)
+ * @param {string} displayText - Text to display (3-letter alias)
  * @param {string} label - Label below avatar (e.g., "Host", participant name)
  * @param {boolean} isSelected - Whether this participant is currently selected
  * @param {boolean} hasItems - Whether this participant has added items
@@ -15,6 +15,7 @@ import { extractFirstName } from '../../utils/sessionTransformers';
  * @param {string} size - Size variant: 'sm' (48px) or 'md' (64px). Default: 'md'
  * @param {string} realName - Full real name for long-press reveal (e.g., "Maulik Patel")
  * @param {boolean} isConfirmed - Whether participant has confirmed their list
+ * @param {boolean} canSeeRealName - If true, allows long-press to reveal real name (host only)
  */
 function ParticipantAvatar({
   displayText,
@@ -24,7 +25,8 @@ function ParticipantAvatar({
   onClick,
   size = 'md',
   realName = null,
-  isConfirmed = false
+  isConfirmed = false,
+  canSeeRealName = false
 }) {
   const [showPopup, setShowPopup] = useState(false);
   const pressTimer = useRef(null);
@@ -53,8 +55,8 @@ function ParticipantAvatar({
 
   // Long press handlers
   const handlePressStart = (e) => {
-    // Only show popup if we have a real name to display
-    if (!firstName) return;
+    // Only show popup if we have a real name AND permission to see it (host only)
+    if (!firstName || !canSeeRealName) return;
 
     // Clear any existing timers
     if (pressTimer.current) clearTimeout(pressTimer.current);
@@ -82,8 +84,8 @@ function ParticipantAvatar({
   };
 
   const handleContextMenu = (e) => {
-    // Prevent default context menu on long press (mobile)
-    if (firstName) {
+    // Prevent default context menu on long press (mobile) if allowed to see real name
+    if (firstName && canSeeRealName) {
       e.preventDefault();
     }
   };

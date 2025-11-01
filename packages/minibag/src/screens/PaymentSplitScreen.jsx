@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
+import UserIdentity from '../components/UserIdentity.jsx';
 
 /**
  * PaymentSplitScreen Component
@@ -191,14 +192,21 @@ function PaymentSplitScreen({
           {participants.map(p => {
             const pName = p.nickname || p.name || 'Participant';
             const owes = participantCosts[pName];
+            const isHost = currentParticipant?.is_creator || false;
             return (
               <div key={p.id || pName} className="border border-gray-300 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-900 text-xs flex-shrink-0">
-                      {pName.slice(0, 2).toUpperCase()}
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-900 text-xs font-medium flex-shrink-0">
+                      {pName.toUpperCase()}
                     </div>
-                    <p className="text-base text-gray-900">{pName}</p>
+                    <div className="text-base text-gray-900">
+                      {isHost ? (
+                        <UserIdentity realName={p.real_name} nickname={pName} />
+                      ) : (
+                        pName
+                      )}
+                    </div>
                   </div>
                   <p className="text-xl text-gray-900">₹{owes.toFixed(0)}</p>
                 </div>

@@ -117,14 +117,15 @@ function ShoppingScreen({
             // Skip if vegetable not found
             if (!veg) return null;
 
-            // Calculate participant breakdown
+            // Calculate participant breakdown (using aliases for privacy)
             const breakdown = [];
             if (hostItems[itemId]) {
-              breakdown.push({ name: hostNickname, qty: hostItems[itemId] });
+              breakdown.push({ name: hostNickname.toUpperCase(), qty: hostItems[itemId] });
             }
             participants.forEach(p => {
               if (p.items && p.items[itemId]) {
-                breakdown.push({ name: p.name, qty: p.items[itemId] });
+                const alias = (p.nickname || p.name || 'P').toUpperCase();
+                breakdown.push({ name: alias, qty: p.items[itemId] });
               }
             });
 

@@ -38,12 +38,13 @@ export default function SessionParticipantList({
       <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
         {/* Host slot */}
         <ParticipantAvatar
-          displayText={hostNickname}
+          displayText={hostNickname.toUpperCase()}
           label={isHost ? "You (Host)" : "Host"}
           isSelected={!readOnly && selectedParticipant === 'host'}
           hasItems={Object.keys(hostItems).length > 0}
           onClick={readOnly ? () => {} : () => onParticipantSelect('host')}
           realName={hostRealName}
+          canSeeRealName={isHost}
         />
 
         {/* Participant slots - show 3 slots total */}
@@ -63,13 +64,14 @@ export default function SessionParticipantList({
             return (
               <ParticipantAvatar
                 key={participant.id || participantName}
-                displayText={participantName.slice(0, 2).toUpperCase()}
+                displayText={participantName.toUpperCase()}
                 label={isMe ? `You (${participantName})` : participantName}
                 isSelected={isSelected}
                 hasItems={Object.keys(participant.items || {}).length > 0}
                 onClick={readOnly ? () => {} : () => onParticipantSelect(participantName)}
                 realName={participant.real_name || null}
                 isConfirmed={participant.items_confirmed || false}
+                canSeeRealName={isHost}
               />
             );
           } else {

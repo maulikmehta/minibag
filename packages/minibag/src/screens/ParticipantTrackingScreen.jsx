@@ -136,11 +136,7 @@ export default function ParticipantTrackingScreen({
                       <p className="text-sm text-gray-500 mt-0.5">
                         {step.showIdentity ? (
                           <>
-                            <UserIdentity
-                              realName={host?.real_name}
-                              nickname={hostNickname}
-                              className="text-sm"
-                            />{' '}
+                            <span className="font-medium text-gray-700">{hostNickname}</span>{' '}
                             {step.descriptionTemplate}
                           </>
                         ) : (
@@ -202,11 +198,7 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-blue-800">
               <span className="font-semibold">Sit tight!</span>
               <br />
-              <UserIdentity
-                realName={host?.real_name}
-                nickname={hostNickname}
-                className="text-sm text-blue-900"
-              /> will head to the store soon. We'll update you when shopping starts.
+              <span className="font-medium text-blue-900">{hostNickname}</span> will head to the store soon. We'll update you when shopping starts.
             </p>
           </div>
         )}
@@ -216,11 +208,7 @@ export default function ParticipantTrackingScreen({
             <p className="text-sm text-amber-800">
               <span className="font-semibold">On it!</span>
               <br />
-              <UserIdentity
-                realName={host?.real_name}
-                nickname={hostNickname}
-                className="text-sm text-amber-900"
-              /> is at the store picking up your items right now.
+              <span className="font-medium text-amber-900">{hostNickname}</span> is at the store picking up your items right now.
             </p>
           </div>
         )}
