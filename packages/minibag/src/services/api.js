@@ -155,8 +155,6 @@ export async function updateSessionStatus(sessionId, status) {
   // Retrieve host token from localStorage
   const hostToken = localStorage.getItem(`host_token_${sessionId}`);
 
-  console.log('updateSessionStatus called:', { sessionId, status, hostToken: hostToken ? 'present' : 'missing' });
-
   const response = await apiFetch(`/api/sessions/${sessionId}/status`, {
     method: 'PUT',
     headers: {

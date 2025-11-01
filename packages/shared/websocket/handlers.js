@@ -11,8 +11,6 @@
  * @param {Server} io - Socket.IO server instance
  */
 export function setupSocketHandlers(socket, io) {
-  console.log('Client connected:', socket.id);
-
   /**
    * JOIN SESSION ROOM
    * Client joins a session room for real-time updates
@@ -20,7 +18,6 @@ export function setupSocketHandlers(socket, io) {
   socket.on('join-session', (data) => {
     const sessionId = data.sessionId || data;
     socket.join(sessionId);
-    console.log(`Client ${socket.id} joined session ${sessionId}`);
     io.to(sessionId).emit('user-joined', { socketId: socket.id });
   });
 
@@ -31,7 +28,6 @@ export function setupSocketHandlers(socket, io) {
   socket.on('leave-session', (data) => {
     const sessionId = data.sessionId || data;
     socket.leave(sessionId);
-    console.log(`Client ${socket.id} left session ${sessionId}`);
     io.to(sessionId).emit('user-left', { socketId: socket.id });
   });
 
@@ -42,7 +38,6 @@ export function setupSocketHandlers(socket, io) {
    */
   socket.on('participant-joined', (data) => {
     const { sessionId, participant } = data;
-    console.log(`Participant joined session ${sessionId}:`, participant);
     // Broadcast to all clients in the session room (including sender)
     io.to(sessionId).emit('participant-joined', participant);
   });
@@ -53,7 +48,6 @@ export function setupSocketHandlers(socket, io) {
    */
   socket.on('participant-left', (data) => {
     const { sessionId, participantId } = data;
-    console.log(`Participant left session ${sessionId}:`, participantId);
     io.to(sessionId).emit('participant-left', participantId);
   });
 
@@ -63,8 +57,6 @@ export function setupSocketHandlers(socket, io) {
    */
   socket.on('participant-items-updated', (data) => {
     const { sessionId, participantId, items, items_confirmed, real_name, nickname } = data;
-    console.log(`Participant ${participantId} updated items in session ${sessionId}`,
-                items_confirmed !== undefined ? `(confirmed: ${items_confirmed})` : '');
     // Broadcast to all clients in the session room (so host can see)
     // Include all metadata for proper state sync
     io.to(sessionId).emit('participant-items-updated', {
@@ -83,7 +75,6 @@ export function setupSocketHandlers(socket, io) {
    */
   socket.on('participant-status-updated', (data) => {
     const { sessionId, participant } = data;
-    console.log(`Participant ${participant.id} status updated in session ${sessionId}`);
     // Broadcast to all clients in the session room
     io.to(sessionId).emit('participant-status-updated', participant);
   });
@@ -95,7 +86,6 @@ export function setupSocketHandlers(socket, io) {
    */
   socket.on('session-status-updated', (data) => {
     const { sessionId, status } = data;
-    console.log(`Session ${sessionId} status updated to: ${status}`);
     // Broadcast to all clients in the session room
     io.to(sessionId).emit('session-status-updated', { status });
   });
@@ -116,7 +106,6 @@ export function setupSocketHandlers(socket, io) {
   socket.on('payment-recorded', (data) => {
     const { sessionId, payment } = data;
     io.to(sessionId).emit('payment-updated', payment);
-    console.log(`Payment recorded in session ${sessionId}:`, payment);
   });
 
   /**
@@ -126,7 +115,6 @@ export function setupSocketHandlers(socket, io) {
   socket.on('payment-edited', (data) => {
     const { sessionId, payment } = data;
     io.to(sessionId).emit('payment-updated', payment);
-    console.log(`Payment edited in session ${sessionId}:`, payment);
   });
 
   /**
@@ -134,6 +122,6 @@ export function setupSocketHandlers(socket, io) {
    * Cleanup when client disconnects
    */
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    // Cleanup happens automatically
   });
 }

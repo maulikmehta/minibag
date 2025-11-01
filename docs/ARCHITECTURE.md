@@ -1,8 +1,8 @@
 # LocalLoops Architecture
 
-**Last Updated:** October 13, 2025  
-**Version:** 1.0.0  
-**Status:** Infrastructure Finalized
+**Last Updated:** November 1, 2025
+**Version:** 1.1.0
+**Status:** Checkpoint Mechanism Implemented
 
 ---
 
@@ -220,16 +220,26 @@ io.on('connection', (socket) => {
 **Session Management:**
 
 ```javascript
-// Session lifecycle
-CREATE → OPEN → ACTIVE → SHOPPING → COMPLETED → EXPIRED
+// Session lifecycle with checkpoint
+CREATE → OPEN → ACTIVE (checkpoint) → SHOPPING → COMPLETED → EXPIRED
 
 // State transitions
 {
   created_at: timestamp,
   scheduled_time: timestamp,
-  expires_at: timestamp,      // +2 hours after scheduled
-  status: 'open'              // open, active, shopping, completed, expired
+  expires_at: timestamp,            // +2 hours after scheduled
+  status: 'open',                   // open, active, shopping, completed, expired
+
+  // Checkpoint fields
+  expected_participants: null,      // null (not set), 0 (solo), 1-3 (group)
+  checkpoint_complete: false,       // All participants ready?
+  host_token: 'secure_token'        // Authentication for host operations
 }
+
+// Checkpoint states
+// 1. Not Set (null): Host must choose solo or group
+// 2. Solo Mode (0): Checkpoint bypassed, immediate shopping
+// 3. Group Mode (1-3): Wait for all expected participants to confirm
 ```
 
 ---
@@ -246,24 +256,29 @@ CREATE → OPEN → ACTIVE → SHOPPING → COMPLETED → EXPIRED
   session_id: "abc123",              // 6-char short code
   session_type: "minibag",           // minibag, partybag, fitbag
   creator_nickname: "Raj",           // Auto-generated
-  
+
   // Location (text only, no GPS)
   location_text: "Building A, Gate 2",
   neighborhood: "Alkapuri",          // For analytics
-  
+
   // Timing
   scheduled_time: timestamp,
   created_at: timestamp,
   expires_at: timestamp,
-  
+
   // Status
   status: "open",                    // open, active, shopping, completed, expired
-  
+
+  // Checkpoint mechanism
+  expected_participants: null,       // null (not set), 0 (solo), 1-3 (group)
+  checkpoint_complete: false,        // Calculated: all expected responded
+  host_token: "secure_token_here",   // 256-bit random authentication token
+
   // Metadata
   title: "Vegetables - Oct 14",
   participant_count: 0,
   total_demand_value: 0,
-  
+
   // Pro features
   is_pro: false
 }
@@ -274,14 +289,20 @@ CREATE → OPEN → ACTIVE → SHOPPING → COMPLETED → EXPIRED
   nickname: "Maya",
   avatar_emoji: "🌸",
   joined_at: timestamp,
-  
+
   items: {
     v1: 2.0,    // item_id: quantity
     v2: 1.5
   },
-  
+
   locked: false,
-  is_creator: false
+  is_creator: false,
+
+  // Checkpoint mechanism
+  items_confirmed: false,            // Participant confirmed their list
+  marked_not_coming: false,          // Participant declined invitation
+  auto_timed_out: false,             // Slot auto-timed out (20 min)
+  invite_timeout_at: timestamp       // When invite expires
 }
 
 // catalog_items collection
@@ -366,12 +387,47 @@ CREATE → OPEN → ACTIVE → SHOPPING → COMPLETED → EXPIRED
 - Input validation (XSS protection)
 - CORS properly configured
 - Environment variables for secrets
+- Host token storage (localStorage per session)
 
-**Server-side (planned):**
+**Server-side:**
 - Rate limiting (prevent abuse)
 - Session validation (prevent tampering)
 - WebSocket authentication
 - Database security rules
+- **Host token authentication** (implemented)
+
+### Host Token Authentication
+
+**Threat Model:**
+- Unauthorized users updating session status
+- Malicious status changes during active session
+
+**Protection:**
+- 256-bit random token generated per session
+- Stored in database and localStorage
+- Required for host-only operations
+- Validated before state-changing operations
+
+**Implementation:**
+```javascript
+// Backend validation
+const host_token = req.headers['x-host-token'];
+const session = await supabase
+  .from('sessions')
+  .select()
+  .eq('session_id', session_id)
+  .eq('host_token', host_token)
+  .single();
+
+if (!session) {
+  return res.status(403).json({ error: 'Invalid host token' });
+}
+```
+
+**Recovery:**
+- If token lost, session cannot be modified
+- Participants can still view and track
+- New session required for shopping
 
 ---
 

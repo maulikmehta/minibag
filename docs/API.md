@@ -1,7 +1,7 @@
 # API Documentation
 
-**Last Updated:** October 13, 2025  
-**Version:** 1.0.0  
+**Last Updated:** November 1, 2025
+**Version:** 1.1.0
 **Base URL:** `https://api.minibag.in` (Production) | `http://localhost:3000` (Development)
 
 ---
@@ -40,28 +40,37 @@ const socket = io('https://ws.minibag.in', {
 Creates a new coordination session.
 
 ```javascript
-socket.emit('create-session', {
-  session_type: 'minibag', // Required: minibag, partybag, fitbag
+// REST API: POST /api/sessions
+{
   location_text: 'Building A, Gate 2',
   scheduled_time: '2025-10-14T18:00:00Z',
-  creator_nickname: 'Raj', // Optional, auto-generated if missing
+  selected_nickname: 'Raj', // From nicknames_pool
+  selected_avatar_emoji: '🌟',
+  real_name: 'Rajesh Kumar', // Optional
+  expected_participants: null, // null (not set), 0 (solo), 1-3 (group)
   items: [
     { item_id: 'v001', quantity: 2, unit: 'kg' }
-  ],
-  is_pro: false
-});
+  ]
+}
 
 // Response
-socket.on('session-created', (data) => {
-  console.log(data);
-  // {
-  //   success: true,
-  //   session_id: 'abc123',
-  //   short_url: 'minibag.in/abc123',
-  //   creator_nickname: 'Raj',
-  //   expires_at: '2025-10-14T20:00:00Z'
-  // }
-});
+{
+  success: true,
+  session: {
+    session_id: 'abc123',
+    status: 'open',
+    host_token: 'secure_token_here', // Store in localStorage
+    expected_participants: null,
+    checkpoint_complete: false,
+    // ... other session fields
+  },
+  participant: {
+    id: 'p_12345',
+    nickname: 'Raj',
+    items_confirmed: true, // Host auto-confirmed on creation
+    // ... other participant fields
+  }
+}
 ```
 
 ##### `join-session`
@@ -188,6 +197,54 @@ socket.emit('leave-session', {
 
 ---
 
+### Session Management API
+
+#### Update Session Status
+
+**Endpoint:** `PUT /api/sessions/:session_id/status`
+
+**Description:** Update the session status (host only, requires authentication).
+
+**Headers:**
+```
+X-Host-Token: <host_token>  (required)
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "status": "shopping"
+}
+```
+
+**Status values:**
+- `open` - Session created, accepting participants
+- `active` - Participants adding items
+- `shopping` - Host recording payments
+- `completed` - All payments recorded
+- `expired` - Session expired
+- `cancelled` - Session cancelled
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "abc123",
+    "status": "shopping",
+    // ... updated session data
+  }
+}
+```
+
+**Errors:**
+- `401 Unauthorized` - Host token missing
+- `403 Forbidden` - Invalid host token or session not found
+- `400 Bad Request` - Invalid status value
+
+---
+
 #### **Server → Client Events**
 
 ##### `session-updated`
@@ -243,6 +300,109 @@ Error occurred.
 ```javascript
 socket.on('error', (error) => {
   // { code: 'SESSION_FULL', message: 'This session is full (4/4 participants)' }
+});
+```
+
+---
+
+## 🎯 Checkpoint & Confirmation System
+
+### Overview
+The checkpoint system ensures all participants are coordinated before shopping begins.
+
+### Three-State Logic
+
+#### 1. Not Set (`expected_participants: null`)
+- Default state after session creation
+- Start shopping button disabled
+- Host must set expected count
+
+#### 2. Solo Mode (`expected_participants: 0`)
+- Host shopping alone
+- Checkpoint bypassed
+- Start shopping enabled immediately
+
+#### 3. Group Mode (`expected_participants: 1-3`)
+- Waiting for participants
+- Checkpoint validates: all expected responded + all joined confirmed
+- 20-minute auto-timeout for unfilled slots
+
+### Participant Confirmation
+
+**Endpoint:** `PUT /api/participants/:participant_id/status`
+
+**Body:**
+```json
+{
+  "items_confirmed": true
+}
+```
+
+**Flow:**
+1. Participant adds items to list
+2. Clicks "Confirm my list"
+3. Backend sets `items_confirmed: true`
+4. WebSocket broadcasts to host
+5. Participant locked from editing items
+6. Navigates to tracking screen
+
+### Decline Invitation
+
+**Endpoint:** `PUT /api/participants/:participant_id/status`
+
+**Body:**
+```json
+{
+  "marked_not_coming": true
+}
+```
+
+**Effect:**
+- Participant excluded from checkpoint validation
+- Checkpoint progresses if other slots filled
+
+---
+
+## 🔐 Host Token Authentication
+
+### Purpose
+Protects host-only operations from unauthorized access.
+
+### Token Generation
+- Generated during session creation (`crypto.randomBytes(32)`)
+- Stored in `sessions.host_token` (unique, indexed)
+- Returned to frontend in session creation response
+
+### Token Storage
+```javascript
+// Frontend: Store in localStorage
+localStorage.setItem(`host_token_${sessionId}`, token);
+
+// Cleared when session ends or user leaves
+```
+
+### Protected Endpoints
+- `PUT /api/sessions/:session_id/status` - Update session status
+- Future: Edit session details, end session early
+
+### Security Considerations
+- Token is 256-bit random value
+- Not exposed in URLs or logs
+- Invalidated when session completes
+- Per-session (not reusable across sessions)
+
+### Example Usage
+```javascript
+// Frontend: Include in request headers
+const hostToken = localStorage.getItem(`host_token_${sessionId}`);
+
+fetch(`/api/sessions/${sessionId}/status`, {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Host-Token': hostToken
+  },
+  body: JSON.stringify({ status: 'shopping' })
 });
 ```
 
@@ -555,4 +715,5 @@ const session = await api.createSession({
 
 ## 🔄 Version History
 
+- **1.1.0** (Nov 1, 2025): Added checkpoint mechanism, host token authentication, participant confirmation system
 - **1.0.0** (Oct 13, 2025): Initial API documentation

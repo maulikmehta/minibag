@@ -677,8 +677,6 @@ export async function updateSessionStatus(req, res) {
               currently_used_in: null
             })
             .eq('currently_used_in', session.id);
-
-          console.log(`Released ${nicknamesUsed.length} nicknames from session ${session_id}`);
         }
       }
     }

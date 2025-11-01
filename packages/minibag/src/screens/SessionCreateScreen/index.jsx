@@ -170,8 +170,6 @@ export default function SessionCreateScreen({
         selected_avatar_emoji: selectedHostNickname.avatar_emoji
       });
 
-      console.log('✅ Session created:', result);
-
       // Navigate to session-active screen and pass hostItems
       onSessionCreated(hostItems);
     } catch (error) {

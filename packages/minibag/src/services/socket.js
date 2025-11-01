@@ -21,7 +21,6 @@ class SocketService {
    */
   connect() {
     if (this.socket?.connected) {
-      console.log('Socket already connected');
       return this.socket;
     }
 
@@ -33,7 +32,6 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket connected:', this.socket.id);
       this.connected = true;
 
       // Rejoin session if we were in one
@@ -43,7 +41,6 @@ class SocketService {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket disconnected:', reason);
       this.connected = false;
     });
 
@@ -77,7 +74,6 @@ class SocketService {
       return;
     }
 
-    console.log(`🚪 Joining session room: ${sessionId}`);
     this.currentSessionId = sessionId;
     this.socket.emit('join-session', { sessionId });
   }
@@ -88,7 +84,6 @@ class SocketService {
   leaveSessionRoom() {
     if (!this.socket || !this.currentSessionId) return;
 
-    console.log(`🚪 Leaving session room: ${this.currentSessionId}`);
     this.socket.emit('leave-session', { sessionId: this.currentSessionId });
     this.currentSessionId = null;
   }

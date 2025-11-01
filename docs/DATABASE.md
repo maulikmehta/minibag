@@ -1,8 +1,8 @@
 # Database Design & Strategy
 
-**Last Updated:** October 13, 2025  
-**Version:** 1.0.0  
-**Decision Status:** Firebase vs Supabase - DECISION REQUIRED
+**Last Updated:** November 1, 2025
+**Version:** 1.1.0
+**Decision Status:** Supabase - IMPLEMENTED
 
 ---
 
@@ -177,10 +177,16 @@ CREATE TABLE sessions (
   vendor_confirmed BOOLEAN DEFAULT false,
   vendor_id UUID,
   vendor_confirmed_at TIMESTAMPTZ,
-  
+
+  -- Checkpoint mechanism
+  expected_participants INTEGER DEFAULT NULL,         -- NULL (not set), 0 (solo), 1-3 (group)
+  checkpoint_complete BOOLEAN DEFAULT false,
+  host_token TEXT UNIQUE NOT NULL,                   -- 256-bit authentication token for host
+
   -- Constraints
   CONSTRAINT valid_session_type CHECK (session_type IN ('minibag', 'partybag', 'fitbag')),
-  CONSTRAINT valid_status CHECK (status IN ('open', 'active', 'shopping', 'completed', 'expired', 'cancelled'))
+  CONSTRAINT valid_status CHECK (status IN ('open', 'active', 'shopping', 'completed', 'expired', 'cancelled')),
+  CONSTRAINT valid_expected_participants CHECK (expected_participants BETWEEN 0 AND 3 OR expected_participants IS NULL)
 );
 
 -- Indexes for performance
@@ -189,6 +195,7 @@ CREATE INDEX idx_sessions_status ON sessions(status);
 CREATE INDEX idx_sessions_scheduled ON sessions(scheduled_time);
 CREATE INDEX idx_sessions_creator ON sessions(creator_id) WHERE creator_id IS NOT NULL;
 CREATE INDEX idx_sessions_neighborhood ON sessions(neighborhood) WHERE neighborhood IS NOT NULL;
+CREATE INDEX idx_sessions_host_token ON sessions(host_token);
 ```
 
 #### **2. participants**
@@ -210,7 +217,13 @@ CREATE TABLE participants (
   -- Status
   locked BOOLEAN DEFAULT false,                  -- Has participant locked their order?
   locked_at TIMESTAMPTZ,
-  
+
+  -- Checkpoint mechanism
+  items_confirmed BOOLEAN DEFAULT false,         -- Participant confirmed their list
+  marked_not_coming BOOLEAN DEFAULT false,       -- Participant declined invitation
+  auto_timed_out BOOLEAN DEFAULT false,          -- Slot auto-timed out (20 min)
+  invite_timeout_at TIMESTAMPTZ,                 -- When invite expires (20 min after join)
+
   -- Constraints
   UNIQUE(session_id, nickname)                   -- No duplicate nicknames in session
 );
@@ -385,6 +398,73 @@ CREATE TABLE user_patterns (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 ```
+
+---
+
+## 🎯 Checkpoint Mechanism
+
+The checkpoint system coordinates participants before shopping.
+
+### Database Fields
+
+#### **sessions.expected_participants**
+- `NULL`: Host hasn't set expected count (button disabled)
+- `0`: Solo mode (bypass checkpoint)
+- `1-3`: Group mode (validate checkpoint)
+
+#### **sessions.checkpoint_complete**
+- Calculated from: `(joinedCount + notComingCount + autoTimedOutCount) >= expectedCount`
+- Updated in real-time as participants respond
+
+#### **sessions.host_token**
+- 256-bit random value (`crypto.randomBytes(32)`)
+- Authenticates host-only operations
+- Required for session status updates
+- Unique per session, invalidated on completion
+
+#### **participants.items_confirmed**
+- `false`: Participant still editing items
+- `true`: Participant confirmed list (locked from editing)
+
+#### **participants.marked_not_coming**
+- `true`: Participant declined invitation
+- Excluded from checkpoint validation
+
+#### **participants.auto_timed_out**
+- `true`: 20 minutes passed without response
+- Counted toward checkpoint completion
+
+### Validation Logic
+
+```sql
+-- Check if checkpoint is complete (used in session queries)
+SELECT
+  s.*,
+  (
+    (SELECT COUNT(*) FROM participants WHERE session_id = s.id AND items_confirmed = true) +
+    (SELECT COUNT(*) FROM participants WHERE session_id = s.id AND marked_not_coming = true) +
+    (SELECT COUNT(*) FROM participants WHERE session_id = s.id AND auto_timed_out = true)
+  ) >= COALESCE(s.expected_participants, 0) as checkpoint_met
+FROM sessions s
+WHERE s.session_id = $1;
+```
+
+### Three-State Flow
+
+1. **Not Set** (`expected_participants: null`)
+   - Default after creation
+   - Host must choose solo or group
+   - Shopping button disabled
+
+2. **Solo Mode** (`expected_participants: 0`)
+   - Checkpoint bypassed
+   - Shopping enabled immediately
+   - No participant validation
+
+3. **Group Mode** (`expected_participants: 1-3`)
+   - Wait for all expected to respond
+   - Validate all joined participants confirmed
+   - Enable shopping when checkpoint met
 
 ---
 
