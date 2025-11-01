@@ -3,7 +3,7 @@ import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRu
 import { useTranslation } from 'react-i18next';
 import useCatalog from './src/hooks/useCatalog.js';
 import useSession from './src/hooks/useSession.js';
-import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipantStatus, updateSessionStatus } from './src/services/api.js';
+import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipantStatus, updateSessionStatus, deletePayment } from './src/services/api.js';
 import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
@@ -23,6 +23,7 @@ import JoinSessionScreen from './src/screens/JoinSessionScreen/index.jsx';
 import ParticipantAddItemsScreen from './src/screens/ParticipantAddItemsScreen/index.jsx';
 import ParticipantTrackingScreen from './src/screens/ParticipantTrackingScreen.jsx';
 import useOnboarding from './src/hooks/useOnboarding.js';
+import { useNotification } from './src/hooks/useNotification.js';
 import {
   GUIDED_TOUR_STEPS,
   HOST_CREATE_TOUR_STEPS,
@@ -43,6 +44,9 @@ const FALLBACK_NAMES = ['Raj', 'Avi', 'Ria', 'Dev', 'Sia', 'Jay', 'Pia', 'Sam'];
 export default function MinibagPrototype({ joinSessionId = null, billSessionId = null, billParticipantId = null }) {
   // Language translation
   const { t, i18n } = useTranslation();
+
+  // Global notifications
+  const notify = useNotification();
 
   // Fetch catalog data from API
   const { categories, items, loading: catalogLoading, error: catalogError } = useCatalog();
@@ -79,6 +83,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [signUpContext, setSignUpContext] = useState('');
   const [itemPayments, setItemPayments] = useState({});
+  const [skippedItems, setSkippedItems] = useState({});
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedItemForPayment, setSelectedItemForPayment] = useState(null);
 
@@ -311,8 +316,59 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       console.log(`Session status updated to: ${status}`);
     } catch (error) {
       console.error('Failed to update session status:', error);
+      notify.error(error.userMessage || 'Failed to update session status');
     }
-  }, [session?.session_id]);
+  }, [session?.session_id, notify]);
+
+  // Handle skip/unskip item toggle
+  const handleSkipToggle = useCallback(async (itemId) => {
+    if (!session?.session_id) return;
+
+    try {
+      const isCurrentlySkipped = skippedItems[itemId];
+
+      if (isCurrentlySkipped) {
+        // Unskip: Delete the skip record
+        await deletePayment(isCurrentlySkipped.paymentId);
+
+        // Update local state
+        setSkippedItems(prev => {
+          const updated = { ...prev };
+          delete updated[itemId];
+          return updated;
+        });
+
+        notify.success('Item unmarked as skipped');
+      } else {
+        // Skip: Create skip record
+        const payment = await recordPayment(session.session_id, {
+          item_id: itemId,
+          skipped: true,
+          skip_reason: 'Item wasn\'t good enough to buy',
+          recorded_by: currentParticipant?.id || null
+        });
+
+        // Update local state
+        setSkippedItems(prev => ({
+          ...prev,
+          [itemId]: {
+            skipped: true,
+            reason: payment.skip_reason || 'Item wasn\'t good enough to buy',
+            paymentId: payment.id,
+            timestamp: Date.now()
+          }
+        }));
+
+        notify.info('Item marked as skipped');
+
+        // Emit WebSocket event for real-time sync
+        socketService.emitPaymentUpdate(session.session_id, payment);
+      }
+    } catch (error) {
+      console.error('Failed to toggle skip status:', error);
+      notify.error(error.userMessage || 'Failed to update skip status');
+    }
+  }, [session?.session_id, skippedItems, currentParticipant?.id, notify]);
 
   // On-demand tour handler - triggered by help icon
   const handleHelpClick = useCallback(() => {
@@ -619,7 +675,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
             setCurrentScreen('participant-tracking');
           } catch (error) {
             console.error('Failed to update participant confirmation:', error);
-            alert('Failed to confirm your list. Please try again.');
+            notify.error(error.userMessage || 'Failed to confirm your list. Please try again.');
           }
         }}
         onNavigateToStep={(step) => {
@@ -702,6 +758,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         hostItems={hostItems}
         participants={participants}
         itemPayments={itemPayments}
+        skippedItems={skippedItems}
         items={items}
         getItemName={getItemName}
         currentParticipant={currentParticipant}
@@ -709,6 +766,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         setShowPaymentModal={setShowPaymentModal}
         selectedItemForPayment={selectedItemForPayment}
         setSelectedItemForPayment={setSelectedItemForPayment}
+        onSkipToggle={handleSkipToggle}
         onRecordPayment={async (itemId, method, amount) => {
           try {
             // Record payment to backend
@@ -733,7 +791,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
             socketService.emitPaymentUpdate(session.session_id, payment);
           } catch (error) {
             console.error('Failed to record payment:', error);
-            alert('Failed to record payment. Please try again.');
+            notify.error(error.userMessage || 'Failed to record payment. Please try again.');
           }
         }}
         onDoneShopping={() => setCurrentScreen('payment-split')}
@@ -762,6 +820,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         hostItems={hostItems}
         participants={participants}
         itemPayments={itemPayments}
+        skippedItems={skippedItems}
         items={items}
         getItemName={getItemName}
         session={session}

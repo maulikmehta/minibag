@@ -17,29 +17,54 @@ export async function recordPayment(req, res) {
       amount,
       method, // 'upi' or 'cash'
       recorded_by, // participant_id
-      vendor_name = null
+      vendor_name = null,
+      skipped = false,
+      skip_reason = 'Item wasn\'t good enough to buy'
     } = req.body;
 
-    // Validation
-    if (!item_id || !amount || !method) {
-      return res.status(400).json({
-        success: false,
-        error: 'item_id, amount, and method are required'
-      });
-    }
+    // Validation for skipped items
+    if (skipped) {
+      // Skipped items must have zero amount and null method
+      if (amount && amount > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Skipped items cannot have amount > 0'
+        });
+      }
+      if (method) {
+        return res.status(400).json({
+          success: false,
+          error: 'Skipped items cannot have a payment method'
+        });
+      }
+      if (!item_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'item_id is required'
+        });
+      }
+    } else {
+      // Validation for regular payments
+      if (!item_id || !amount || !method) {
+        return res.status(400).json({
+          success: false,
+          error: 'item_id, amount, and method are required'
+        });
+      }
 
-    if (!['upi', 'cash'].includes(method)) {
-      return res.status(400).json({
-        success: false,
-        error: 'method must be "upi" or "cash"'
-      });
-    }
+      if (!['upi', 'cash'].includes(method)) {
+        return res.status(400).json({
+          success: false,
+          error: 'method must be "upi" or "cash"'
+        });
+      }
 
-    if (amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'amount must be greater than 0'
-      });
+      if (amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'amount must be greater than 0'
+        });
+      }
     }
 
     // Insert payment record
@@ -48,11 +73,13 @@ export async function recordPayment(req, res) {
       .insert({
         session_id,
         item_id,
-        amount: parseFloat(amount),
-        method,
+        amount: skipped ? 0 : parseFloat(amount),
+        method: skipped ? null : method,
         recorded_by,
-        vendor_name,
-        status: 'paid',
+        vendor_name: skipped ? null : vendor_name,
+        status: skipped ? 'skipped' : 'paid',
+        skipped,
+        skip_reason: skipped ? skip_reason : null,
         recorded_at: new Date().toISOString()
       })
       .select()
@@ -226,31 +253,36 @@ export async function getPaymentSummary(req, res) {
     const summary = {
       total_amount: 0,
       total_items_paid: 0,
+      total_items_skipped: 0,
       upi_amount: 0,
       cash_amount: 0,
       payments_by_participant: {}
     };
 
     payments.forEach(payment => {
-      summary.total_amount += payment.amount;
-      summary.total_items_paid++;
-
-      if (payment.method === 'upi') {
-        summary.upi_amount += payment.amount;
+      if (payment.skipped) {
+        summary.total_items_skipped++;
       } else {
-        summary.cash_amount += payment.amount;
-      }
+        summary.total_amount += payment.amount;
+        summary.total_items_paid++;
 
-      // Track by participant
-      if (payment.recorded_by) {
-        if (!summary.payments_by_participant[payment.recorded_by]) {
-          summary.payments_by_participant[payment.recorded_by] = {
-            total: 0,
-            count: 0
-          };
+        if (payment.method === 'upi') {
+          summary.upi_amount += payment.amount;
+        } else {
+          summary.cash_amount += payment.amount;
         }
-        summary.payments_by_participant[payment.recorded_by].total += payment.amount;
-        summary.payments_by_participant[payment.recorded_by].count++;
+
+        // Track by participant
+        if (payment.recorded_by) {
+          if (!summary.payments_by_participant[payment.recorded_by]) {
+            summary.payments_by_participant[payment.recorded_by] = {
+              total: 0,
+              count: 0
+            };
+          }
+          summary.payments_by_participant[payment.recorded_by].total += payment.amount;
+          summary.payments_by_participant[payment.recorded_by].count++;
+        }
       }
     });
 
@@ -315,17 +347,25 @@ export async function getPaymentSplit(req, res) {
       });
     }
 
-    // Build payment map by item_id
+    // Build payment map by item_id (exclude skipped items from calculations)
     const paymentMap = {};
+    const skippedItems = {};
     payments.forEach(p => {
-      paymentMap[p.item_id] = p;
+      if (p.skipped) {
+        skippedItems[p.item_id] = p;
+      } else {
+        paymentMap[p.item_id] = p;
+      }
     });
 
-    // Calculate total quantities per item
+    // Calculate total quantities per item (exclude skipped items)
     const itemTotals = {};
     sessionData.participants.forEach(participant => {
       participant.participant_items.forEach(item => {
-        itemTotals[item.item_id] = (itemTotals[item.item_id] || 0) + item.quantity;
+        // Only count non-skipped items
+        if (!skippedItems[item.item_id]) {
+          itemTotals[item.item_id] = (itemTotals[item.item_id] || 0) + item.quantity;
+        }
       });
     });
 
@@ -360,13 +400,17 @@ export async function getPaymentSplit(req, res) {
       };
     });
 
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments.reduce((sum, p) => p.skipped ? sum : sum + p.amount, 0);
 
     res.json({
       success: true,
       session_id,
       total_paid: Math.round(totalPaid),
-      splits
+      splits,
+      skipped_items: Object.keys(skippedItems).map(item_id => ({
+        item_id,
+        skip_reason: skippedItems[item_id].skip_reason
+      }))
     });
   } catch (error) {
     console.error('Error calculating payment split:', error);

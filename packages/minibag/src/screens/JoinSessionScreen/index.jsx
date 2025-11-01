@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, MapPin, Clock, ShoppingBag, Users, Loader2 } from 'lucide-react';
 import AppHeader from '../../components/layout/AppHeader.jsx';
+import { useNotification } from '../../hooks/useNotification.js';
 
 export default function JoinSessionScreen({
   session,
@@ -13,6 +14,8 @@ export default function JoinSessionScreen({
   onNavigateToHome,
   onNavigateToCreate
 }) {
+  const notify = useNotification();
+
   // Local state for this screen
   const [joiningSession, setJoiningSession] = useState(false);
   const [participantName, setParticipantName] = useState('');
@@ -53,18 +56,18 @@ export default function JoinSessionScreen({
   // Handle joining a session
   const handleJoinSession = async () => {
     if (!participantName.trim()) {
-      alert('Please enter your name');
+      notify.warning('Please enter your name');
       return;
     }
 
     if (!selectedNickname) {
-      alert('Please select a nickname');
+      notify.warning('Please select a nickname');
       return;
     }
 
     // Check if session is full (max 4 people: 1 host + 3 participants)
     if (participants.length >= 3) {
-      alert('This list is full! Maximum 4 people can shop together.');
+      notify.error('This list is full! Maximum 4 people can shop together.');
       return;
     }
 
@@ -87,11 +90,11 @@ export default function JoinSessionScreen({
       console.error('❌ Failed to join session:', error);
       // Check error type
       if (error.message && error.message.includes('full')) {
-        alert('This list is full! Maximum 4 people can shop together.');
+        notify.error('This list is full! Maximum 4 people can shop together.');
       } else if (error.message && error.message.includes('expired')) {
-        alert('This invite link has expired. The host set a 20-minute timeout. Please ask for a new link.');
+        notify.error('This invite link has expired. The host set a 20-minute timeout. Please ask for a new link.');
       } else {
-        alert('Unable to join list. Please check the link and try again.');
+        notify.error(error.userMessage || 'Unable to join list. Please check the link and try again.');
       }
     } finally {
       setJoiningSession(false);

@@ -9,7 +9,7 @@ import SessionParticipantList from '../components/session/SessionParticipantList
 import ExpectedParticipantsInput from '../components/session/ExpectedParticipantsInput.jsx';
 import SessionInviteControls from '../components/session/SessionInviteControls.jsx';
 import CheckpointStatus from '../components/session/CheckpointStatus.jsx';
-import { useSessionNotifications } from '../hooks/useSessionNotifications.js';
+import { useNotification } from '../hooks/useNotification.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
 
@@ -41,15 +41,15 @@ export default function SessionActiveScreen({
 }) {
   const { t, i18n } = useTranslation();
 
-  // Use custom hooks for state management
-  const { notification, showNotification } = useSessionNotifications();
+  // Use new notification system
+  const notify = useNotification();
 
   useParticipantSync({
     session,
     currentParticipant,
     participants,
     onUpdateParticipants,
-    onShowNotification: showNotification
+    onShowNotification: notify.success
   });
 
   const {
@@ -339,20 +339,6 @@ export default function SessionActiveScreen({
         onHelpClick={onHelpClick}
         onLogoClick={onLogoClick}
       />
-
-      {/* Toast Notification */}
-      {notification && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full px-6 animate-fade-in">
-          <div className="bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium">{notification}</p>
-          </div>
-        </div>
-      )}
 
       <div className="p-6 pt-20">
         {/* Progress Bar - Only show for host */}

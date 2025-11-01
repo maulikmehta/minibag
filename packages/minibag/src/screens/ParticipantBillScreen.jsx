@@ -1,5 +1,6 @@
 import React from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
+import { useNotification } from '../hooks/useNotification.js';
 
 /**
  * ParticipantBillScreen Component
@@ -23,6 +24,8 @@ function ParticipantBillScreen({
   getItemName,
   onGoHome
 }) {
+  const notify = useNotification();
+
   // Empty state - no participants
   if (participants.length === 0) {
     return (
@@ -116,7 +119,7 @@ function ParticipantBillScreen({
         <div className="space-y-3">
           <button
             onClick={() => {
-              alert(`Opening UPI payment for ₹${participantCost.toFixed(0)}\n\nIn real app: Deep-link to PhonePe/GPay`);
+              notify.info(`UPI payment for ₹${participantCost.toFixed(0)} (Demo: would open PhonePe/GPay)`);
             }}
             className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors"
           >
@@ -125,7 +128,7 @@ function ParticipantBillScreen({
 
           <button
             onClick={() => {
-              alert('Marked as paid via cash.\n\nIn real app: Notify host');
+              notify.success('Marked as paid via cash (Demo: would notify host)');
             }}
             className="w-full border-2 border-gray-900 py-4 rounded-lg text-base text-gray-900"
           >

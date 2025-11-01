@@ -5,6 +5,7 @@ import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import ProgressBar from '../../components/layout/ProgressBar.jsx';
+import { useNotification } from '../../hooks/useNotification.js';
 
 export default function SessionCreateScreen({
   categories,
@@ -24,6 +25,7 @@ export default function SessionCreateScreen({
   initialHostItems = {}
 }) {
   const { i18n } = useTranslation();
+  const notify = useNotification();
 
   // Local state for this screen - initialize from parent's hostItems when navigating back
   const [hostItems, setHostItems] = useState(initialHostItems);
@@ -134,12 +136,12 @@ export default function SessionCreateScreen({
   // Handle session creation with nickname selection
   const handleCreateSession = async () => {
     if (!hostName.trim()) {
-      alert('Please enter your name');
+      notify.warning('Please enter your name');
       return;
     }
 
     if (!selectedHostNickname) {
-      alert('Please select a nickname');
+      notify.warning('Please select a nickname');
       return;
     }
 
@@ -174,7 +176,7 @@ export default function SessionCreateScreen({
       onSessionCreated(hostItems);
     } catch (error) {
       console.error('❌ Failed to create session:', error);
-      alert('Unable to start list. Please try again.');
+      notify.error(error.userMessage || 'Unable to start list. Please try again.');
     } finally {
       setCreatingSession(false);
     }

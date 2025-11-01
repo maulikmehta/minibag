@@ -1,5 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationToast from './components/NotificationToast';
 
 // Loading component for lazy-loaded routes
 function LoadingFallback({ message = 'Loading...' }) {
@@ -45,20 +47,23 @@ function BillViewWrapper() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          {/* Direct to app for field testing */}
-          <Route path="/" element={<MinibagPrototype />} />
-          <Route path="/home" element={<LocalLoopsLanding />} />
-          <Route path="/minibag" element={<MinibagLandingWrapper />} />
-          <Route path="/app" element={<MinibagPrototype />} />
-          <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
-          <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <NotificationProvider>
+      <BrowserRouter>
+        <Suspense fallback={<LoadingFallback />}>
+          <NotificationToast />
+          <Routes>
+            {/* Direct to app for field testing */}
+            <Route path="/" element={<MinibagPrototype />} />
+            <Route path="/home" element={<LocalLoopsLanding />} />
+            <Route path="/minibag" element={<MinibagLandingWrapper />} />
+            <Route path="/app" element={<MinibagPrototype />} />
+            <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
+            <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </NotificationProvider>
   );
 }
 

@@ -29,6 +29,7 @@ function PaymentSplitScreen({
   hostItems,
   participants,
   itemPayments,
+  skippedItems = {},
   items,
   getItemName,
   session,
@@ -229,6 +230,35 @@ function PaymentSplitScreen({
             );
           })}
         </div>
+
+        {/* Skipped Items Section */}
+        {Object.keys(skippedItems).length > 0 && (
+          <div className="border border-yellow-300 bg-yellow-50 rounded-lg p-4 mb-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="text-yellow-600">⚠️</span>
+              Skipped Items
+            </h3>
+            <div className="text-sm text-gray-700 space-y-2">
+              {Object.entries(skippedItems).map(([itemId, skipData]) => {
+                const veg = items.find(v => v.id === itemId);
+                if (!veg) return null;
+                return (
+                  <div key={itemId} className="flex justify-between items-start py-2 border-b border-yellow-200 last:border-0">
+                    <div className="flex-1">
+                      <p className="text-base text-gray-900">{getItemName(veg)}</p>
+                      <p className="text-xs text-gray-600 italic mt-1">
+                        {skipData.reason || 'Item wasn\'t good enough to buy'}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded ml-2">
+                      SKIPPED
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">

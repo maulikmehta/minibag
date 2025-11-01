@@ -37,6 +37,7 @@ function ShoppingScreen({
   hostItems,
   participants,
   itemPayments,
+  skippedItems = {},
   items,
   getItemName,
   currentParticipant,
@@ -45,6 +46,7 @@ function ShoppingScreen({
   selectedItemForPayment,
   setSelectedItemForPayment,
   onRecordPayment,
+  onSkipToggle,
   onDoneShopping,
   onUpdateSessionStatus,
   showSessionMenu,
@@ -71,7 +73,7 @@ function ShoppingScreen({
 
   const hostNickname = currentParticipant?.nickname || 'You';
   const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
-  const allItemsPaid = Object.keys(allItems).every(id => itemPayments[id]);
+  const allItemsHandled = Object.keys(allItems).every(id => itemPayments[id] || skippedItems[id]);
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
@@ -110,6 +112,7 @@ function ShoppingScreen({
             const veg = items.find(v => v.id === itemId);
             const payment = itemPayments[itemId];
             const isPaid = !!payment;
+            const isSkipped = !!skippedItems[itemId];
 
             // Skip if vegetable not found
             if (!veg) return null;
@@ -129,9 +132,19 @@ function ShoppingScreen({
               <div
                 key={itemId}
                 className={`flex items-start gap-3 py-3 px-2 ${
-                  isPaid ? 'bg-gray-50' : ''
+                  isPaid ? 'bg-gray-50' : isSkipped ? 'bg-yellow-50' : ''
                 }`}
               >
+                {/* Skip Checkbox */}
+                <div className="flex items-center mt-2">
+                  <input
+                    type="checkbox"
+                    checked={isSkipped}
+                    onChange={() => onSkipToggle && onSkipToggle(itemId)}
+                    className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                  />
+                </div>
+
                 {veg.thumbnail_url || veg.img ? (
                   <img
                     src={veg.thumbnail_url || veg.img}
@@ -149,7 +162,16 @@ function ShoppingScreen({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-base text-gray-900 mb-1">{getItemName(veg)}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className={`text-base ${isSkipped ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                      {getItemName(veg)}
+                    </p>
+                    {isSkipped && (
+                      <span className="px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded">
+                        SKIPPED
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500">
                     {breakdown.map((b, idx) => (
                       <span key={idx}>
@@ -157,14 +179,19 @@ function ShoppingScreen({
                       </span>
                     ))}
                   </p>
-                  {isPaid && (
+                  {isPaid && !isSkipped && (
                     <p className="text-sm text-gray-900 mt-1">
                       ✓ ₹{payment.amount} • {payment.method === 'upi' ? 'UPI' : 'Cash'}
                     </p>
                   )}
+                  {isSkipped && (
+                    <p className="text-sm text-gray-600 italic mt-1">
+                      {skippedItems[itemId]?.reason || 'Item wasn\'t good enough to buy'}
+                    </p>
+                  )}
                 </div>
 
-                {isPaid ? (
+                {isPaid && !isSkipped ? (
                   <button
                     onClick={() => {
                       setSelectedItemForPayment(itemId);
@@ -174,7 +201,7 @@ function ShoppingScreen({
                   >
                     Edit
                   </button>
-                ) : (
+                ) : !isSkipped ? (
                   <button
                     onClick={() => {
                       setSelectedItemForPayment(itemId);
@@ -184,7 +211,7 @@ function ShoppingScreen({
                   >
                     Pay
                   </button>
-                )}
+                ) : null}
               </div>
             );
           })}
@@ -209,7 +236,7 @@ function ShoppingScreen({
       )}
 
       {/* Done button */}
-      {allItemsPaid && (
+      {allItemsHandled && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
           <button
             onClick={onDoneShopping}

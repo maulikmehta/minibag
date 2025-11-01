@@ -1,6 +1,7 @@
 import React from 'react';
 import { Share2, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../../hooks/useNotification.js';
 
 /**
  * Component for session invitation controls
@@ -19,6 +20,7 @@ export default function SessionInviteControls({
   disabled = false
 }) {
   const { t } = useTranslation();
+  const notify = useNotification();
 
   const handleCopyLink = async () => {
     if (!session || disabled) return;
@@ -32,10 +34,10 @@ export default function SessionInviteControls({
 
     try {
       await navigator.clipboard.writeText(shareText);
-      alert('✓ Invitation copied to clipboard!');
+      notify.success('Invitation copied to clipboard!');
     } catch (error) {
       // Fallback for browsers that don't support clipboard API
-      alert(`Copy this message:\n\n${shareText}`);
+      notify.info('Copy failed. Please copy manually from the link.');
     }
   };
 

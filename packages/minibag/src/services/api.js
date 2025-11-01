@@ -8,6 +8,49 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 /**
+ * User-friendly error messages for common API errors
+ */
+const ERROR_MESSAGES = {
+  NETWORK_ERROR: 'No internet connection. Please check your network.',
+  SERVER_ERROR: 'Something went wrong on our end. Please try again.',
+  NOT_FOUND: 'Resource not found. The link may be expired.',
+  FORBIDDEN: 'You don\'t have permission to do that.',
+  TIMEOUT: 'Request timed out. Please check your connection.',
+  INVALID_DATA: 'Invalid data provided. Please check your input.',
+  UNKNOWN: 'An unexpected error occurred. Please try again.'
+};
+
+/**
+ * Custom API Error class with user-friendly messages
+ */
+class APIError extends Error {
+  constructor(message, statusCode, userMessage) {
+    super(message);
+    this.name = 'APIError';
+    this.statusCode = statusCode;
+    this.userMessage = userMessage || message;
+  }
+}
+
+/**
+ * Get user-friendly error message based on status code
+ */
+function getUserFriendlyMessage(statusCode, defaultMessage) {
+  switch (statusCode) {
+    case 404:
+      return ERROR_MESSAGES.NOT_FOUND;
+    case 403:
+      return ERROR_MESSAGES.FORBIDDEN;
+    case 500:
+    case 502:
+    case 503:
+      return ERROR_MESSAGES.SERVER_ERROR;
+    default:
+      return defaultMessage || ERROR_MESSAGES.UNKNOWN;
+  }
+}
+
+/**
  * Base fetch wrapper with error handling
  */
 async function apiFetch(endpoint, options = {}) {
@@ -31,23 +74,64 @@ async function apiFetch(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    const data = await response.json();
+
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    const isJson = contentType && contentType.includes('application/json');
+
+    let data;
+    try {
+      data = isJson ? await response.json() : await response.text();
+    } catch (parseError) {
+      console.error('Failed to parse response:', parseError);
+      throw new APIError(
+        'Invalid response from server',
+        response.status,
+        ERROR_MESSAGES.SERVER_ERROR
+      );
+    }
 
     if (!response.ok) {
       // Log full error details for debugging
       console.error(`API Error (${endpoint}):`, {
         status: response.status,
-        error: data.error,
+        error: data.error || data,
         details: data.details,
         data
       });
-      throw new Error(data.error || `HTTP error! status: ${response.status}`);
+
+      const errorMessage = data.error || data.message || `HTTP error! status: ${response.status}`;
+      const userMessage = getUserFriendlyMessage(response.status, errorMessage);
+
+      throw new APIError(errorMessage, response.status, userMessage);
     }
 
     return data;
   } catch (error) {
+    // Handle network errors
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error(`Network Error (${endpoint}):`, error);
+      throw new APIError('Network error', 0, ERROR_MESSAGES.NETWORK_ERROR);
+    }
+
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      console.error(`Timeout Error (${endpoint}):`, error);
+      throw new APIError('Request timeout', 0, ERROR_MESSAGES.TIMEOUT);
+    }
+
+    // Re-throw APIError instances
+    if (error instanceof APIError) {
+      throw error;
+    }
+
+    // Handle other errors
     console.error(`API Error (${endpoint}):`, error);
-    throw error;
+    throw new APIError(
+      error.message || 'Unknown error',
+      0,
+      ERROR_MESSAGES.UNKNOWN
+    );
   }
 }
 
