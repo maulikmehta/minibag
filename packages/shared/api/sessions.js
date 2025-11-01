@@ -308,7 +308,8 @@ export async function createSession(req, res) {
         nickname,
         avatar_emoji,
         real_name, // Store real name if provided
-        is_creator: true
+        is_creator: true,
+        items_confirmed: true // Host confirms when clicking "Start List"
       })
       .select()
       .single();

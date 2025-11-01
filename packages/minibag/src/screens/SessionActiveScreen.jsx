@@ -86,10 +86,12 @@ export default function SessionActiveScreen({
   const confirmedParticipants = activeParticipants.filter(p => p.items_confirmed).length;
   const hasConfirmedParticipants = confirmedParticipants > 0;
 
-  // Check if ALL participants (including host) have confirmed their lists
-  const hostConfirmed = currentParticipant?.items_confirmed || false;
-  const otherParticipantsConfirmed = activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed);
-  const allParticipantsConfirmed = hostConfirmed && otherParticipantsConfirmed;
+  // Check if ALL JOINED participants (not host, not declined) have confirmed their lists
+  // Host already confirmed when clicking "Start List" button
+  // participants array already excludes host (is_creator is filtered out in sessionTransformers.js)
+  const joinedParticipants = participants.filter(p => !p.marked_not_coming);
+  const allJoinedParticipantsConfirmed = joinedParticipants.length === 0 ||
+                                         joinedParticipants.every(p => p.items_confirmed);
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -486,12 +488,12 @@ export default function SessionActiveScreen({
         participantCount={activeParticipants.length}
         confirmedParticipants={confirmedParticipants}
         hasConfirmedParticipants={hasConfirmedParticipants}
-        allParticipantsConfirmed={allParticipantsConfirmed}
+        allJoinedParticipantsConfirmed={allJoinedParticipantsConfirmed}
         autoTimedOutCount={autoTimedOutCount}
         isInviteExpired={isInviteExpired}
         expectedCount={expectedCount}
         onStartShopping={onNavigateToShopping}
-        disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (expectedCount > 0 && !allParticipantsConfirmed)}
+        disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (expectedCount > 0 && !allJoinedParticipantsConfirmed)}
       />
     </div>
   );

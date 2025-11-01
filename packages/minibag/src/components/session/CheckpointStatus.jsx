@@ -7,10 +7,10 @@ import React from 'react';
  * @param {Object} props
  * @param {boolean} props.checkpointComplete - Whether the checkpoint is complete
  * @param {number} props.waitingCount - Number of participants still waiting to join
- * @param {number} props.participantCount - Total number of participants
- * @param {number} props.confirmedParticipants - Number of participants who confirmed
+ * @param {number} props.participantCount - Total number of joined participants (not declined)
+ * @param {number} props.confirmedParticipants - Number of joined participants who confirmed
  * @param {boolean} props.hasConfirmedParticipants - Whether any participants have confirmed
- * @param {boolean} props.allParticipantsConfirmed - Whether all participants have confirmed their lists
+ * @param {boolean} props.allJoinedParticipantsConfirmed - Whether all joined participants have confirmed their lists (host excluded, confirmed at "Start List")
  * @param {number} props.autoTimedOutCount - Number of slots that timed out
  * @param {boolean} props.isInviteExpired - Whether the 20-minute invite window expired
  * @param {number|null} props.expectedCount - Expected participants count
@@ -23,7 +23,7 @@ export default function CheckpointStatus({
   participantCount,
   confirmedParticipants,
   hasConfirmedParticipants,
-  allParticipantsConfirmed,
+  allJoinedParticipantsConfirmed,
   autoTimedOutCount,
   isInviteExpired,
   expectedCount,
@@ -38,7 +38,7 @@ export default function CheckpointStatus({
           {isInviteExpired && autoTimedOutCount > 0
             ? `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`
             : confirmedParticipants > 0
-              ? `${confirmedParticipants} of ${participantCount} ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
+              ? `${confirmedParticipants} of ${participantCount} joined ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
               : `${participantCount} ${participantCount === 1 ? 'participant has' : 'participants have'} joined`}
         </p>
       )}
@@ -52,8 +52,8 @@ export default function CheckpointStatus({
             ? 'Set how many friends joining above'
             : !checkpointComplete
               ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond`
-              : (participantCount > 0 && !allParticipantsConfirmed
-                  ? `Waiting for ${participantCount - confirmedParticipants} ${participantCount - confirmedParticipants === 1 ? 'participant' : 'participants'} to confirm their list`
+              : (participantCount > 0 && !allJoinedParticipantsConfirmed
+                  ? `Waiting for ${participantCount - confirmedParticipants} joined ${participantCount - confirmedParticipants === 1 ? 'participant' : 'participants'} to confirm their list`
                   : '')
         }
       >
