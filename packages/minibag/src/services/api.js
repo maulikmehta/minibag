@@ -229,20 +229,6 @@ export async function deletePayment(paymentId) {
 // ============================================================================
 
 /**
- * Update participant metadata (confirmation status, etc.)
- * @param {string} participantId - Participant ID (UUID)
- * @param {Object} metadata - Metadata to update {items_confirmed, etc.}
- * @returns {Promise<Object>} Updated participant data
- */
-export async function updateParticipant(participantId, metadata) {
-  const response = await apiFetch(`/api/participants/${participantId}`, {
-    method: 'PATCH',
-    body: JSON.stringify(metadata),
-  });
-  return response.data;
-}
-
-/**
  * Update participant status (items_confirmed, marked_not_coming)
  * @param {string} participantId - Participant ID (UUID)
  * @param {Object} status - Status to update {items_confirmed, marked_not_coming}
@@ -372,7 +358,6 @@ export default {
   deletePayment,
 
   // Participant Items
-  updateParticipant,
   updateParticipantStatus,
   updateParticipantItems,
   addParticipantItem,

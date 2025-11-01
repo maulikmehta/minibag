@@ -194,8 +194,6 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   React.useEffect(() => {
     if (session?.session_id && currentParticipant?.is_creator) {
       const handleParticipantItemsUpdate = ({ participantId, items, items_confirmed, real_name, nickname }) => {
-        console.log(`Host received update: Participant ${participantId} updated items`, items, 'confirmed:', items_confirmed);
-
         // Update local participants state with items and metadata
         setParticipants(prevParticipants => {
           return prevParticipants.map(p => {
@@ -594,41 +592,35 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onNavigateToShopping={() => setCurrentScreen('shopping')}
         onNavigateToTracking={async () => {
           // Mark participant as confirmed
-          if (currentParticipant?.id) {
-            try {
-              const participantData = participants.find(p => p.id === currentParticipant.id);
-              const itemsToSend = participantData?.items || {};
-
-              console.log('🔍 Participant confirming:', {
-                participantId: currentParticipant.id,
-                nickname: currentParticipant.nickname,
-                items: itemsToSend,
-                participantsArray: participants
-              });
-
-              await updateParticipantStatus(currentParticipant.id, { items_confirmed: true });
-
-              // Emit WebSocket event to notify host
-              console.log('📡 Emitting participant-items-updated with:', {
-                participantId: currentParticipant.id,
-                items: itemsToSend,
-                items_confirmed: true
-              });
-
-              socketService.emitParticipantItemsUpdated(
-                currentParticipant.id,
-                itemsToSend,
-                {
-                  real_name: currentParticipant.real_name,
-                  nickname: currentParticipant.nickname,
-                  items_confirmed: true
-                }
-              );
-            } catch (error) {
-              console.error('Failed to update participant confirmation:', error);
-            }
+          if (!currentParticipant?.id) {
+            setCurrentScreen('participant-tracking');
+            return;
           }
-          setCurrentScreen('participant-tracking');
+
+          try {
+            const participantData = participants.find(p => p.id === currentParticipant.id);
+            const itemsToSend = participantData?.items || {};
+
+            // Update status in backend
+            await updateParticipantStatus(currentParticipant.id, { items_confirmed: true });
+
+            // Notify host via WebSocket
+            socketService.emitParticipantItemsUpdated(
+              currentParticipant.id,
+              itemsToSend,
+              {
+                real_name: currentParticipant.real_name,
+                nickname: currentParticipant.nickname,
+                items_confirmed: true
+              }
+            );
+
+            // Navigate to tracking screen on success
+            setCurrentScreen('participant-tracking');
+          } catch (error) {
+            console.error('Failed to update participant confirmation:', error);
+            alert('Failed to confirm your list. Please try again.');
+          }
         }}
         onNavigateToStep={(step) => {
           // Handle progress bar step navigation
@@ -664,7 +656,6 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
               // Save to backend so host can see
               try {
                 await updateParticipantItems(currentParticipant.id, myData.items);
-                console.log('Participant items synced to backend');
                 // WebSocket sync happens only on confirmation to prevent input flickering
               } catch (error) {
                 console.error('Failed to sync participant items to backend:', error);
