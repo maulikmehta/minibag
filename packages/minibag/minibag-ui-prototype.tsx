@@ -32,7 +32,7 @@ import {
   PARTICIPANT_SESSION_TOUR_STEPS,
   PARTICIPANT_ADD_ITEMS_TOUR_STEPS
 } from './src/config/tooltips.config.js';
-import { transformSessionData } from './src/utils/sessionTransformers.js';
+import { transformSessionData, transformParticipant } from './src/utils/sessionTransformers.js';
 import './src/styles/driver-custom.css';
 
 // Hardcoded data removed - now fetched from API via useCatalog hook
@@ -737,8 +737,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     return (
       <ParticipantTrackingScreen
         session={session}
-        participant={currentParticipant}
-        participants={apiParticipants}
+        participant={participants.find(p => p.id === currentParticipant?.id) || (currentParticipant ? transformParticipant(currentParticipant) : null)}
+        participants={participants}
         items={VEGETABLES}
         getItemName={getItemName}
         getTotalWeight={getTotalWeight}

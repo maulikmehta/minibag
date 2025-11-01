@@ -281,8 +281,8 @@ export function useSession(sessionId = null) {
     });
 
     // Listen for status changes
-    socketService.onSessionStatusChanged((newStatus) => {
-      setSession(prev => ({ ...prev, status: newStatus }));
+    socketService.onSessionStatusUpdated((data) => {
+      setSession(prev => ({ ...prev, status: data.status }));
     });
 
     return () => {
