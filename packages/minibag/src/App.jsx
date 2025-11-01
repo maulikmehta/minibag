@@ -1,10 +1,23 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import LocalLoopsLanding from './LocalLoopsLanding';
-import LandingPage from './LandingPage';
-import MinibagPrototype from '../minibag-ui-prototype';
 
-// Lazy load admin dashboard to reduce main bundle size (saves ~180 KB)
+// Loading component for lazy-loaded routes
+function LoadingFallback({ message = 'Loading...' }) {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+// Lazy load all routes to reduce main bundle size
+// Each screen becomes a separate chunk, loaded only when accessed
+const LocalLoopsLanding = lazy(() => import('./LocalLoopsLanding'));
+const LandingPage = lazy(() => import('./LandingPage'));
+const MinibagPrototype = lazy(() => import('../minibag-ui-prototype'));
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 
 // Wrapper component to navigate to app on button click
@@ -33,23 +46,18 @@ function BillViewWrapper() {
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Direct to app for field testing */}
-        <Route path="/" element={<MinibagPrototype />} />
-        <Route path="/home" element={<LocalLoopsLanding />} />
-        <Route path="/minibag" element={<MinibagLandingWrapper />} />
-        <Route path="/app" element={<MinibagPrototype />} />
-        <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
-        <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
-        <Route
-          path="/admin"
-          element={
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading admin...</div>}>
-              <AdminDashboard />
-            </Suspense>
-          }
-        />
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          {/* Direct to app for field testing */}
+          <Route path="/" element={<MinibagPrototype />} />
+          <Route path="/home" element={<LocalLoopsLanding />} />
+          <Route path="/minibag" element={<MinibagLandingWrapper />} />
+          <Route path="/app" element={<MinibagPrototype />} />
+          <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
+          <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -36,6 +36,21 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false  // Disabled for production - saves 2.3 MB and prevents source code exposure
+    sourcemap: false,  // Disabled for production - saves 2.3 MB and prevents source code exposure
+    rollupOptions: {
+      output: {
+        // Manual vendor chunking for better caching
+        manualChunks: {
+          // Core React libraries (cached across visits)
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // WebSocket client (only for active sessions)
+          'vendor-socket': ['socket.io-client'],
+          // Internationalization (language support)
+          'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          // Charts library (only in admin dashboard)
+          'vendor-charts': ['chart.js', 'react-chartjs-2']
+        }
+      }
+    }
   }
 });
