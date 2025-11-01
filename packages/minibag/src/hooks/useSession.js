@@ -27,7 +27,7 @@ export function useSession(sessionId = null) {
   /**
    * Persist session to localStorage
    */
-  const persistSession = useCallback((sessionData, participantData) => {
+  const persistSession = useCallback((sessionData, participantData, hostToken = null) => {
     try {
       const dataToStore = {
         session: sessionData,
@@ -35,6 +35,11 @@ export function useSession(sessionId = null) {
         timestamp: Date.now()
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(dataToStore));
+
+      // Store host token separately if provided (for session creator only)
+      if (hostToken) {
+        localStorage.setItem(`host_token_${sessionData.session_id}`, hostToken);
+      }
     } catch (err) {
       console.error('Failed to persist session:', err);
     }
@@ -45,6 +50,14 @@ export function useSession(sessionId = null) {
    */
   const clearPersistedSession = useCallback(() => {
     try {
+      // Get session ID before clearing, to also remove host token
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (stored) {
+        const { session: storedSession } = JSON.parse(stored);
+        if (storedSession?.session_id) {
+          localStorage.removeItem(`host_token_${storedSession.session_id}`);
+        }
+      }
       localStorage.removeItem(SESSION_STORAGE_KEY);
     } catch (err) {
       console.error('Failed to clear persisted session:', err);
@@ -156,8 +169,8 @@ export function useSession(sessionId = null) {
       setCurrentParticipant(result.participant);
       setParticipants([result.participant]);
 
-      // Persist session to localStorage
-      persistSession(result.session, result.participant);
+      // Persist session to localStorage (including host_token for creator)
+      persistSession(result.session, result.participant, result.host_token);
 
       // Join WebSocket room
       socketService.joinSessionRoom(result.session.session_id);

@@ -16,17 +16,31 @@ async function apiFetch(endpoint, options = {}) {
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
     },
   };
 
-  const config = { ...defaultOptions, ...options };
+  // Properly merge options while preserving both default and custom headers
+  const config = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...(options.headers || {})
+    }
+  };
 
   try {
     const response = await fetch(url, config);
     const data = await response.json();
 
     if (!response.ok) {
+      // Log full error details for debugging
+      console.error(`API Error (${endpoint}):`, {
+        status: response.status,
+        error: data.error,
+        details: data.details,
+        data
+      });
       throw new Error(data.error || `HTTP error! status: ${response.status}`);
     }
 
@@ -138,8 +152,16 @@ export async function joinSession(sessionId, items = [], nicknameData = {}) {
  * @returns {Promise<Object>} Updated session data
  */
 export async function updateSessionStatus(sessionId, status) {
+  // Retrieve host token from localStorage
+  const hostToken = localStorage.getItem(`host_token_${sessionId}`);
+
+  console.log('updateSessionStatus called:', { sessionId, status, hostToken: hostToken ? 'present' : 'missing' });
+
   const response = await apiFetch(`/api/sessions/${sessionId}/status`, {
     method: 'PUT',
+    headers: {
+      'X-Host-Token': hostToken || '' // Include host token for authentication
+    },
     body: JSON.stringify({ status }),
   });
   return response.data;
