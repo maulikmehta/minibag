@@ -36,21 +36,10 @@ export async function updateParticipantItems(req, res) {
       });
     }
 
-    // Delete all existing items for this participant
-    const { error: deleteError } = await supabase
-      .from('participant_items')
-      .delete()
-      .eq('participant_id', participant_id);
+    // Get UUID mappings for item_ids from items to be saved
+    const itemIds = items.map(item => item.item_id);
 
-    if (deleteError) {
-      console.error('Error deleting old items:', deleteError);
-      throw deleteError;
-    }
-
-    // Insert new items (if any)
-    if (items.length > 0) {
-      // Get UUID mappings for item_ids
-      const itemIds = items.map(item => item.item_id);
+    if (itemIds.length > 0) {
       const { data: catalogItems, error: catalogError } = await supabase
         .from('catalog_items')
         .select('id, item_id')
@@ -64,21 +53,57 @@ export async function updateParticipantItems(req, res) {
         itemIdMap[item.item_id] = item.id;
       });
 
-      // Prepare items for insertion
-      const itemsToInsert = items.map(item => ({
+      // Prepare items for upsert
+      const itemsToUpsert = items.map(item => ({
         participant_id: participant_id,
         item_id: itemIdMap[item.item_id], // Use UUID
         quantity: item.quantity,
         unit: item.unit || 'kg'
       }));
 
-      const { error: insertError } = await supabase
+      // Use upsert to handle both insert and update atomically
+      // This prevents race conditions from concurrent updates
+      const { error: upsertError } = await supabase
         .from('participant_items')
-        .insert(itemsToInsert);
+        .upsert(itemsToUpsert, {
+          onConflict: 'participant_id,item_id',
+          ignoreDuplicates: false
+        });
 
-      if (insertError) {
-        console.error('Error inserting items:', insertError);
-        throw insertError;
+      if (upsertError) {
+        console.error('Error upserting items:', upsertError);
+        throw upsertError;
+      }
+    }
+
+    // Delete items that are no longer in the list
+    // Get all current items for this participant
+    const { data: currentItems } = await supabase
+      .from('participant_items')
+      .select('item_id')
+      .eq('participant_id', participant_id);
+
+    if (currentItems && currentItems.length > 0) {
+      // Get UUIDs of items we want to keep
+      const itemIds = items.map(item => item.item_id);
+      const { data: catalogItems } = await supabase
+        .from('catalog_items')
+        .select('id, item_id')
+        .in('item_id', itemIds);
+
+      const uuidsToKeep = catalogItems?.map(item => item.id) || [];
+
+      // Find items to delete (items that exist but aren't in the new list)
+      const itemsToDelete = currentItems
+        .filter(item => !uuidsToKeep.includes(item.item_id))
+        .map(item => item.item_id);
+
+      if (itemsToDelete.length > 0) {
+        await supabase
+          .from('participant_items')
+          .delete()
+          .eq('participant_id', participant_id)
+          .in('item_id', itemsToDelete);
       }
     }
 

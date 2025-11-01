@@ -3,7 +3,7 @@ import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRu
 import { useTranslation } from 'react-i18next';
 import useCatalog from './src/hooks/useCatalog.js';
 import useSession from './src/hooks/useSession.js';
-import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipant, updateSessionStatus } from './src/services/api.js';
+import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipantStatus, updateSessionStatus } from './src/services/api.js';
 import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
@@ -193,14 +193,22 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   // Listen for participant item updates (host only)
   React.useEffect(() => {
     if (session?.session_id && currentParticipant?.is_creator) {
-      const handleParticipantItemsUpdate = ({ participantId, items }) => {
-        console.log(`Host received update: Participant ${participantId} updated items`, items);
+      const handleParticipantItemsUpdate = ({ participantId, items, items_confirmed, real_name, nickname }) => {
+        console.log(`Host received update: Participant ${participantId} updated items`, items, 'confirmed:', items_confirmed);
 
-        // Update local participants state
+        // Update local participants state with items and metadata
         setParticipants(prevParticipants => {
           return prevParticipants.map(p => {
             if (p.id === participantId) {
-              return { ...p, items };
+              return {
+                ...p,
+                items,
+                // Update items_confirmed status if provided
+                ...(typeof items_confirmed === 'boolean' && { items_confirmed }),
+                // Update participant names if provided (in case they changed)
+                ...(real_name && { real_name }),
+                ...(nickname && { nickname })
+              };
             }
             return p;
           });
@@ -588,11 +596,28 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           // Mark participant as confirmed
           if (currentParticipant?.id) {
             try {
-              await updateParticipant(currentParticipant.id, { items_confirmed: true });
+              const participantData = participants.find(p => p.id === currentParticipant.id);
+              const itemsToSend = participantData?.items || {};
+
+              console.log('🔍 Participant confirming:', {
+                participantId: currentParticipant.id,
+                nickname: currentParticipant.nickname,
+                items: itemsToSend,
+                participantsArray: participants
+              });
+
+              await updateParticipantStatus(currentParticipant.id, { items_confirmed: true });
+
               // Emit WebSocket event to notify host
+              console.log('📡 Emitting participant-items-updated with:', {
+                participantId: currentParticipant.id,
+                items: itemsToSend,
+                items_confirmed: true
+              });
+
               socketService.emitParticipantItemsUpdated(
                 currentParticipant.id,
-                participants.find(p => p.id === currentParticipant.id)?.items || {},
+                itemsToSend,
                 {
                   real_name: currentParticipant.real_name,
                   nickname: currentParticipant.nickname,
@@ -640,9 +665,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
               try {
                 await updateParticipantItems(currentParticipant.id, myData.items);
                 console.log('Participant items synced to backend');
-
-                // Emit WebSocket event so host gets real-time update
-                socketService.emitParticipantItemsUpdated(currentParticipant.id, myData.items);
+                // WebSocket sync happens only on confirmation to prevent input flickering
               } catch (error) {
                 console.error('Failed to sync participant items to backend:', error);
                 // Don't block UI - localStorage is still saved

@@ -62,10 +62,18 @@ export function setupSocketHandlers(socket, io) {
    * Broadcast when a participant updates their item selections
    */
   socket.on('participant-items-updated', (data) => {
-    const { sessionId, participantId, items } = data;
-    console.log(`Participant ${participantId} updated items in session ${sessionId}`);
+    const { sessionId, participantId, items, items_confirmed, real_name, nickname } = data;
+    console.log(`Participant ${participantId} updated items in session ${sessionId}`,
+                items_confirmed !== undefined ? `(confirmed: ${items_confirmed})` : '');
     // Broadcast to all clients in the session room (so host can see)
-    io.to(sessionId).emit('participant-items-updated', { participantId, items });
+    // Include all metadata for proper state sync
+    io.to(sessionId).emit('participant-items-updated', {
+      participantId,
+      items,
+      ...(items_confirmed !== undefined && { items_confirmed }),
+      ...(real_name && { real_name }),
+      ...(nickname && { nickname })
+    });
   });
 
   /**
