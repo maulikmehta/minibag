@@ -77,7 +77,7 @@ export const validateJoinSession = [
   validate
 ];
 
-// Payment validation
+// Payment validation with custom logic for skip items
 export const validatePayment = [
   param('session_id')
     .isString()
@@ -88,12 +88,46 @@ export const validatePayment = [
     .trim()
     .notEmpty()
     .withMessage('Item ID is required'),
+  body('skipped')
+    .optional()
+    .isBoolean()
+    .withMessage('Skipped must be a boolean'),
+  body('skip_reason')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Skip reason must be less than 200 characters'),
+  // Custom validation for amount and method based on skipped flag
   body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('Amount must be greater than 0'),
+    .optional()
+    .custom((value, { req }) => {
+      // If skipped, amount can be 0, null, or undefined
+      if (req.body.skipped === true) {
+        return true;
+      }
+      // If not skipped, amount must be a number >= 0.01
+      if (typeof value !== 'number' || value < 0.01) {
+        throw new Error('Amount must be greater than 0 for non-skipped items');
+      }
+      return true;
+    }),
   body('method')
-    .isIn(['upi', 'cash'])
-    .withMessage('Method must be "upi" or "cash"'),
+    .optional()
+    .custom((value, { req }) => {
+      // If skipped, method must be 'skip'
+      if (req.body.skipped === true) {
+        if (value !== 'skip') {
+          throw new Error('Method must be "skip" for skipped items');
+        }
+        return true;
+      }
+      // If not skipped, method must be upi or cash
+      if (!['upi', 'cash'].includes(value)) {
+        throw new Error('Method must be "upi" or "cash" for non-skipped items');
+      }
+      return true;
+    }),
   body('recorded_by')
     .optional()
     .isUUID()

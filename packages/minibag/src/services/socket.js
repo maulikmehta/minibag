@@ -237,9 +237,25 @@ class SocketService {
    */
   emitSessionStatusUpdate(status) {
     if (!this.currentSessionId) {
-      console.error('Cannot emit session-status-updated: no session');
+      console.warn('Cannot emit session-status-updated: session not joined yet');
+
+      // Queue the emit for when socket reconnects
+      const retryEmit = () => {
+        if (this.currentSessionId) {
+          this.emit('session-status-updated', { status });
+        }
+      };
+
+      // Retry once after 500ms (gives socket time to reconnect)
+      setTimeout(() => {
+        if (this.currentSessionId) {
+          retryEmit();
+        }
+      }, 500);
+
       return;
     }
+
     this.emit('session-status-updated', { status });
   }
 

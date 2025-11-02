@@ -310,8 +310,12 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       // Update status via API
       await updateSessionStatus(session.session_id, status);
 
-      // Emit WebSocket event to notify all participants
-      socketService.emitSessionStatusUpdate(status);
+      // Only emit WebSocket if socket is ready
+      if (socketService.isConnected() && socketService.getCurrentSessionId()) {
+        socketService.emitSessionStatusUpdate(status);
+      } else {
+        console.warn('WebSocket not ready, skipping real-time broadcast. Status updated via API.');
+      }
 
       console.log(`Session status updated to: ${status}`);
     } catch (error) {
@@ -343,6 +347,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         // Skip: Create skip record
         const payment = await recordPayment(session.session_id, {
           item_id: itemId,
+          amount: 0,
+          method: 'skip', // Use 'skip' instead of null due to DB constraint
           skipped: true,
           skip_reason: 'Item wasn\'t good enough to buy',
           recorded_by: currentParticipant?.id || null

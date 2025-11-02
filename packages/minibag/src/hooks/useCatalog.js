@@ -19,17 +19,19 @@ export function useCategories() {
 
     async function fetchCategories() {
       try {
+        console.log('[useCatalog] Fetching categories...');
         setLoading(true);
         setError(null);
         const data = await getCategories();
 
         if (mounted) {
           setCategories(data);
+          console.log('[useCatalog] Categories loaded:', data.length);
         }
       } catch (err) {
         if (mounted) {
           setError(err.message);
-          console.error('Failed to fetch categories:', err);
+          console.error('[useCatalog] Failed to fetch categories:', err);
         }
       } finally {
         if (mounted) {
@@ -41,6 +43,7 @@ export function useCategories() {
     fetchCategories();
 
     return () => {
+      console.log('[useCatalog] Cleaning up categories hook');
       mounted = false;
     };
   }, []);
@@ -62,17 +65,19 @@ export function useItems(categoryId = null) {
 
     async function fetchItems() {
       try {
+        console.log('[useCatalog] Fetching items for category:', categoryId);
         setLoading(true);
         setError(null);
         const data = await getItems(categoryId);
 
         if (mounted) {
           setItems(data);
+          console.log('[useCatalog] Items loaded:', data.length);
         }
       } catch (err) {
         if (mounted) {
           setError(err.message);
-          console.error('Failed to fetch items:', err);
+          console.error('[useCatalog] Failed to fetch items:', err);
         }
       } finally {
         if (mounted) {
@@ -84,6 +89,7 @@ export function useItems(categoryId = null) {
     fetchItems();
 
     return () => {
+      console.log('[useCatalog] Cleaning up items hook for category:', categoryId);
       mounted = false;
     };
   }, [categoryId]);

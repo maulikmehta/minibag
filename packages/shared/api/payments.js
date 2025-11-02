@@ -24,45 +24,57 @@ export async function recordPayment(req, res) {
 
     // Validation for skipped items
     if (skipped) {
-      // Skipped items must have zero amount and null method
-      if (amount && amount > 0) {
+      // Ensure amount and method are not provided or are explicitly null/0
+      if (amount !== undefined && amount !== 0 && amount !== null) {
         return res.status(400).json({
           success: false,
-          error: 'Skipped items cannot have amount > 0'
+          error: 'Skipped items cannot have amount > 0',
+          details: { received: amount, expected: '0 or undefined' }
         });
       }
-      if (method) {
+
+      // Method must be 'skip' for skipped items
+      if (method !== undefined && method !== null && method !== 'skip') {
         return res.status(400).json({
           success: false,
-          error: 'Skipped items cannot have a payment method'
+          error: 'Skipped items must have method set to "skip"',
+          details: { received: method, expected: '"skip", null, or undefined' }
         });
       }
+
       if (!item_id) {
         return res.status(400).json({
           success: false,
-          error: 'item_id is required'
+          error: 'item_id is required for skipped items'
         });
       }
     } else {
       // Validation for regular payments
-      if (!item_id || !amount || !method) {
+      if (!item_id || amount === undefined || amount === null || !method) {
         return res.status(400).json({
           success: false,
-          error: 'item_id, amount, and method are required'
+          error: 'item_id, amount, and method are required for payments',
+          details: {
+            item_id: !!item_id,
+            amount: amount !== undefined && amount !== null,
+            method: !!method
+          }
         });
       }
 
       if (!['upi', 'cash'].includes(method)) {
         return res.status(400).json({
           success: false,
-          error: 'method must be "upi" or "cash"'
+          error: 'method must be "upi" or "cash"',
+          details: { received: method, expected: '"upi" or "cash"' }
         });
       }
 
       if (amount <= 0) {
         return res.status(400).json({
           success: false,
-          error: 'amount must be greater than 0'
+          error: 'amount must be greater than 0 for payments',
+          details: { received: amount, expected: '> 0' }
         });
       }
     }
@@ -74,7 +86,7 @@ export async function recordPayment(req, res) {
         session_id,
         item_id,
         amount: skipped ? 0 : parseFloat(amount),
-        method: skipped ? null : method,
+        method: skipped ? 'skip' : method, // Use 'skip' instead of null for DB constraint
         recorded_by,
         vendor_name: skipped ? null : vendor_name,
         status: skipped ? 'skipped' : 'paid',
@@ -158,10 +170,10 @@ export async function updatePayment(req, res) {
     updates.updated_at = new Date().toISOString();
 
     // Validate method if provided
-    if (method && !['upi', 'cash'].includes(method)) {
+    if (method && !['upi', 'cash', 'skip'].includes(method)) {
       return res.status(400).json({
         success: false,
-        error: 'method must be "upi" or "cash"'
+        error: 'method must be "upi", "cash", or "skip"'
       });
     }
 

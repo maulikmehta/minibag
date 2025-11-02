@@ -125,17 +125,12 @@ export function useSession(sessionId = null) {
     };
   }, [restoreSession, sessionId]);
 
-  // Load session if sessionId is provided
-  useEffect(() => {
-    if (sessionId) {
-      loadSession(sessionId);
-    }
-  }, [sessionId]);
+  // Load session if sessionId is provided (moved below loadSession definition)
 
   /**
    * Load session data from API
    */
-  const loadSession = async (id) => {
+  const loadSession = useCallback(async (id) => {
     try {
       setLoading(true);
       setError(null);
@@ -153,7 +148,7 @@ export function useSession(sessionId = null) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Create a new session
@@ -289,6 +284,13 @@ export function useSession(sessionId = null) {
       socketService.removeAllListeners();
     };
   }, [session]);
+
+  // Load session if sessionId is provided
+  useEffect(() => {
+    if (sessionId) {
+      loadSession(sessionId);
+    }
+  }, [sessionId, loadSession]);
 
   return {
     session,

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useNotificationContext } from '../contexts/NotificationContext';
 
 /**
@@ -15,7 +16,9 @@ import { useNotificationContext } from '../contexts/NotificationContext';
 export function useNotification() {
   const { addNotification } = useNotificationContext();
 
-  return {
+  // Memoize the notification object to maintain stable reference across renders
+  // This prevents infinite loops in components that depend on this hook
+  return useMemo(() => ({
     /**
      * Show a success notification
      * @param {string} message - Success message
@@ -47,5 +50,5 @@ export function useNotification() {
      * @returns {string} Notification ID
      */
     info: (message, duration) => addNotification('info', message, duration)
-  };
+  }), [addNotification]);
 }

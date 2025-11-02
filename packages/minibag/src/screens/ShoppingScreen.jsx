@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
+
+// Feature flag: Set to false to disable skip items feature
+const ENABLE_SKIP_ITEMS = true;
 
 /**
  * ShoppingScreen Component
@@ -57,9 +60,13 @@ function ShoppingScreen({
   onHelpClick,
   onLogoClick
 }) {
+  // Track if we've already updated status to prevent duplicate calls
+  const statusUpdatedRef = useRef(false);
+
   // Update session status to 'shopping' when component mounts
   useEffect(() => {
-    if (session?.session_id && onUpdateSessionStatus) {
+    if (session?.session_id && onUpdateSessionStatus && !statusUpdatedRef.current) {
+      statusUpdatedRef.current = true;
       onUpdateSessionStatus('shopping');
     }
   }, [session?.session_id, onUpdateSessionStatus]);
@@ -73,7 +80,9 @@ function ShoppingScreen({
 
   const hostNickname = currentParticipant?.nickname || 'You';
   const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
-  const allItemsHandled = Object.keys(allItems).every(id => itemPayments[id] || skippedItems[id]);
+  const allItemsHandled = Object.keys(allItems).every(id =>
+    itemPayments[id] || (ENABLE_SKIP_ITEMS && skippedItems[id])
+  );
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-32">
@@ -136,15 +145,17 @@ function ShoppingScreen({
                   isPaid ? 'bg-gray-50' : isSkipped ? 'bg-yellow-50' : ''
                 }`}
               >
-                {/* Skip Checkbox */}
-                <div className="flex items-center mt-2">
-                  <input
-                    type="checkbox"
-                    checked={isSkipped}
-                    onChange={() => onSkipToggle && onSkipToggle(itemId)}
-                    className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
-                  />
-                </div>
+                {/* Skip Checkbox - Hidden when feature is disabled */}
+                {ENABLE_SKIP_ITEMS && (
+                  <div className="flex items-center mt-2">
+                    <input
+                      type="checkbox"
+                      checked={isSkipped}
+                      onChange={() => onSkipToggle && onSkipToggle(itemId)}
+                      className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                    />
+                  </div>
+                )}
 
                 {veg.thumbnail_url || veg.img ? (
                   <img
@@ -164,10 +175,10 @@ function ShoppingScreen({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className={`text-base ${isSkipped ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                    <p className={`text-base ${isSkipped && ENABLE_SKIP_ITEMS ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                       {getItemName(veg)}
                     </p>
-                    {isSkipped && (
+                    {ENABLE_SKIP_ITEMS && isSkipped && (
                       <span className="px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded">
                         SKIPPED
                       </span>
@@ -185,7 +196,7 @@ function ShoppingScreen({
                       ✓ ₹{payment.amount} • {payment.method === 'upi' ? 'UPI' : 'Cash'}
                     </p>
                   )}
-                  {isSkipped && (
+                  {ENABLE_SKIP_ITEMS && isSkipped && (
                     <p className="text-sm text-gray-600 italic mt-1">
                       {skippedItems[itemId]?.reason || 'Item wasn\'t good enough to buy'}
                     </p>

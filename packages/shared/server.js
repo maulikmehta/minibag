@@ -68,19 +68,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// General API rate limiting
+// General API rate limiting (DISABLED in development for debugging)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per IP per window
+  max: process.env.NODE_ENV === 'production' ? 100 : 999999, // Effectively unlimited for dev
   message: 'Too many requests, please try again later',
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV !== 'production' // Skip rate limiting in development
 });
 
 // Stricter limits for session creation (prevent spam)
 const createSessionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 sessions per IP per hour
+  max: process.env.NODE_ENV === 'production' ? 10 : 100, // 100 for dev, 10 for production
   message: 'Too many sessions created. Please try again later.'
 });
 
