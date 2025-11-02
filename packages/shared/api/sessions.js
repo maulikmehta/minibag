@@ -50,6 +50,115 @@ function isSessionExpired(session) {
 }
 
 /**
+ * Check if all items in a session are financially settled
+ * (either paid or skipped)
+ * Returns true if all participant items have corresponding payment records
+ */
+async function checkFinancialSettlement(sessionId) {
+  try {
+    // Get all participant items for this session
+    const { data: participantItems, error: itemsError } = await supabase
+      .from('participant_items')
+      .select('item_id')
+      .eq('session_id', sessionId);
+
+    if (itemsError) {
+      console.error('Error fetching participant items:', itemsError);
+      return false;
+    }
+
+    // If no items, consider it settled
+    if (!participantItems || participantItems.length === 0) {
+      return true;
+    }
+
+    // Get all payments for this session
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('item_id')
+      .eq('session_id', sessionId);
+
+    if (paymentsError) {
+      console.error('Error fetching payments:', paymentsError);
+      return false;
+    }
+
+    // Create set of item IDs that have payment records
+    const paidItemIds = new Set(payments?.map(p => p.item_id) || []);
+
+    // Check if all participant items have payment records (paid or skipped)
+    return participantItems.every(item => paidItemIds.has(item.item_id));
+  } catch (error) {
+    console.error('Error checking financial settlement:', error);
+    return false;
+  }
+}
+
+/**
+ * Perform session cleanup tasks asynchronously (non-blocking)
+ * - Check and set financial settlement timestamp
+ * - Release nicknames back to pool
+ */
+async function performSessionCleanup(session, status) {
+  try {
+    // Check if financially settled (all items paid or skipped) and set timestamp
+    if (status === 'completed' && !session.financially_settled_at) {
+      const isFinanciallySettled = await checkFinancialSettlement(session.id);
+      if (isFinanciallySettled) {
+        const { error: settlementError } = await supabase
+          .from('sessions')
+          .update({ financially_settled_at: new Date().toISOString() })
+          .eq('id', session.id);
+
+        if (settlementError) {
+          console.error('Error updating financially_settled_at:', settlementError);
+        }
+      }
+    }
+
+    // Release nicknames back to pool
+    const { data: participants, error: participantsError } = await supabase
+      .from('participants')
+      .select('id')
+      .eq('session_id', session.id);
+
+    if (participantsError) {
+      console.error('Error fetching participants for cleanup:', participantsError);
+      return;
+    }
+
+    if (participants && participants.length > 0) {
+      // Find which nicknames were from the pool (have nickname_pool_id)
+      const { data: nicknamesUsed, error: nicknamesError } = await supabase
+        .from('nicknames_pool')
+        .select('id')
+        .eq('currently_used_in', session.id);
+
+      if (nicknamesError) {
+        console.error('Error fetching nicknames for cleanup:', nicknamesError);
+        return;
+      }
+
+      if (nicknamesUsed && nicknamesUsed.length > 0) {
+        const { error: releaseError } = await supabase
+          .from('nicknames_pool')
+          .update({
+            is_available: true,
+            currently_used_in: null
+          })
+          .eq('currently_used_in', session.id);
+
+        if (releaseError) {
+          console.error('Error releasing nicknames:', releaseError);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in performSessionCleanup:', error);
+  }
+}
+
+/**
  * 3-letter names for participant fallback (if pool is empty)
  */
 const FALLBACK_NAMES = [
@@ -676,42 +785,32 @@ export async function updateSessionStatus(req, res) {
       });
     }
 
+    // Prepare update data
+    const updateData = { status };
+
+    // Set completed_at timestamp when status changes to 'completed'
+    if (status === 'completed' && !session.completed_at) {
+      updateData.completed_at = new Date().toISOString();
+    }
+
     // Update session status
     const { data: updatedSession, error: updateError } = await supabase
       .from('sessions')
-      .update({ status })
+      .update(updateData)
       .eq('session_id', session_id)
       .select()
       .single();
 
     if (updateError) throw updateError;
 
-    // If session is completed, release nicknames back to pool
+    // Run cleanup tasks asynchronously (non-blocking)
     if (status === 'completed' || status === 'cancelled') {
-      const { data: participants } = await supabase
-        .from('participants')
-        .select('id')
-        .eq('session_id', session.id);
-
-      if (participants && participants.length > 0) {
-        // Find which nicknames were from the pool (have nickname_pool_id)
-        const { data: nicknamesUsed } = await supabase
-          .from('nicknames_pool')
-          .select('id')
-          .eq('currently_used_in', session.id);
-
-        if (nicknamesUsed && nicknamesUsed.length > 0) {
-          await supabase
-            .from('nicknames_pool')
-            .update({
-              is_available: true,
-              currently_used_in: null
-            })
-            .eq('currently_used_in', session.id);
-        }
-      }
+      performSessionCleanup(session, status).catch(err => {
+        console.error('Error performing session cleanup:', err);
+      });
     }
 
+    // Return response immediately without waiting for cleanup
     res.json({
       success: true,
       data: updatedSession

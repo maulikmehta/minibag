@@ -50,10 +50,13 @@ function PaymentSplitScreen({
   // State for expanded participants in compact view
   const [expandedParticipants, setExpandedParticipants] = useState({});
 
-  // Update session status to 'completed' when component mounts
+  // Update session status to 'completed' when component mounts (non-blocking)
   useEffect(() => {
     if (session?.session_id && onUpdateSessionStatus) {
-      onUpdateSessionStatus('completed');
+      // Run in background - don't block UI
+      onUpdateSessionStatus('completed').catch(err => {
+        console.error('Failed to update session status to completed:', err);
+      });
     }
   }, [session?.session_id, onUpdateSessionStatus]);
 
