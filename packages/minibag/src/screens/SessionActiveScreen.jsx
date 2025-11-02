@@ -157,7 +157,7 @@ export default function SessionActiveScreen({
               <p className="text-lg font-semibold text-gray-900">Shopping Session</p>
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <Clock size={12} />
-                <span>4 hour session</span>
+                <span>2 hour session</span>
               </div>
             </div>
             {currentParticipant && (
@@ -355,7 +355,7 @@ export default function SessionActiveScreen({
             <p className="text-lg font-semibold text-gray-900">Share & Collaborate</p>
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <Clock size={12} />
-              <span>4 hour session</span>
+              <span>2 hour session</span>
             </div>
           </div>
           {currentParticipant && (

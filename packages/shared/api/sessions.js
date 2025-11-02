@@ -41,6 +41,15 @@ function generateHostToken() {
 }
 
 /**
+ * Check if a session has expired
+ * Sessions expire 2 hours after scheduled time
+ */
+function isSessionExpired(session) {
+  if (!session.expires_at) return false;
+  return new Date() > new Date(session.expires_at);
+}
+
+/**
  * 3-letter names for participant fallback (if pool is empty)
  */
 const FALLBACK_NAMES = [
@@ -418,6 +427,9 @@ export async function getSession(req, res) {
       });
     }
 
+    // Check if session has expired
+    const is_session_expired = isSessionExpired(session);
+
     // Get participants with their items
     const { data: participants, error: participantsError } = await supabase
       .from('participants')
@@ -443,7 +455,8 @@ export async function getSession(req, res) {
       data: {
         session: {
           ...session,
-          is_invite_expired
+          is_invite_expired,
+          is_session_expired
         },
         participants
       }
@@ -486,6 +499,15 @@ export async function joinSession(req, res) {
       return res.status(404).json({
         success: false,
         error: 'Session not found'
+      });
+    }
+
+    // Check if session has expired (2 hours after scheduled time)
+    if (isSessionExpired(session)) {
+      return res.status(410).json({
+        success: false,
+        error: 'This session has expired. Sessions are only valid for 2 hours after the scheduled time.',
+        error_code: 'SESSION_EXPIRED'
       });
     }
 
@@ -642,6 +664,15 @@ export async function updateSessionStatus(req, res) {
       return res.status(403).json({
         success: false,
         error: 'Invalid host token or session not found'
+      });
+    }
+
+    // Check if session has expired (allow setting to 'expired' status even if already expired)
+    if (isSessionExpired(session) && status !== 'expired') {
+      return res.status(410).json({
+        success: false,
+        error: 'Cannot update expired session. Sessions expire 2 hours after scheduled time.',
+        error_code: 'SESSION_EXPIRED'
       });
     }
 

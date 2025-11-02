@@ -74,9 +74,9 @@ export function useSession(sessionId = null) {
 
       const { session: storedSession, currentParticipant: storedParticipant, timestamp } = JSON.parse(stored);
 
-      // Check if session is still valid (less than 4 hours old)
-      const fourHours = 4 * 60 * 60 * 1000;
-      if (Date.now() - timestamp > fourHours) {
+      // Check if session is still valid (less than 2 hours old)
+      const twoHours = 2 * 60 * 60 * 1000;
+      if (Date.now() - timestamp > twoHours) {
         clearPersistedSession();
         return false;
       }

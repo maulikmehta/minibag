@@ -27,8 +27,8 @@ export async function createSession(db, data) {
   }
   
   const scheduledTime = new Date(data.scheduled_time);
-  // Free sessions expire 4 hours after scheduled time
-  const expiresAt = new Date(scheduledTime.getTime() + 4 * 60 * 60 * 1000);
+  // Sessions expire 2 hours after scheduled time
+  const expiresAt = new Date(scheduledTime.getTime() + 2 * 60 * 60 * 1000);
   
   const session = {
     session_id: sessionId,
