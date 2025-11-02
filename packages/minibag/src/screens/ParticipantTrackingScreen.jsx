@@ -114,7 +114,7 @@ export default function ParticipantTrackingScreen({
             currentParticipant={participant}
             currentUser={participant}
             phase="shopping"
-            message={getBannerMessage()}
+            persistentMessage={getBannerMessage()}
           />
         </div>
 
@@ -199,7 +199,7 @@ export default function ParticipantTrackingScreen({
                 return (
                   <ItemRow
                     key={itemId}
-                    fallbackEmoji={item?.emoji || '🥬'}
+                    emoji={item?.emoji || '🥬'}
                     name={getItemName(item)}
                     subtitle={`${qty}kg`}
                   />

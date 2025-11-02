@@ -8,20 +8,23 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
  * Dynamic contextual banner that shows:
  * 1. Global banner notifications (from NotificationContext)
  * 2. Local temporary messages (passed as props)
- * 3. Identity information based on session phase
+ * 3. Persistent status messages (for tracking screens)
+ * 4. Identity information based on session phase
  *
  * @param {Object} currentParticipant - The current user's participant object
  * @param {Object} currentUser - The current user (with is_creator flag)
  * @param {string} phase - Current session phase: 'waiting' | 'shopping' | 'confirming' | 'payment'
  * @param {string|null} message - Temporary message to display (auto-dismisses after 3s)
  * @param {function} onMessageDismiss - Callback when temporary message is dismissed
+ * @param {string|null} persistentMessage - Persistent status message (doesn't auto-dismiss)
  */
 function IdentityBanner({
   currentParticipant,
   currentUser,
   phase = 'waiting',
   message = null,
-  onMessageDismiss
+  onMessageDismiss,
+  persistentMessage = null
 }) {
   const [showMessage, setShowMessage] = useState(false);
   const [showIdentity, setShowIdentity] = useState(true);
@@ -61,8 +64,9 @@ function IdentityBanner({
 
   // Determine banner content based on priority:
   // 1. Global banner notification (from context)
-  // 2. Local temporary message (from props)
-  // 3. Identity display (auto-dismisses after 5s)
+  // 2. Persistent status message (for tracking screens)
+  // 3. Local temporary message (from props)
+  // 4. Identity display (auto-dismisses after 5s)
   const getBannerContent = () => {
     // Priority 1: Global banner notification
     if (bannerNotification) {
@@ -106,7 +110,18 @@ function IdentityBanner({
       };
     }
 
-    // Priority 2: Local temporary message
+    // Priority 2: Persistent status message
+    if (persistentMessage) {
+      return {
+        text: persistentMessage,
+        emoji: '📦',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200',
+        textColor: 'text-blue-800'
+      };
+    }
+
+    // Priority 3: Local temporary message
     if (showMessage && message) {
       return {
         text: message,
