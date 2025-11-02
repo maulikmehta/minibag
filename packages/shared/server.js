@@ -70,21 +70,34 @@ app.use((req, res, next) => {
   next();
 });
 
-// General API rate limiting (DISABLED in development for debugging)
+// General API rate limiting (ENABLED in all environments)
+// Security: Rate limiting active in development to catch issues early
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 999999, // Effectively unlimited for dev
-  message: 'Too many requests, please try again later',
-  standardHeaders: true, // Return rate limit info in headers
-  legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV !== 'production' // Skip rate limiting in development
+  max: process.env.NODE_ENV === 'production' ? 100 : 500, // More generous in dev, but still limited
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false, // Disable X-RateLimit-* headers
+  // Rate limiting now active in ALL environments (no skip function)
 });
 
 // Stricter limits for session creation (prevent spam)
 const createSessionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: process.env.NODE_ENV === 'production' ? 10 : 100, // 100 for dev, 10 for production
-  message: 'Too many sessions created. Please try again later.'
+  max: process.env.NODE_ENV === 'production' ? 10 : 50, // 50 for dev, 10 for production
+  message: 'Too many sessions created from this IP. Please try again in an hour.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict limits for authentication attempts (prevent brute force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 5 : 20, // Very strict in production
+  message: 'Too many failed authentication attempts. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Only count failed attempts
 });
 
 // Basic routes
@@ -161,7 +174,7 @@ app.get('/api/catalog/popular', catalogAPI.getPopularItems);
 app.get('/api/sessions/nickname-options', sessionsAPI.getNicknameOptions);
 app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, sessionsAPI.createSession);
 app.get('/api/sessions/:session_id', sessionsAPI.getSession);
-app.post('/api/sessions/:session_id/join', validateJoinSession, sessionsAPI.joinSession);
+app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, sessionsAPI.joinSession); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
 
