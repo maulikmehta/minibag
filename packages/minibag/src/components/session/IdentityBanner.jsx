@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useIdentityDisplay } from '../../hooks/useIdentityDisplay';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
@@ -7,16 +7,18 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
  *
  * Dynamic contextual banner that shows:
  * 1. Global banner notifications (from NotificationContext)
- * 2. Local temporary messages (passed as props)
- * 3. Persistent status messages (for tracking screens)
+ * 2. Persistent status messages (for tracking screens)
+ * 3. Local messages (from props)
  * 4. Identity information based on session phase
+ *
+ * All notifications persist until replaced by new ones to minimize attention switching.
  *
  * @param {Object} currentParticipant - The current user's participant object
  * @param {Object} currentUser - The current user (with is_creator flag)
  * @param {string} phase - Current session phase: 'waiting' | 'shopping' | 'confirming' | 'payment'
- * @param {string|null} message - Temporary message to display (auto-dismisses after 3s)
- * @param {function} onMessageDismiss - Callback when temporary message is dismissed
- * @param {string|null} persistentMessage - Persistent status message (doesn't auto-dismiss)
+ * @param {string|null} message - Local message to display (persists until replaced)
+ * @param {function} onMessageDismiss - Callback when message is dismissed
+ * @param {string|null} persistentMessage - Persistent status message (for tracking screens)
  */
 function IdentityBanner({
   currentParticipant,
@@ -26,8 +28,6 @@ function IdentityBanner({
   onMessageDismiss,
   persistentMessage = null
 }) {
-  const [showMessage, setShowMessage] = useState(false);
-  const [showIdentity, setShowIdentity] = useState(true);
   const isHost = currentUser?.is_creator || false;
 
   // Get banner notification from global context
@@ -40,33 +40,11 @@ function IdentityBanner({
     phase === 'payment' ? 'payment' : 'full'
   );
 
-  // Handle temporary message display
-  useEffect(() => {
-    if (message) {
-      setShowMessage(true);
-      const timer = setTimeout(() => {
-        setShowMessage(false);
-        if (onMessageDismiss) {
-          onMessageDismiss();
-        }
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [message, onMessageDismiss]);
-
-  // Auto-dismiss identity notification after 5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowIdentity(false);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
-
   // Determine banner content based on priority:
   // 1. Global banner notification (from context)
   // 2. Persistent status message (for tracking screens)
-  // 3. Local temporary message (from props)
-  // 4. Identity display (auto-dismisses after 5s)
+  // 3. Local message (from props)
+  // 4. Identity display (default, always visible)
   const getBannerContent = () => {
     // Priority 1: Global banner notification
     if (bannerNotification) {
@@ -121,8 +99,8 @@ function IdentityBanner({
       };
     }
 
-    // Priority 3: Local temporary message
-    if (showMessage && message) {
+    // Priority 3: Local message
+    if (message) {
       return {
         text: message,
         emoji: '👋',
@@ -132,11 +110,7 @@ function IdentityBanner({
       };
     }
 
-    // Default identity message based on phase (only if not auto-dismissed)
-    if (!showIdentity) {
-      return null;
-    }
-
+    // Default identity message based on phase (always visible)
     const alias = identity.alias;
     const displayName = identity.displayName;
 
@@ -215,7 +189,7 @@ function IdentityBanner({
     <div className="min-h-[44px] flex items-center justify-center">
       {content ? (
         <div
-          className={`flex items-center justify-center gap-2 ${content.bgColor} border ${content.borderColor} px-3 py-2 rounded-lg transition-all duration-300 relative`}
+          className={`w-full flex items-center justify-center gap-2 ${content.bgColor} border ${content.borderColor} px-3 py-2 rounded-lg transition-all duration-300 relative`}
         >
           <span className="text-lg">{content.emoji}</span>
           <p className={`text-sm ${content.textColor}`}>
