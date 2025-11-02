@@ -17,6 +17,9 @@ export const sessionSchema = {
   // Host authentication
   host_token: "string", // Secure token for host-only actions
 
+  // Participant authentication (optional)
+  session_pin: "string", // Optional 4-6 digit PIN for participant authentication
+
   // Location (text only, no GPS)
   location_text: "string",
   neighborhood: "string",
@@ -25,6 +28,8 @@ export const sessionSchema = {
   scheduled_time: "timestamp",
   created_at: "timestamp",
   expires_at: "timestamp",
+  completed_at: "timestamp", // When session status changed to 'completed'
+  financially_settled_at: "timestamp", // When all items were paid or skipped
 
   // Status tracking
   status: "enum", // open, active, shopping, completed, expired, cancelled
