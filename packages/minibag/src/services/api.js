@@ -212,6 +212,21 @@ export async function createSession(sessionData) {
  */
 export async function getSession(sessionId) {
   const response = await apiFetch(`/api/sessions/${sessionId}`);
+
+  // DEBUG: Log what we received from API
+  console.log('📡 [getSession] API Response:', {
+    sessionId,
+    sessionStatus: response.data?.session?.status,
+    participantsCount: response.data?.participants?.length,
+    participantsDetail: response.data?.participants?.map(p => ({
+      id: p.id,
+      nickname: p.nickname,
+      is_creator: p.is_creator,
+      items_count: p.items?.length,
+      items_keys: p.items ? (Array.isArray(p.items) ? `array[${p.items.length}]` : Object.keys(p.items).slice(0, 3)) : 'no items'
+    }))
+  });
+
   return response.data;
 }
 

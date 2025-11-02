@@ -157,33 +157,87 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
   // Sync session data to local state when session loads
   React.useEffect(() => {
+    console.log('⚡ useEffect triggered - session data sync', {
+      hasSession: !!session,
+      sessionStatus: session?.status,
+      apiParticipantsCount: apiParticipants?.length,
+      catalogItemsCount: items?.length
+    });
+
     if (session && apiParticipants) {
+      // DEBUG: Log API participants with their items BEFORE transformation
+      console.log('📥 API Participants BEFORE transform:', apiParticipants.map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        is_creator: p.is_creator,
+        items_array: p.items, // Raw items array from API
+        items_count: p.items?.length
+      })));
+
       // Transform API data to frontend format using centralized transformers
       const { hostItems: transformedHostItems, participants: transformedParticipants } =
-        transformSessionData(session, apiParticipants);
+        transformSessionData(session, apiParticipants, items);
+
+      // DEBUG: Log transformed data
+      console.log('🔍 Transformed Data AFTER transform:', {
+        hostItems: transformedHostItems,
+        participants: transformedParticipants,
+        catalogAvailable: items?.length > 0
+      });
 
       // Always sync from API as source of truth
       setHostItems(transformedHostItems);
 
-      // If current user is a participant, restore their items from localStorage
-      if (currentParticipant && !currentParticipant.is_creator) {
-        const localItems = loadParticipantItemsFromLocalStorage(currentParticipant.id);
+      // DEFENSIVE FIX: Merge transformed participants with current state to preserve items
+      // If API returns empty items arrays, keep the existing items from state
+      setParticipants(prevParticipants => {
+        console.log('🔄 Merging participant data. Previous:', prevParticipants.map(p => ({
+          id: p.id,
+          itemsCount: Object.keys(p.items || {}).length
+        })));
 
-        if (localItems) {
-          // Merge localStorage items with API data (localStorage takes precedence for current user)
-          const updatedParticipants = transformedParticipants.map(p => {
-            if (p.id === currentParticipant.id) {
-              return { ...p, items: localItems };
-            }
-            return p;
-          });
-          setParticipants(updatedParticipants);
-        } else {
-          setParticipants(transformedParticipants);
+        const merged = transformedParticipants.map(newParticipant => {
+          // Find existing participant in state
+          const existingParticipant = prevParticipants.find(p => p.id === newParticipant.id);
+
+          // If new participant has empty items but existing has items, preserve existing
+          const newItemsCount = Object.keys(newParticipant.items || {}).length;
+          const existingItemsCount = Object.keys(existingParticipant?.items || {}).length;
+
+          if (newItemsCount === 0 && existingItemsCount > 0) {
+            console.warn(`⚠️ API returned empty items for ${newParticipant.name}, preserving ${existingItemsCount} existing items`);
+            return {
+              ...newParticipant,
+              items: existingParticipant.items // Preserve existing items
+            };
+          }
+
+          // Otherwise use new data
+          return newParticipant;
+        });
+
+        // If current user is a participant, restore their items from localStorage (takes precedence)
+        if (currentParticipant && !currentParticipant.is_creator) {
+          const localItems = loadParticipantItemsFromLocalStorage(currentParticipant.id);
+
+          if (localItems) {
+            console.log('📦 Restoring current participant items from localStorage');
+            return merged.map(p => {
+              if (p.id === currentParticipant.id) {
+                return { ...p, items: localItems };
+              }
+              return p;
+            });
+          }
         }
-      } else {
-        setParticipants(transformedParticipants);
-      }
+
+        console.log('✅ Merged participants:', merged.map(p => ({
+          id: p.id,
+          itemsCount: Object.keys(p.items || {}).length
+        })));
+
+        return merged;
+      });
     }
   }, [session, apiParticipants, currentParticipant, loadParticipantItemsFromLocalStorage]);
 
@@ -717,10 +771,17 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
               // Save to backend so host can see
               try {
-                await updateParticipantItems(currentParticipant.id, myData.items);
+                console.log('💾 Saving participant items to backend:', {
+                  participantId: currentParticipant.id,
+                  items: myData.items,
+                  itemCount: Object.keys(myData.items || {}).length
+                });
+                const result = await updateParticipantItems(currentParticipant.id, myData.items);
+                console.log('✅ Participant items saved successfully:', result);
                 // WebSocket sync happens only on confirmation to prevent input flickering
               } catch (error) {
-                console.error('Failed to sync participant items to backend:', error);
+                console.error('❌ Failed to sync participant items to backend:', error);
+                console.error('Error details:', error.message, error.stack);
                 // Don't block UI - localStorage is still saved
               }
             }
@@ -743,7 +804,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     return (
       <ParticipantTrackingScreen
         session={session}
-        participant={participants.find(p => p.id === currentParticipant?.id) || (currentParticipant ? transformParticipant(currentParticipant) : null)}
+        participant={participants.find(p => p.id === currentParticipant?.id) || (currentParticipant ? transformParticipant(currentParticipant, items) : null)}
         participants={participants}
         items={VEGETABLES}
         getItemName={getItemName}

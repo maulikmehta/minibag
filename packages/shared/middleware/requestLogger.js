@@ -74,8 +74,8 @@ export const httpLogger = pinoHttp({
       params: req.params,
       // Don't log request body in production (can be large)
       // body: process.env.NODE_ENV === 'development' ? req.body : undefined,
-      remoteAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      remoteAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers?.['user-agent'],
     }),
     res: (res) => ({
       statusCode: res.statusCode,
@@ -88,7 +88,10 @@ export const httpLogger = pinoHttp({
  * Logs uncaught errors with full context
  */
 export function errorLogger(err, req, res, next) {
-  req.log.error({
+  // Use req.log if available (from pino-http), otherwise fallback to logger
+  const log = req.log || logger;
+
+  log.error({
     err,
     req: {
       id: req.id,

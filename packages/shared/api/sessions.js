@@ -600,6 +600,20 @@ export async function getSession(req, res) {
 
     if (participantsError) throw participantsError;
 
+    // DEBUG: Log what we got from database
+    console.log('🗄️ [getSession] Database returned participants:', {
+      sessionId: session_id,
+      sessionStatus: session.status,
+      participantsCount: participants?.length,
+      participantsDetail: participants?.map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        is_creator: p.is_creator,
+        items_count: p.items?.length,
+        items_sample: p.items?.slice(0, 2) // Show first 2 items
+      }))
+    });
+
     // Calculate if invite link has expired (20 minutes after expected_participants_set_at)
     const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
     const is_invite_expired = session.expected_participants_set_at

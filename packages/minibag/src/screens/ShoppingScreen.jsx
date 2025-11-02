@@ -73,10 +73,18 @@ function ShoppingScreen({
   }, [session?.session_id, onUpdateSessionStatus]);
 
   // Calculate total quantities for all items (memoized for performance)
-  const allItems = useMemo(
-    () => aggregateAllItems(hostItems, participants),
-    [hostItems, participants]
-  );
+  const allItems = useMemo(() => {
+    const aggregated = aggregateAllItems(hostItems, participants);
+
+    // DEBUG: Log aggregation
+    console.log('🛒 Shopping Screen - Aggregated Items:', {
+      hostItems,
+      participants: participants.map(p => ({ id: p.id, name: p.name, items: p.items })),
+      aggregated
+    });
+
+    return aggregated;
+  }, [hostItems, participants]);
 
   const hostNickname = currentParticipant?.nickname || 'You';
   const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
@@ -118,25 +126,13 @@ function ShoppingScreen({
 
         <div className="divide-y divide-gray-200 mb-6">
           {Object.entries(allItems).map(([itemId, totalQty]) => {
-            const veg = items.find(v => v.id === itemId);
+            const veg = items.find(v => v.item_id === itemId || v.id === itemId);
             const payment = itemPayments[itemId];
             const isPaid = !!payment;
             const isSkipped = !!skippedItems[itemId];
 
             // Skip if vegetable not found
             if (!veg) return null;
-
-            // Calculate participant breakdown (using aliases for privacy)
-            const breakdown = [];
-            if (hostItems[itemId]) {
-              breakdown.push({ name: hostNickname.toUpperCase(), qty: hostItems[itemId] });
-            }
-            participants.forEach(p => {
-              if (p.items && p.items[itemId]) {
-                const alias = (p.nickname || p.name || 'P').toUpperCase();
-                breakdown.push({ name: alias, qty: p.items[itemId] });
-              }
-            });
 
             return (
               <div
@@ -173,11 +169,7 @@ function ShoppingScreen({
                     )}
                   </div>
                   <p className="text-sm text-gray-500">
-                    {breakdown.map((b, idx) => (
-                      <span key={idx}>
-                        {b.name}: {b.qty}kg{idx < breakdown.length - 1 ? ', ' : ''}
-                      </span>
-                    ))}
+                    Total: {totalQty} {veg.unit}
                   </p>
                   {isPaid && !isSkipped && (
                     <p className="text-sm text-gray-900 mt-1">

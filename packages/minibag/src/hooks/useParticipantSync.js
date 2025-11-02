@@ -55,11 +55,12 @@ export function useParticipantSync({
     }
 
     const handleParticipantStatusUpdate = (updatedParticipant) => {
-      // Update local participant state
-      const updatedParticipants = participants.map(p =>
-        p.id === updatedParticipant.id ? { ...p, ...updatedParticipant } : p
+      // Update local participant state using functional setState to avoid stale closure
+      onUpdateParticipants(prevParticipants =>
+        prevParticipants.map(p =>
+          p.id === updatedParticipant.id ? { ...p, ...updatedParticipant } : p
+        )
       );
-      onUpdateParticipants(updatedParticipants);
 
       // Show notification (host only)
       if (currentParticipant?.is_creator && updatedParticipant.marked_not_coming !== undefined) {
@@ -74,7 +75,7 @@ export function useParticipantSync({
     return () => {
       socketService.off('participant-status-updated', handleParticipantStatusUpdate);
     };
-  }, [session?.session_id, participants, currentParticipant?.is_creator, onUpdateParticipants, onShowNotification]);
+  }, [session?.session_id, currentParticipant?.is_creator, onUpdateParticipants, onShowNotification]);
 
   // Listen for participant items updates (real-time sync when participants add/update items)
   useEffect(() => {
@@ -88,20 +89,45 @@ export function useParticipantSync({
     const handleParticipantItemsUpdate = (data) => {
       const { participantId, items, real_name, nickname, items_confirmed } = data;
 
-      // Update local participant state with new items
-      const updatedParticipants = participants.map(p => {
-        if (p.id === participantId) {
-          return {
-            ...p,
-            items,
-            ...(items_confirmed !== undefined && { items_confirmed }),
-            ...(real_name && { real_name }),
-            ...(nickname && { nickname })
-          };
-        }
-        return p;
+      console.log('🔔 WebSocket: participant-items-updated received:', {
+        participantId,
+        items,
+        itemsType: typeof items,
+        itemsKeys: items ? Object.keys(items) : 'null',
+        items_confirmed,
+        real_name,
+        nickname
       });
-      onUpdateParticipants(updatedParticipants);
+
+      // Update local participant state with new items using functional setState to avoid stale closure
+      onUpdateParticipants(prevParticipants => {
+        console.log('🔄 Updating participants. Previous state:', prevParticipants.map(p => ({
+          id: p.id,
+          name: p.name,
+          itemsBefore: p.items
+        })));
+
+        const updated = prevParticipants.map(p => {
+          if (p.id === participantId) {
+            return {
+              ...p,
+              items,
+              ...(items_confirmed !== undefined && { items_confirmed }),
+              ...(real_name && { real_name }),
+              ...(nickname && { nickname })
+            };
+          }
+          return p;
+        });
+
+        console.log('✅ Participants after update:', updated.map(p => ({
+          id: p.id,
+          name: p.name,
+          itemsAfter: p.items
+        })));
+
+        return updated;
+      });
 
       // Show notification when participant confirms their list (privacy-aware)
       if (items_confirmed) {
@@ -125,5 +151,5 @@ export function useParticipantSync({
     return () => {
       socketService.off('participant-items-updated', handleParticipantItemsUpdate);
     };
-  }, [session?.session_id, participants, currentParticipant?.is_creator, onUpdateParticipants, onShowNotification]);
+  }, [session?.session_id, currentParticipant?.is_creator, onUpdateParticipants, onShowNotification]);
 }

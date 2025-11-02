@@ -126,10 +126,23 @@ export function useSession(sessionId = null) {
    */
   const loadSession = useCallback(async (id) => {
     try {
+      console.log('🔄 loadSession called for session:', id);
       setLoading(true);
       setError(null);
 
       const data = await getSession(id);
+      console.log('📡 getSession API response:', {
+        sessionId: data.session?.session_id,
+        sessionStatus: data.session?.status,
+        participantsCount: data.participants?.length,
+        participantsWithItems: data.participants?.map(p => ({
+          id: p.id,
+          nickname: p.nickname,
+          is_creator: p.is_creator,
+          items_count: p.items?.length,
+          items_array: p.items
+        }))
+      });
       setSession(data.session);
       setParticipants(data.participants || []);
 
@@ -250,11 +263,17 @@ export function useSession(sessionId = null) {
 
     // Listen for participant joins
     socketService.onParticipantJoined((participant) => {
+      console.log('🔔 useSession: participant-joined WebSocket event', {
+        participantId: participant.id,
+        participantData: participant
+      });
       setParticipants(prev => {
         // Avoid duplicates
         if (prev.some(p => p.id === participant.id)) {
+          console.log('⚠️ Duplicate participant, skipping');
           return prev;
         }
+        console.log('➕ Adding new participant to state');
         return [...prev, participant];
       });
     });
