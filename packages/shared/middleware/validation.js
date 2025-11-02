@@ -45,6 +45,14 @@ export const validateSessionCreation = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Real name must be less than 100 characters'),
+  body('session_pin')
+    .optional()
+    .matches(/^\d{4,6}$/)
+    .withMessage('Session PIN must be a 4-6 digit number'),
+  body('generate_pin')
+    .optional()
+    .isBoolean()
+    .withMessage('generate_pin must be a boolean'),
   validate
 ];
 
@@ -52,7 +60,7 @@ export const validateSessionCreation = [
 export const validateJoinSession = [
   param('session_id')
     .isString()
-    .isLength({ min: 6, max: 8 })
+    .isLength({ min: 6, max: 12 })
     .withMessage('Invalid session ID format'),
   body('selected_nickname')
     .optional()
@@ -74,6 +82,10 @@ export const validateJoinSession = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Real name must be less than 100 characters'),
+  body('session_pin')
+    .optional()
+    .matches(/^\d{4,6}$/)
+    .withMessage('Session PIN must be a 4-6 digit number'),
   validate
 ];
 
@@ -81,7 +93,7 @@ export const validateJoinSession = [
 export const validatePayment = [
   param('session_id')
     .isString()
-    .isLength({ min: 6, max: 8 })
+    .isLength({ min: 6, max: 12 })
     .withMessage('Invalid session ID format'),
   body('item_id')
     .isString()
@@ -145,7 +157,7 @@ export const validatePayment = [
 export const validateSessionStatus = [
   param('session_id')
     .isString()
-    .isLength({ min: 6, max: 8 })
+    .isLength({ min: 6, max: 12 })
     .withMessage('Invalid session ID format'),
   body('status')
     .isIn(['open', 'active', 'shopping', 'completed', 'expired', 'cancelled'])

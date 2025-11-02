@@ -5,12 +5,16 @@
 
 import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
+import { setHostTokenCookie, getHostToken } from '../utils/cookies.js';
 
 /**
- * Generate a short, unique session ID (8 chars - increased for collision resistance)
+ * Generate a short, unique session ID (12 chars for strong collision resistance)
+ * Security improvement: Increased from 8 to 12 characters
+ * - 8 chars (4 bytes): 4.2 billion combinations (2^32)
+ * - 12 chars (6 bytes): 281 trillion combinations (2^48)
  */
 function generateSessionId() {
-  return crypto.randomBytes(4).toString('hex'); // abcd1234 (8 chars = 4.2 billion combinations)
+  return crypto.randomBytes(6).toString('hex'); // abc123def456 (12 chars = 281 trillion combinations)
 }
 
 /**
@@ -38,6 +42,26 @@ async function generateUniqueSessionId(maxAttempts = 3) {
  */
 function generateHostToken() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Generate a 4-6 digit numeric PIN for session authentication
+ * @param {number} length - Length of PIN (4-6 digits)
+ * @returns {string} - Numeric PIN
+ */
+function generateSessionPin(length = 4) {
+  const min = Math.pow(10, length - 1);
+  const max = Math.pow(10, length) - 1;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
+/**
+ * Validate PIN format (4-6 digits)
+ * @param {string} pin - PIN to validate
+ * @returns {boolean}
+ */
+function isValidPinFormat(pin) {
+  return /^\d{4,6}$/.test(pin);
 }
 
 /**
@@ -318,7 +342,10 @@ export async function createSession(req, res) {
       real_name,
       selected_nickname_id,
       selected_nickname,
-      selected_avatar_emoji
+      selected_avatar_emoji,
+      // Security: Optional PIN for participant authentication
+      session_pin = null, // 4-6 digit PIN, or null for no PIN protection
+      generate_pin = false // If true, auto-generate a 4-digit PIN
     } = req.body;
 
     // Validation
@@ -327,6 +354,20 @@ export async function createSession(req, res) {
         success: false,
         error: 'location_text and scheduled_time are required'
       });
+    }
+
+    // Validate PIN if provided
+    if (session_pin && !isValidPinFormat(session_pin)) {
+      return res.status(400).json({
+        success: false,
+        error: 'session_pin must be a 4-6 digit number'
+      });
+    }
+
+    // Generate PIN if requested
+    let finalPin = session_pin;
+    if (generate_pin && !session_pin) {
+      finalPin = generateSessionPin(4); // Generate 4-digit PIN
     }
 
     // Cleanup expired pending sessions (opportunistic cleanup)
@@ -382,7 +423,7 @@ export async function createSession(req, res) {
     expiresAt.setHours(expiresAt.getHours() + 2);
 
     // Transaction-like behavior with rollback capability
-    // Step 1: Create session with host_token
+    // Step 1: Create session with host_token and optional PIN
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
@@ -398,7 +439,8 @@ export async function createSession(req, res) {
         status: 'open',
         expected_participants, // Number of participants expected (for checkpoint)
         checkpoint_complete: expected_participants === 0, // Auto-complete if no participants expected
-        host_token // Store host token for creator authentication
+        host_token, // Store host token for creator authentication
+        session_pin: finalPin // Store PIN for participant authentication (null if no PIN)
       })
       .select()
       .single();
@@ -494,13 +536,18 @@ export async function createSession(req, res) {
       // Fall back to participant without items if refetch fails
     }
 
+    // Set host token as httpOnly cookie (secure authentication)
+    setHostTokenCookie(res, host_token, session.id);
+
     res.json({
       success: true,
       data: {
         session: session,
         participant: participantWithItems || participant,
         session_url: `/session/${session_id}`,
-        host_token: host_token // Return host token for creator to store locally
+        // host_token removed - now stored in httpOnly cookie
+        session_pin: finalPin, // Return PIN for host to share with participants (null if no PIN)
+        auth_method: 'cookie' // Indicate that authentication is via cookie
       }
     });
   } catch (error) {
@@ -559,13 +606,18 @@ export async function getSession(req, res) {
       ? (new Date() - new Date(session.expected_participants_set_at)) >= TIMEOUT_MS
       : false;
 
+    // Remove session_pin from response for security (don't expose PIN)
+    // But include boolean flag indicating if PIN is required
+    const { session_pin, ...sessionWithoutPin } = session;
+
     res.json({
       success: true,
       data: {
         session: {
-          ...session,
+          ...sessionWithoutPin,
           is_invite_expired,
-          is_session_expired
+          is_session_expired,
+          requires_pin: !!session_pin // Boolean flag: does session require PIN?
         },
         participants
       }
@@ -592,7 +644,9 @@ export async function joinSession(req, res) {
       real_name,
       selected_nickname_id,
       selected_nickname,
-      selected_avatar_emoji
+      selected_avatar_emoji,
+      // Security: PIN for authentication
+      session_pin = null // Required if session has PIN protection
     } = req.body;
 
     // Get session
@@ -609,6 +663,27 @@ export async function joinSession(req, res) {
         success: false,
         error: 'Session not found'
       });
+    }
+
+    // **CRITICAL SECURITY CHECK: Validate PIN if session is PIN-protected**
+    if (session.session_pin) {
+      // Session requires PIN
+      if (!session_pin) {
+        return res.status(401).json({
+          success: false,
+          error: 'This session requires a PIN to join. Please enter the PIN shared by the host.',
+          error_code: 'PIN_REQUIRED'
+        });
+      }
+
+      // Validate PIN matches
+      if (session_pin !== session.session_pin) {
+        return res.status(403).json({
+          success: false,
+          error: 'Incorrect PIN. Please check the PIN and try again.',
+          error_code: 'INCORRECT_PIN'
+        });
+      }
     }
 
     // Check if session has expired (2 hours after scheduled time)
@@ -743,13 +818,16 @@ export async function updateSessionStatus(req, res) {
   try {
     const { session_id } = req.params;
     const { status } = req.body;
-    const host_token = req.headers['x-host-token']; // Host must send token
+
+    // Get host token from cookie or headers (backward compatibility)
+    const host_token = getHostToken(req);
 
     // Verify host token
     if (!host_token) {
       return res.status(401).json({
         success: false,
-        error: 'Host token required for this action'
+        error: 'Host token required for this action. Please log in as session host.',
+        error_code: 'HOST_TOKEN_REQUIRED'
       });
     }
 
