@@ -24,6 +24,7 @@ function IdentityBanner({
   onMessageDismiss
 }) {
   const [showMessage, setShowMessage] = useState(false);
+  const [showIdentity, setShowIdentity] = useState(true);
   const isHost = currentUser?.is_creator || false;
 
   // Get banner notification from global context
@@ -50,10 +51,18 @@ function IdentityBanner({
     }
   }, [message, onMessageDismiss]);
 
+  // Auto-dismiss identity notification after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowIdentity(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Determine banner content based on priority:
   // 1. Global banner notification (from context)
   // 2. Local temporary message (from props)
-  // 3. Identity display (default)
+  // 3. Identity display (auto-dismisses after 5s)
   const getBannerContent = () => {
     // Priority 1: Global banner notification
     if (bannerNotification) {
@@ -108,7 +117,11 @@ function IdentityBanner({
       };
     }
 
-    // Default identity message based on phase
+    // Default identity message based on phase (only if not auto-dismissed)
+    if (!showIdentity) {
+      return null;
+    }
+
     const alias = identity.alias;
     const displayName = identity.displayName;
 
@@ -184,21 +197,41 @@ function IdentityBanner({
   const content = getBannerContent();
 
   return (
-    <div
-      className={`inline-flex items-center gap-2 ${content.bgColor} border ${content.borderColor} px-3 py-2 rounded-lg transition-all duration-300 relative`}
-    >
-      <span className="text-lg">{content.emoji}</span>
-      <p className={`text-sm ${content.textColor}`}>
-        {content.text}
-      </p>
-      {content.isDismissible && content.onDismiss && (
-        <button
-          onClick={content.onDismiss}
-          className={`ml-2 ${content.textColor} opacity-60 hover:opacity-100 transition-opacity`}
-          aria-label="Dismiss notification"
+    <div className="min-h-[44px] flex items-center justify-center">
+      {content ? (
+        <div
+          className={`flex items-center justify-center gap-2 ${content.bgColor} border ${content.borderColor} px-3 py-2 rounded-lg transition-all duration-300 relative`}
         >
+          <span className="text-lg">{content.emoji}</span>
+          <p className={`text-sm ${content.textColor}`}>
+            {content.text}
+          </p>
+          {content.isDismissible && content.onDismiss && (
+            <button
+              onClick={content.onDismiss}
+              className={`ml-2 ${content.textColor} opacity-60 hover:opacity-100 transition-opacity`}
+              aria-label="Dismiss notification"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-center py-2">
           <svg
-            className="w-4 h-4"
+            className="w-5 h-5 text-gray-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -207,10 +240,10 @@ function IdentityBanner({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
             />
           </svg>
-        </button>
+        </div>
       )}
     </div>
   );
