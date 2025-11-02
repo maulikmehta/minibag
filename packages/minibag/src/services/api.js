@@ -60,6 +60,7 @@ async function apiFetch(endpoint, options = {}) {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // IMPORTANT: Send cookies for httpOnly authentication
   };
 
   // Properly merge options while preserving both default and custom headers
@@ -234,17 +235,14 @@ export async function joinSession(sessionId, items = [], nicknameData = {}) {
  * @param {string} sessionId - Session ID
  * @param {string} status - New status (open, active, shopping, completed, expired, cancelled)
  * @returns {Promise<Object>} Updated session data
+ *
+ * NOTE: Host authentication now handled via httpOnly cookie automatically
  */
 export async function updateSessionStatus(sessionId, status) {
-  // Retrieve host token from localStorage
-  const hostToken = localStorage.getItem(`host_token_${sessionId}`);
-
   const response = await apiFetch(`/api/sessions/${sessionId}/status`, {
     method: 'PUT',
-    headers: {
-      'X-Host-Token': hostToken || '' // Include host token for authentication
-    },
     body: JSON.stringify({ status }),
+    // Host token sent automatically via httpOnly cookie (credentials: 'include')
   });
   return response.data;
 }

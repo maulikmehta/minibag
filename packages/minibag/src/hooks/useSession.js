@@ -26,6 +26,7 @@ export function useSession(sessionId = null) {
 
   /**
    * Persist session to localStorage
+   * NOTE: Host token no longer stored - now handled via httpOnly cookie
    */
   const persistSession = useCallback((sessionData, participantData, hostToken = null) => {
     try {
@@ -36,10 +37,8 @@ export function useSession(sessionId = null) {
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(dataToStore));
 
-      // Store host token separately if provided (for session creator only)
-      if (hostToken) {
-        localStorage.setItem(`host_token_${sessionData.session_id}`, hostToken);
-      }
+      // Host token management removed - now using httpOnly cookies for security
+      // The server sets the cookie automatically, no client-side storage needed
     } catch (err) {
       console.error('Failed to persist session:', err);
     }
@@ -47,18 +46,13 @@ export function useSession(sessionId = null) {
 
   /**
    * Clear persisted session from localStorage
+   * NOTE: Host token cookie cleared by server or via expiration
    */
   const clearPersistedSession = useCallback(() => {
     try {
-      // Get session ID before clearing, to also remove host token
-      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (stored) {
-        const { session: storedSession } = JSON.parse(stored);
-        if (storedSession?.session_id) {
-          localStorage.removeItem(`host_token_${storedSession.session_id}`);
-        }
-      }
       localStorage.removeItem(SESSION_STORAGE_KEY);
+      // Host token cookie is httpOnly and managed by server
+      // It will expire automatically or can be cleared via /api/logout endpoint
     } catch (err) {
       console.error('Failed to clear persisted session:', err);
     }

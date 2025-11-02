@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
@@ -53,6 +54,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // Parse cookies for httpOnly authentication
 
 // Add request ID for tracking
 app.use((req, res, next) => {
@@ -180,6 +182,7 @@ app.get('/api/analytics/overview', analyticsAPI.getAnalyticsOverview);
 app.get('/api/analytics/sessions/weekly', analyticsAPI.getWeeklySessionTrends);
 app.get('/api/analytics/revenue', analyticsAPI.getRevenueAnalytics);
 app.get('/api/analytics/sessions/recent', analyticsAPI.getRecentSessions);
+app.get('/api/analytics/sessions/completions', analyticsAPI.getSessionCompletions);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
