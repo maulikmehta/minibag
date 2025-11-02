@@ -206,6 +206,8 @@ app.get('/api/catalog/popular', catalogAPI.getPopularItems);
 app.get('/api/sessions/nickname-options', sessionsAPI.getNicknameOptions);
 app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, sessionsAPI.createSession);
 app.get('/api/sessions/:session_id', sessionsAPI.getSession);
+app.get('/api/sessions/:session_id/shopping-items', sessionsAPI.getShoppingItems); // Aggregated items for shopping screen
+app.get('/api/sessions/:session_id/bill-items', sessionsAPI.getBillItems); // Aggregated items with payments for bill screen
 app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, sessionsAPI.joinSession); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);

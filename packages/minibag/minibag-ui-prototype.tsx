@@ -188,8 +188,30 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       // Always sync from API as source of truth
       setHostItems(transformedHostItems);
 
-      // DEFENSIVE FIX: Merge transformed participants with current state to preserve items
-      // If API returns empty items arrays, keep the existing items from state
+      /**
+       * DEFENSIVE FIX (Fallback Mechanism)
+       *
+       * ROOT CAUSE: Supabase's embedded relation query syntax returns empty arrays
+       * for participants without records in participant_items table. This happens during:
+       * - Session status transitions (active → shopping → completed)
+       * - Page refreshes before DB commits complete
+       * - WebSocket event race conditions
+       *
+       * PROPER FIX: New server-side aggregation endpoints available:
+       * - GET /api/sessions/:session_id/shopping-items - Pre-aggregated data for shopping screen
+       * - GET /api/sessions/:session_id/bill-items - Pre-aggregated data with payments for bills
+       *
+       * These endpoints query participant_items directly (never returns empty) and perform
+       * server-side aggregation, eliminating the empty items issue at its source.
+       *
+       * MIGRATION PATH: Gradually migrate screens to use new endpoints:
+       * 1. ShoppingScreen: Call /shopping-items on mount instead of using transformed participant data
+       * 2. BillScreen: Call /bill-items to get participant bills with payment info
+       * 3. Once all screens migrated, remove this defensive merge logic
+       *
+       * CURRENT BEHAVIOR: This defensive merge preserves items in client state when API returns empty.
+       * It's a safety net that should eventually be removed once proper fix is fully adopted.
+       */
       setParticipants(prevParticipants => {
         console.log('🔄 Merging participant data. Previous:', prevParticipants.map(p => ({
           id: p.id,
@@ -248,6 +270,134 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       setCurrentScreen('session-active');
     }
   }, [session, currentParticipant, currentScreen, joinSessionId, billSessionId]);
+
+  /**
+   * OPTION 1: Parallel Endpoint Logging (Testing Phase)
+   *
+   * This fetches data from the new shopping-items aggregation endpoint
+   * and compares it with the current state data. This is for validation
+   * purposes only - we're not using the new data yet.
+   *
+   * Purpose: Verify the new endpoint returns identical data to current approach
+   * before switching over completely.
+   *
+   * TODO: Once data is verified to match, remove old endpoint calls and use only new
+   */
+  React.useEffect(() => {
+    const compareShoppingData = async () => {
+      if (currentScreen !== 'shopping' || !session?.session_id) return;
+
+      try {
+        console.log('🔄 [Option 1] Fetching from new shopping-items endpoint...');
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/sessions/${session.session_id}/shopping-items`);
+        const result = await response.json();
+
+        if (!result.success) {
+          console.error('❌ [Option 1] New endpoint failed:', result.error);
+          return;
+        }
+
+        const newEndpointData = result.data;
+
+        // Calculate aggregated items from current state (old approach)
+        const currentStateAggregated = {};
+
+        // Add host items
+        Object.entries(hostItems || {}).forEach(([itemId, qty]) => {
+          currentStateAggregated[itemId] = {
+            totalQuantity: qty,
+            participants: [currentParticipant?.nickname || 'Host']
+          };
+        });
+
+        // Add participant items
+        participants.forEach(participant => {
+          Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
+            if (!currentStateAggregated[itemId]) {
+              currentStateAggregated[itemId] = {
+                totalQuantity: 0,
+                participants: []
+              };
+            }
+            currentStateAggregated[itemId].totalQuantity += qty;
+            if (!currentStateAggregated[itemId].participants.includes(participant.nickname)) {
+              currentStateAggregated[itemId].participants.push(participant.nickname);
+            }
+          });
+        });
+
+        // Compare the two datasets
+        console.log('📊 [Option 1] DATA COMPARISON:');
+        console.log('-----------------------------------');
+        console.log('🆕 New Endpoint Data:', {
+          aggregatedItems: newEndpointData.aggregatedItems,
+          participantCount: newEndpointData.participants?.length,
+          participants: newEndpointData.participants?.map(p => ({
+            nickname: p.nickname,
+            itemsCount: p.itemsCount
+          }))
+        });
+        console.log('📦 Current State Data:', {
+          aggregatedItems: currentStateAggregated,
+          participantCount: participants.length,
+          participants: participants.map(p => ({
+            nickname: p.nickname,
+            itemsCount: Object.keys(p.items || {}).length
+          }))
+        });
+
+        // Deep comparison of aggregated items
+        const newItemIds = Object.keys(newEndpointData.aggregatedItems || {}).sort();
+        const oldItemIds = Object.keys(currentStateAggregated).sort();
+
+        let differencesFound = false;
+
+        if (newItemIds.length !== oldItemIds.length) {
+          console.warn('⚠️ [Option 1] MISMATCH: Different number of items!');
+          console.warn(`  New: ${newItemIds.length}, Old: ${oldItemIds.length}`);
+          differencesFound = true;
+        }
+
+        newItemIds.forEach(itemId => {
+          const newItem = newEndpointData.aggregatedItems[itemId];
+          const oldItem = currentStateAggregated[itemId];
+
+          if (!oldItem) {
+            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} exists in new data but not in old`);
+            differencesFound = true;
+            return;
+          }
+
+          if (Math.abs(newItem.totalQuantity - oldItem.totalQuantity) > 0.01) {
+            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} quantity differs!`);
+            console.warn(`  New: ${newItem.totalQuantity}, Old: ${oldItem.totalQuantity}`);
+            differencesFound = true;
+          }
+
+          const newParticipants = newItem.participants.sort();
+          const oldParticipants = oldItem.participants.sort();
+          if (JSON.stringify(newParticipants) !== JSON.stringify(oldParticipants)) {
+            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} participants differ!`);
+            console.warn(`  New: ${newParticipants.join(', ')}, Old: ${oldParticipants.join(', ')}`);
+            differencesFound = true;
+          }
+        });
+
+        if (!differencesFound) {
+          console.log('✅ [Option 1] DATA MATCHES PERFECTLY! Safe to migrate.');
+        } else {
+          console.warn('⚠️ [Option 1] DIFFERENCES FOUND! Review before migrating.');
+        }
+        console.log('-----------------------------------');
+
+      } catch (error) {
+        console.error('❌ [Option 1] Error fetching/comparing shopping data:', error);
+      }
+    };
+
+    compareShoppingData();
+  }, [currentScreen, session?.session_id, hostItems, participants, currentParticipant]);
 
   // Listen for participant item updates (host only)
   React.useEffect(() => {

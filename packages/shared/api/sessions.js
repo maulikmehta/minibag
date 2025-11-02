@@ -646,6 +646,333 @@ export async function getSession(req, res) {
 }
 
 /**
+ * GET /api/sessions/:session_id/shopping-items
+ * Get pre-aggregated shopping items with participant summaries
+ * Optimized endpoint that eliminates empty items issue
+ */
+export async function getShoppingItems(req, res) {
+  try {
+    const { session_id } = req.params;
+
+    // Get session to verify it exists
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('id, session_id, status')
+      .eq('session_id', session_id)
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    // Get all participant items with catalog data and participant info
+    // Note: participant_items doesn't have session_id, need to filter through participant
+    const { data: participantItems, error: itemsError } = await supabase
+      .from('participant_items')
+      .select(`
+        *,
+        catalog_item:catalog_items(id, item_id, name, unit, base_price, emoji),
+        participant:participants!inner(id, nickname, avatar_emoji, items_confirmed, session_id)
+      `)
+      .eq('participant.session_id', session.id);
+
+    if (itemsError) throw itemsError;
+
+    // Get all participants (including those without items)
+    const { data: allParticipants, error: participantsError } = await supabase
+      .from('participants')
+      .select('id, nickname, avatar_emoji, items_confirmed, is_creator')
+      .eq('session_id', session.id);
+
+    if (participantsError) throw participantsError;
+
+    // Aggregate items by item_id
+    const aggregatedItems = {};
+    const participantItemCounts = {};
+
+    // Initialize participant item counts
+    allParticipants.forEach(p => {
+      participantItemCounts[p.id] = 0;
+    });
+
+    // Process each participant item
+    participantItems.forEach(item => {
+      if (!item.catalog_item) {
+        console.warn('⚠️ [getShoppingItems] Missing catalog_item for item:', item);
+        return;
+      }
+
+      const itemId = item.catalog_item.item_id;
+      const participantId = item.participant?.id;
+
+      if (!participantId) {
+        console.warn('⚠️ [getShoppingItems] Missing participant for item:', item);
+        return;
+      }
+
+      // Count items per participant
+      participantItemCounts[participantId]++;
+
+      // Aggregate by item_id
+      if (!aggregatedItems[itemId]) {
+        aggregatedItems[itemId] = {
+          item_id: itemId,
+          name: item.catalog_item.name,
+          unit: item.catalog_item.unit,
+          base_price: item.catalog_item.base_price,
+          emoji: item.catalog_item.emoji,
+          totalQuantity: 0,
+          participants: []
+        };
+      }
+
+      aggregatedItems[itemId].totalQuantity += item.quantity;
+
+      // Add participant nickname to the list (avoid duplicates)
+      const participantNickname = item.participant.nickname;
+      if (!aggregatedItems[itemId].participants.includes(participantNickname)) {
+        aggregatedItems[itemId].participants.push(participantNickname);
+      }
+    });
+
+    // Create participant summaries
+    const participantSummaries = allParticipants.map(p => ({
+      id: p.id,
+      nickname: p.nickname,
+      avatar_emoji: p.avatar_emoji,
+      items_confirmed: p.items_confirmed,
+      is_creator: p.is_creator,
+      itemsCount: participantItemCounts[p.id] || 0
+    }));
+
+    console.log('✅ [getShoppingItems] Aggregated shopping items:', {
+      sessionId: session_id,
+      sessionStatus: session.status,
+      totalUniqueItems: Object.keys(aggregatedItems).length,
+      totalParticipants: participantSummaries.length,
+      itemsSample: Object.values(aggregatedItems).slice(0, 3)
+    });
+
+    res.json({
+      success: true,
+      data: {
+        session: {
+          id: session.id,
+          session_id: session.session_id,
+          status: session.status
+        },
+        aggregatedItems,
+        participants: participantSummaries
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching shopping items:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * GET /api/sessions/:session_id/bill-items
+ * Get pre-aggregated bill items with payment information
+ * Used for bill/payment screens to avoid empty items issue
+ */
+export async function getBillItems(req, res) {
+  try {
+    const { session_id } = req.params;
+
+    // Get session to verify it exists
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('id, session_id, status')
+      .eq('session_id', session_id)
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    // Get all participant items with catalog data and participant info
+    // Note: participant_items doesn't have session_id, need to filter through participant
+    const { data: participantItems, error: itemsError } = await supabase
+      .from('participant_items')
+      .select(`
+        *,
+        catalog_item:catalog_items(id, item_id, name, unit, base_price, emoji),
+        participant:participants!inner(id, nickname, avatar_emoji, real_name, items_confirmed, is_creator, session_id)
+      `)
+      .eq('participant.session_id', session.id);
+
+    if (itemsError) throw itemsError;
+
+    // Get all participants (including those without items)
+    const { data: allParticipants, error: participantsError } = await supabase
+      .from('participants')
+      .select('id, nickname, avatar_emoji, real_name, items_confirmed, is_creator')
+      .eq('session_id', session.id);
+
+    if (participantsError) throw participantsError;
+
+    // Get all payments for this session
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('session_id', session_id);
+
+    if (paymentsError) throw paymentsError;
+
+    // Build payment map by item_id (catalog item UUID)
+    const paymentMap = {};
+    const skippedItems = {};
+    (payments || []).forEach(p => {
+      if (p.skipped) {
+        skippedItems[p.item_id] = p;
+      } else {
+        paymentMap[p.item_id] = p;
+      }
+    });
+
+    // Aggregate items by item_id and calculate quantities
+    const itemTotals = {};
+    const participantItemsMap = {}; // participantId -> { itemId -> quantity }
+
+    // Initialize participant items map
+    allParticipants.forEach(p => {
+      participantItemsMap[p.id] = {};
+    });
+
+    // Process each participant item
+    participantItems.forEach(item => {
+      if (!item.catalog_item) {
+        console.warn('⚠️ [getBillItems] Missing catalog_item for item:', item);
+        return;
+      }
+
+      const catalogItemId = item.catalog_item.id; // UUID
+      const itemId = item.catalog_item.item_id; // String ID (v001, etc.)
+      const participantId = item.participant?.id;
+
+      if (!participantId) {
+        console.warn('⚠️ [getBillItems] Missing participant for item:', item);
+        return;
+      }
+
+      // Track participant's items
+      if (!participantItemsMap[participantId][itemId]) {
+        participantItemsMap[participantId][itemId] = {
+          quantity: 0,
+          catalogItemId
+        };
+      }
+      participantItemsMap[participantId][itemId].quantity += item.quantity;
+
+      // Only count non-skipped items in totals
+      if (!skippedItems[catalogItemId]) {
+        if (!itemTotals[catalogItemId]) {
+          itemTotals[catalogItemId] = {
+            itemId,
+            name: item.catalog_item.name,
+            unit: item.catalog_item.unit,
+            base_price: item.catalog_item.base_price,
+            emoji: item.catalog_item.emoji,
+            totalQuantity: 0
+          };
+        }
+        itemTotals[catalogItemId].totalQuantity += item.quantity;
+      }
+    });
+
+    // Calculate splits for each participant
+    const participantBills = allParticipants.map(participant => {
+      let totalCost = 0;
+      const itemBreakdown = [];
+
+      Object.entries(participantItemsMap[participant.id]).forEach(([itemId, data]) => {
+        const catalogItemId = data.catalogItemId;
+        const payment = paymentMap[catalogItemId];
+
+        if (payment && itemTotals[catalogItemId]) {
+          const totalQty = itemTotals[catalogItemId].totalQuantity;
+          const pricePerKg = payment.amount / totalQty;
+          const itemCost = pricePerKg * data.quantity;
+
+          totalCost += itemCost;
+          itemBreakdown.push({
+            item_id: itemId,
+            catalog_item_id: catalogItemId,
+            name: itemTotals[catalogItemId].name,
+            emoji: itemTotals[catalogItemId].emoji,
+            quantity: data.quantity,
+            unit: itemTotals[catalogItemId].unit,
+            price_per_kg: Math.round(pricePerKg),
+            item_cost: Math.round(itemCost)
+          });
+        }
+      });
+
+      return {
+        participant_id: participant.id,
+        nickname: participant.nickname,
+        avatar_emoji: participant.avatar_emoji,
+        real_name: participant.real_name,
+        is_creator: participant.is_creator,
+        items_confirmed: participant.items_confirmed,
+        total_cost: Math.round(totalCost),
+        items_count: Object.keys(participantItemsMap[participant.id]).length,
+        items: itemBreakdown
+      };
+    });
+
+    const totalPaid = (payments || []).reduce((sum, p) => p.skipped ? sum : sum + p.amount, 0);
+
+    console.log('✅ [getBillItems] Calculated bill items:', {
+      sessionId: session_id,
+      sessionStatus: session.status,
+      totalParticipants: participantBills.length,
+      totalPaid: Math.round(totalPaid),
+      paymentsCount: payments?.length || 0
+    });
+
+    res.json({
+      success: true,
+      data: {
+        session: {
+          id: session.id,
+          session_id: session.session_id,
+          status: session.status
+        },
+        participants: participantBills,
+        total_paid: Math.round(totalPaid),
+        payments_count: payments?.length || 0,
+        skipped_items: Object.keys(skippedItems).map(catalog_item_id => ({
+          catalog_item_id,
+          item_id: itemTotals[catalog_item_id]?.itemId,
+          skip_reason: skippedItems[catalog_item_id].skip_reason
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching bill items:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
  * POST /api/sessions/:session_id/join
  * Join an existing session
  */
