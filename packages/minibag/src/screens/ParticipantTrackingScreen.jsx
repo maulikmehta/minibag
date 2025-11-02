@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
+import IdentityBanner from '../components/session/IdentityBanner.jsx';
 import { extractFirstName } from '../utils/sessionTransformers.js';
 
 /**
@@ -76,6 +77,18 @@ export default function ParticipantTrackingScreen({
     },
   ];
 
+  // Determine banner message based on session status
+  const getBannerMessage = () => {
+    if (sessionStatus === 'completed') {
+      return 'All set! Your items are ready. Check your bill to see what you owe.';
+    }
+    if (sessionStatus === 'shopping') {
+      return `On it! ${hostNickname} is at the store picking up your items right now.`;
+    }
+    // Default: waiting/active status
+    return `${hostNickname} will head to the store soon. We'll update you when shopping starts.`;
+  };
+
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
       <AppHeader
@@ -93,6 +106,16 @@ export default function ParticipantTrackingScreen({
           <p className="text-sm text-gray-600">
             See where your items are
           </p>
+        </div>
+
+        {/* Status Banner */}
+        <div className="mb-6">
+          <IdentityBanner
+            currentParticipant={participant}
+            currentUser={participant}
+            phase="shopping"
+            message={getBannerMessage()}
+          />
         </div>
 
         {/* Progress Tracker - Courier Style with Numbers */}
@@ -176,7 +199,7 @@ export default function ParticipantTrackingScreen({
                 return (
                   <ItemRow
                     key={itemId}
-                    imageUrl={item?.thumbnail_url || item?.img}
+                    fallbackEmoji={item?.emoji || '🥬'}
                     name={getItemName(item)}
                     subtitle={`${qty}kg`}
                   />
@@ -191,37 +214,6 @@ export default function ParticipantTrackingScreen({
             </div>
           </div>
         </div>
-
-        {/* Info message based on status */}
-        {sessionStatus === 'active' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-800">
-              <span className="font-semibold">Sit tight!</span>
-              <br />
-              <span className="font-medium text-blue-900">{hostNickname}</span> will head to the store soon. We'll update you when shopping starts.
-            </p>
-          </div>
-        )}
-
-        {sessionStatus === 'shopping' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-amber-800">
-              <span className="font-semibold">On it!</span>
-              <br />
-              <span className="font-medium text-amber-900">{hostNickname}</span> is at the store picking up your items right now.
-            </p>
-          </div>
-        )}
-
-        {sessionStatus === 'completed' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-800">
-              <span className="font-semibold">All set!</span>
-              <br />
-              Your items are ready. Check your bill to see what you owe.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Fixed bottom button */}
