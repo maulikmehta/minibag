@@ -47,7 +47,36 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(helmet());
+// Configure helmet with Content Security Policy
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for Vite dev mode
+      styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for Tailwind
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: [
+        "'self'",
+        process.env.SUPABASE_URL || "https://*.supabase.co",
+        process.env.FRONTEND_URL || "http://localhost:5173",
+        "ws://localhost:*", // WebSocket in development
+        "wss://*" // WebSocket in production
+      ],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Needed for WebSocket
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Needed for API
+}));
+// CORS configuration
+// - origin: Restricted to frontend URL only (prevents cross-origin attacks)
+// - credentials: true (allows httpOnly cookies for authentication)
+// - Development: http://localhost:5173
+// - Production: Should be set via FRONTEND_URL env variable
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
