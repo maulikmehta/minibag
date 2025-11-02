@@ -265,20 +265,8 @@ export default function SessionCreateScreen({
                   isSelected ? 'bg-gray-50' : ''
                 }`}
               >
-                {veg.thumbnail_url || veg.img ? (
-                  <img
-                    src={veg.thumbnail_url || veg.img}
-                    alt={veg.name}
-                    loading="lazy"
-                    className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                  🥬
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
+                  {veg.emoji || '🥬'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base text-gray-900">{getItemName(veg)}</p>

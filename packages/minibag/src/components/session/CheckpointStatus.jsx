@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 /**
  * Component for displaying checkpoint status and start shopping button
@@ -16,6 +17,7 @@ import React from 'react';
  * @param {number|null} props.expectedCount - Expected participants count
  * @param {Function} props.onStartShopping - Callback when start shopping button is clicked
  * @param {boolean} props.disabled - If true, button is disabled (no items, checkpoint incomplete, or waiting for confirmations)
+ * @param {boolean} props.isLoading - If true, shows loading spinner
  */
 export default function CheckpointStatus({
   checkpointComplete,
@@ -28,8 +30,24 @@ export default function CheckpointStatus({
   isInviteExpired,
   expectedCount,
   onStartShopping,
-  disabled = false
+  disabled = false,
+  isLoading = false
 }) {
+  const [internalLoading, setInternalLoading] = useState(false);
+
+  const handleClick = async () => {
+    if (disabled || isLoading || internalLoading) return;
+
+    setInternalLoading(true);
+    try {
+      await onStartShopping();
+    } finally {
+      // Keep loading state for a moment to prevent double-clicks
+      setTimeout(() => setInternalLoading(false), 1000);
+    }
+  };
+
+  const showLoading = isLoading || internalLoading;
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
       {/* Show checkpoint status or timeout message */}
@@ -44,9 +62,9 @@ export default function CheckpointStatus({
       )}
 
       <button
-        onClick={onStartShopping}
-        disabled={disabled}
-        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+        onClick={handleClick}
+        disabled={disabled || showLoading}
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         title={
           expectedCount === null
             ? 'Set how many friends joining above'
@@ -57,11 +75,16 @@ export default function CheckpointStatus({
                   : '')
         }
       >
-        {expectedCount === null
-          ? 'Start shopping'
-          : !checkpointComplete
-            ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
-            : 'Start shopping'}
+        {showLoading && (
+          <Loader2 size={20} className="animate-spin" />
+        )}
+        {showLoading
+          ? 'Starting...'
+          : (expectedCount === null
+              ? 'Start shopping'
+              : !checkpointComplete
+                ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
+                : 'Start shopping')}
       </button>
     </div>
   );

@@ -13,6 +13,7 @@ import IdentityBanner from '../components/session/IdentityBanner.jsx';
 import { useNotification } from '../hooks/useNotification.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
+import { aggregateAllItems } from '../utils/calculateItems';
 
 export default function SessionActiveScreen({
   session,
@@ -62,13 +63,11 @@ export default function SessionActiveScreen({
     isInviteExpired
   } = useExpectedParticipants(session, participants);
 
-  // Compute all items from host + participants
-  const allItems = { ...hostItems };
-  participants.forEach(p => {
-    Object.entries(p.items || {}).forEach(([id, qty]) => {
-      allItems[id] = (allItems[id] || 0) + qty;
-    });
-  });
+  // Compute all items from host + participants (memoized for performance)
+  const allItems = useMemo(
+    () => aggregateAllItems(hostItems, participants),
+    [hostItems, participants]
+  );
 
   // Get selected participant's items
   const selectedItems = selectedParticipant === 'host'
@@ -210,20 +209,8 @@ export default function SessionActiveScreen({
                         isSelected ? 'bg-gray-50' : ''
                       }`}
                     >
-                      {veg.thumbnail_url || veg.img ? (
-                        <img
-                          src={veg.thumbnail_url || veg.img}
-                          alt={veg.name}
-                          loading="lazy"
-                          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextElementSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                        🥬
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
+                        {veg.emoji || '🥬'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-base text-gray-900">{getItemName(veg)}</p>
@@ -396,7 +383,7 @@ export default function SessionActiveScreen({
               return (
                 <ItemRow
                   key={itemId}
-                  imageUrl={veg?.thumbnail_url || veg?.img}
+                  fallbackEmoji={veg?.emoji || '🥬'}
                   name={getItemName(veg)}
                   subtitle={`${qty}kg`}
                 />

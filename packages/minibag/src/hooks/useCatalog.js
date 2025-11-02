@@ -1,10 +1,12 @@
 /**
  * useCatalog Hook
  * Fetches and manages catalog data (categories and items)
+ * Uses emoji-only display for performance (no image loading)
  */
 
 import { useState, useEffect } from 'react';
 import { getCategories, getItems } from '../services/api.js';
+import { getItemEmoji, getCategoryEmoji } from '../utils/emojiMap';
 
 /**
  * Hook to fetch catalog categories
@@ -137,16 +139,20 @@ export function useCatalog() {
   }));
 
   // Map items to use category_id string instead of UUID
-  const formattedItems = rawItems.map(item => ({
-    id: item.item_id || item.id,
-    name: item.name,
-    name_gu: item.name_gu || item.name,
-    name_hi: item.name_hi || item.name,
-    img: item.thumbnail_url || item.image_url || getDefaultImage(item.category_id),
-    thumbnail_url: item.thumbnail_url || item.image_url,
-    category: categoryIdMap[item.category_id] || item.category_id, // Map UUID to string
-    category_id: item.category_id // Keep original UUID for filtering
-  }));
+  // Use emoji-only display for performance (no image loading)
+  const formattedItems = rawItems.map(item => {
+    const categoryString = categoryIdMap[item.category_id] || item.category_id;
+    return {
+      id: item.item_id || item.id,
+      name: item.name,
+      name_gu: item.name_gu || item.name,
+      name_hi: item.name_hi || item.name,
+      emoji: getItemEmoji(item.name, categoryString, item.emoji),
+      category: categoryString, // Map UUID to string
+      category_id: item.category_id, // Keep original UUID for filtering
+      price_per_kg: item.price_per_kg || 0
+    };
+  });
 
   return {
     categories: formattedCategories,
@@ -160,25 +166,30 @@ export function useCatalog() {
 /**
  * Format catalog data to match the existing UI structure
  * This transforms API data to the format expected by the prototype
+ * Uses emoji-only display for performance
  */
 export function formatCatalogForUI(categories, items) {
   // Transform categories to match UI format
   const formattedCategories = categories.map(cat => ({
     id: cat.id,
     name: cat.name,
-    emoji: cat.icon,
+    emoji: cat.icon || getCategoryEmoji(cat.name),
     color: getCategoryColor(cat.color || cat.name)
   }));
 
-  // Transform items to match UI format
-  const formattedItems = items.map(item => ({
-    id: item.id || item.item_id,
-    name: item.name,
-    name_gu: item.name_gu || item.name,
-    name_hi: item.name_hi || item.name,
-    img: item.image_url || getDefaultImage(item.category_id),
-    category: item.category_id || item.category?.id
-  }));
+  // Transform items to match UI format with emoji only
+  const formattedItems = items.map(item => {
+    const categoryId = item.category_id || item.category?.id;
+    return {
+      id: item.id || item.item_id,
+      name: item.name,
+      name_gu: item.name_gu || item.name,
+      name_hi: item.name_hi || item.name,
+      emoji: getItemEmoji(item.name, categoryId, item.emoji),
+      category: categoryId,
+      price_per_kg: item.price_per_kg || 0
+    };
+  });
 
   return { categories: formattedCategories, items: formattedItems };
 }
@@ -200,19 +211,6 @@ function getCategoryColor(colorOrName) {
   };
 
   return colorMap[colorOrName?.toLowerCase()] || 'bg-gray-100';
-}
-
-/**
- * Get default placeholder image
- */
-function getDefaultImage(categoryId) {
-  const placeholders = {
-    1: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&h=200&fit=crop',
-    2: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&h=200&fit=crop',
-    3: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&h=200&fit=crop',
-  };
-
-  return placeholders[categoryId] || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&h=200&fit=crop';
 }
 
 export default useCatalog;

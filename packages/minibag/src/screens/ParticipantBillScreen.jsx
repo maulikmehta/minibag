@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
 import { useNotification } from '../hooks/useNotification.js';
+import { aggregateAllItems } from '../utils/calculateItems';
 
 /**
  * ParticipantBillScreen Component
@@ -50,75 +51,75 @@ function ParticipantBillScreen({
   // Get participant data (first participant)
   const participant = participants[0];
 
-  // Calculate total quantities for all items
-  const allItems = { ...hostItems };
-  participants.forEach(p => {
-    Object.entries(p.items || {}).forEach(([id, qty]) => {
-      allItems[id] = (allItems[id] || 0) + qty;
+  // Calculate total quantities for all items (memoized)
+  const allItems = useMemo(
+    () => aggregateAllItems(hostItems, participants),
+    [hostItems, participants]
+  );
+
+  // Calculate participant's bill (memoized)
+  const { participantCost, billItems } = useMemo(() => {
+    let cost = 0;
+    const items = [];
+
+    Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
+      const veg = getItemName ? items.find(v => v.id === itemId) : null;
+      const payment = itemPayments[itemId];
+      if (payment) {
+        const totalQty = allItems[itemId];
+        const pricePerKg = payment.amount / totalQty;
+        const itemCost = pricePerKg * qty;
+        cost += itemCost;
+        items.push({
+          name: getItemName ? getItemName(veg) : `Item ${itemId}`,
+          qty,
+          pricePerKg: pricePerKg.toFixed(0),
+          itemCost: itemCost.toFixed(0),
+          emoji: veg?.emoji || '🥬'
+        });
+      }
     });
-  });
 
-  // Calculate participant's bill
-  let participantCost = 0;
-  const billItems = [];
-
-  Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
-    const veg = items.find(v => v.id === itemId);
-    const payment = itemPayments[itemId];
-    if (payment) {
-      const totalQty = allItems[itemId];
-      const pricePerKg = payment.amount / totalQty;
-      const itemCost = pricePerKg * qty;
-      participantCost += itemCost;
-      billItems.push({
-        name: getItemName(veg),
-        qty,
-        pricePerKg: pricePerKg.toFixed(0),
-        itemCost: itemCost.toFixed(0)
-      });
-    }
-  });
+    return { participantCost: cost, billItems: items };
+  }, [participant, allItems, itemPayments, items, getItemName]);
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
       <AppHeader />
       <div className="p-6">
-        <p className="text-2xl text-gray-900 mb-6">Your bill</p>
+        <p className="text-2xl font-bold text-gray-900 mb-4">Your Bill</p>
 
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
-          <p className="text-sm text-gray-600 mb-1">Shopping completed by Host</p>
-          <p className="text-base text-gray-900">
-            You are: <UserIdentity
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-gray-600 mb-0.5">Shopping completed by Host</p>
+          <p className="text-sm text-gray-900 font-medium">
+            <UserIdentity
               realName={participant.real_name}
               nickname={participant.nickname || participant.name || 'Participant'}
             />
           </p>
         </div>
 
-        <div className="border border-gray-300 rounded-lg overflow-hidden mb-6">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-300">
-            <p className="text-sm text-gray-900">Items purchased</p>
-          </div>
+        {/* Compact Total at Top */}
+        <div className="mb-6 p-4 bg-gray-900 rounded-lg text-center">
+          <p className="text-xs text-gray-300 mb-1">Total Amount</p>
+          <p className="text-4xl font-bold text-white">₹{participantCost.toFixed(0)}</p>
+          <p className="text-xs text-gray-400 mt-1">{billItems.length} {billItems.length === 1 ? 'item' : 'items'}</p>
+        </div>
 
-          <div className="divide-y divide-gray-200">
+        {/* Compact Item List */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-3">Items</p>
+          <div className="space-y-2">
             {billItems.map((item, idx) => (
-              <div key={idx} className="py-3 px-3">
-                <div className="flex justify-between items-start mb-1">
-                  <p className="text-base text-gray-900">{item.name}</p>
-                  <p className="text-base text-gray-900">₹{item.itemCost}</p>
+              <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                <span className="text-xl">{item.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-900 font-medium truncate">{item.name}</p>
+                  <p className="text-xs text-gray-500">{item.qty}kg × ₹{item.pricePerKg}/kg</p>
                 </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>{item.qty}kg × ₹{item.pricePerKg}/kg</span>
-                </div>
+                <p className="text-sm text-gray-900 font-bold">₹{item.itemCost}</p>
               </div>
             ))}
-          </div>
-
-          <div className="bg-gray-50 px-4 py-4 border-t-2 border-gray-900">
-            <div className="flex justify-between items-center">
-              <p className="text-base text-gray-900">Total amount due</p>
-              <p className="text-3xl text-gray-900">₹{participantCost.toFixed(0)}</p>
-            </div>
           </div>
         </div>
 

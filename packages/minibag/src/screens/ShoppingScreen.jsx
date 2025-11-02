@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
+import { aggregateAllItems } from '../utils/calculateItems';
 
 // Feature flag: Set to false to disable skip items feature
 const ENABLE_SKIP_ITEMS = true;
@@ -70,13 +71,12 @@ function ShoppingScreen({
       onUpdateSessionStatus('shopping');
     }
   }, [session?.session_id, onUpdateSessionStatus]);
-  // Calculate total quantities for all items
-  const allItems = { ...hostItems };
-  participants.forEach(p => {
-    Object.entries(p.items || {}).forEach(([id, qty]) => {
-      allItems[id] = (allItems[id] || 0) + qty;
-    });
-  });
+
+  // Calculate total quantities for all items (memoized for performance)
+  const allItems = useMemo(
+    () => aggregateAllItems(hostItems, participants),
+    [hostItems, participants]
+  );
 
   const hostNickname = currentParticipant?.nickname || 'You';
   const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
@@ -157,20 +157,8 @@ function ShoppingScreen({
                   </div>
                 )}
 
-                {veg.thumbnail_url || veg.img ? (
-                  <img
-                    src={veg.thumbnail_url || veg.img}
-                    alt={veg.name}
-                    loading="lazy"
-                    className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0 mt-1"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl mt-1" style={{display: (veg.thumbnail_url || veg.img) ? 'none' : 'flex'}}>
-                  🥬
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl mt-1">
+                  {veg.emoji || '🥬'}
                 </div>
 
                 <div className="flex-1 min-w-0">
