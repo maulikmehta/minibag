@@ -37,11 +37,14 @@ export const ITEM_NAME_EMOJI_MAP = {
   cucumber: '🥒',
   eggplant: '🍆',
   pepper: '🫑',
+  capsicum: '🫑',
   corn: '🌽',
   cabbage: '🥬',
   lettuce: '🥬',
   spinach: '🥬',
   mushroom: '🍄',
+  beans: '🫘',
+  peas: '🫛',
 
   // Fruits
   apple: '🍎',

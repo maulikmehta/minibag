@@ -103,21 +103,27 @@ All products use:
 localloops/
 ├── packages/
 │   ├── minibag/              # Vegetable coordination
+│   │   └── docs/             # App-specific docs
 │   ├── partybag/             # Future: Celebration coordination
 │   ├── fitbag/               # Future: Wellness coordination
-│   └── shared/               # Shared components, hooks, utils
+│   └── shared/               # Shared backend (API, WebSocket)
 │
-├── server/                   # WebSocket server (real-time sync)
+├── docs/                     # Organized documentation
+│   ├── design/               # Design system & UX patterns
+│   ├── architecture/         # Component library, API, data models
+│   └── operations/           # Known issues, testing, monitoring
 │
-├── docs/                     # Documentation
-│   ├── DEVELOPMENT.md        # Setup & workflow guide
-│   ├── ARCHITECTURE.md       # System design (TBD)
-│   └── DEPLOYMENT.md         # Deploy procedures (TBD)
+├── archive/                  # Historical documents
+│   ├── session-summaries/    # Development session notes
+│   └── project-snapshots/    # Point-in-time status reports
 │
 ├── .cloudflared/             # Cloudflare Tunnel config
 │
-├── CHANGELOG.md              # Version history
 ├── README.md                 # This file
+├── QUICK_START.md            # Quick start guide
+├── SETUP_INSTRUCTIONS.md     # Detailed setup
+├── SETUP_DATABASE.md         # Database setup
+├── CHANGELOG.md              # Version history
 └── package.json              # Root workspace config
 ```
 
@@ -164,9 +170,32 @@ This starts:
 
 ## 📖 Documentation
 
-- **[Development Setup](docs/DEVELOPMENT.md)** - Infrastructure setup, daily workflow
+### Getting Started
+- **[Quick Start Guide](QUICK_START.md)** - Get up and running in 5 minutes
+- **[Setup Instructions](SETUP_INSTRUCTIONS.md)** - Detailed development setup
+- **[Setup Database](SETUP_DATABASE.md)** - Database configuration
 - **[Changelog](CHANGELOG.md)** - Version history, breaking changes
-- **[Minibag Docs](packages/minibag/minibag-dev-doc.md)** - Product vision, roadmap
+
+### Design & Architecture
+- **[Design System](docs/design/LOCALLOOPS_DESIGN_SYSTEM.md)** - Complete design language, UX patterns, components
+- **[Shared Component Library](docs/architecture/SHARED_COMPONENT_LIBRARY.md)** - Reusable components structure
+- **[Core API Specification](docs/architecture/CORE_API_SPECIFICATION.md)** - API standards and endpoints
+- **[Core Data Models](docs/architecture/CORE_DATA_MODELS.md)** - Database schemas and patterns
+- **[Future Features](docs/design/FUTURE_FEATURES.md)** - Planned features and ideas
+
+### Operations & Development
+- **[Known Issues](docs/operations/KNOWN_ISSUES.md)** - Current bugs and technical debt
+- **[Pre-Field Testing Improvements](docs/operations/PRE_FIELD_TESTING_IMPROVEMENTS.md)** - Security & optimization checklist
+- **[Bundle Quick Reference](docs/operations/BUNDLE_QUICK_REFERENCE.md)** - Bundle size monitoring
+- **[Field Testing Guide](docs/operations/FIELD_TESTING_GUIDE.md)** - Testing procedures
+
+### App-Specific Documentation
+- **[Minibag Docs](packages/minibag/)** - Product vision, roadmap, features
+  - [Bundle Monitoring](packages/minibag/BUNDLE_MONITORING_GUIDE.md)
+  - [Feature Implementation Plan](packages/minibag/FEATURE_IMPLEMENTATION_PLAN.md)
+  - [Tooltip Implementation](packages/minibag/docs/TOOLTIP_IMPLEMENTATION.md)
+  - [Nickname Selection](packages/minibag/docs/NICKNAME_SELECTION_IMPLEMENTATION.md)
+  - [Admin Dashboard](packages/minibag/docs/ADMIN_DASHBOARD_SETUP.md)
 
 ---
 

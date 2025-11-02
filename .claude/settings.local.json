@@ -27,7 +27,19 @@
       "Bash(git log:*)",
       "Bash(pkill:*)",
       "Bash(awk:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(node clean-db.js:*)",
+      "Bash(xargs ls:*)",
+      "Bash(gzip:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm run size:*)",
+      "Bash(git mv:*)",
+      "Bash(xargs kill:*)",
+      "Bash(node -c:*)",
+      "Bash(npx supabase db:*)",
+      "Bash(psql:*)",
+      "Bash(node verify-emoji-migration.js:*)",
+      "Bash(npm run test:run:*)"
     ],
     "deny": [],
     "ask": []

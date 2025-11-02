@@ -52,8 +52,8 @@ function App() {
         <Suspense fallback={<LoadingFallback />}>
           <NotificationToast />
           <Routes>
-            {/* Direct to app for field testing */}
-            <Route path="/" element={<MinibagPrototype />} />
+            {/* Landing page as home - Get Started navigates to /app */}
+            <Route path="/" element={<MinibagLandingWrapper />} />
             <Route path="/home" element={<LocalLoopsLanding />} />
             <Route path="/minibag" element={<MinibagLandingWrapper />} />
             <Route path="/app" element={<MinibagPrototype />} />

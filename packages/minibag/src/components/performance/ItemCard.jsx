@@ -23,24 +23,11 @@ const ItemCard = React.memo(({
         isSelected ? 'bg-gray-50' : ''
       }`}
     >
-      {/* Item Image/Icon */}
-      {item.thumbnail_url || item.img ? (
-        <img
-          src={item.thumbnail_url || item.img}
-          alt={item.name}
-          loading="lazy"
-          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.nextElementSibling.style.display = 'flex';
-          }}
-        />
-      ) : null}
+      {/* Item Emoji Icon */}
       <div
         className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl"
-        style={{display: (item.thumbnail_url || item.img) ? 'none' : 'flex'}}
       >
-        🥬
+        {item.emoji || '🥬'}
       </div>
 
       {/* Item Info */}

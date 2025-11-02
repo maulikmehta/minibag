@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
+import removeConsole from 'vite-plugin-remove-console';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,6 +12,12 @@ export default defineConfig({
       filename: 'dist/stats.html',
       gzipSize: true,
       brotliSize: true
+    }),
+    // Remove console statements in production builds
+    removeConsole({
+      includes: ['log', 'debug', 'info', 'warn', 'error'],
+      // Keep console.error in production for critical errors
+      excludes: ['error']
     })
   ],
   server: {

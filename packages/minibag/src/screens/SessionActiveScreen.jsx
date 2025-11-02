@@ -383,7 +383,7 @@ export default function SessionActiveScreen({
               return (
                 <ItemRow
                   key={itemId}
-                  fallbackEmoji={veg?.emoji || '🥬'}
+                  emoji={veg?.emoji || '🥬'}
                   name={getItemName(veg)}
                   subtitle={`${qty}kg`}
                 />

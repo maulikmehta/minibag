@@ -10,6 +10,10 @@ import { dirname, resolve } from 'path';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 
+// Logging
+import logger from './utils/logger.js';
+import { requestIdMiddleware, httpLogger, errorLogger } from './middleware/requestLogger.js';
+
 // API route imports
 import * as catalogAPI from './api/catalog.js';
 import * as sessionsAPI from './api/sessions.js';
@@ -85,12 +89,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Parse cookies for httpOnly authentication
 
-// Add request ID for tracking
-app.use((req, res, next) => {
-  req.id = crypto.randomBytes(8).toString('hex');
-  res.setHeader('X-Request-ID', req.id);
-  next();
-});
+// Request ID tracking (must be before HTTP logger)
+app.use(requestIdMiddleware);
+
+// HTTP request/response logging with Pino
+app.use(httpLogger);
 
 // Add request timeout (30 seconds)
 app.use((req, res, next) => {
@@ -231,18 +234,12 @@ io.on('connection', (socket) => {
   setupSocketHandlers(socket, io);
 });
 
+// Error logging middleware (logs errors before handling them)
+app.use(errorLogger);
+
 // Enhanced error handling
 app.use((err, req, res, next) => {
-  // Log error with context
-  console.error(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    requestId: req.id,
-    method: req.method,
-    path: req.path,
-    error: err.message,
-    stack: err.stack,
-    userId: req.session?.userId || 'anonymous'
-  }));
+  // Error already logged by errorLogger middleware
 
   // Send appropriate response
   const statusCode = err.statusCode || err.status || 500;
@@ -263,9 +260,19 @@ app.use((err, req, res, next) => {
 const PORT = process.env.API_PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`✓ API server running on port ${PORT}`);
-  console.log(`✓ WebSocket server running on port ${PORT}`);
-  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info({
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+  }, 'LocalLoops API Server started');
+
+  logger.info('Server features:');
+  logger.info('  ✓ API server');
+  logger.info('  ✓ WebSocket server');
+  logger.info('  ✓ Structured logging (Pino)');
+  logger.info('  ✓ Rate limiting');
+  logger.info('  ✓ Security headers (Helmet)');
+  logger.info('  ✓ Request ID tracking');
 });
 
 export { app, io };

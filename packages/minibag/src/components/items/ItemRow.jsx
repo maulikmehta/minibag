@@ -3,11 +3,10 @@ import React from 'react';
 /**
  * ItemRow Component
  *
- * Displays a single item row with image, name, subtitle, and optional action content.
+ * Displays a single item row with emoji icon, name, subtitle, and optional action content.
  * Used across the app for consistent item display.
  *
- * @param {string} imageUrl - URL of item thumbnail
- * @param {string} fallbackEmoji - Emoji to show if image fails (default: 🥬)
+ * @param {string} emoji - Emoji to display for the item (default: 🥬)
  * @param {string} name - Item name
  * @param {string|React.ReactNode} subtitle - Subtitle text or component
  * @param {React.ReactNode} rightContent - Optional content on the right (quantity, button, etc.)
@@ -15,8 +14,7 @@ import React from 'react';
  * @param {string} className - Additional CSS classes
  */
 function ItemRow({
-  imageUrl,
-  fallbackEmoji = '🥬',
+  emoji = '🥬',
   name,
   subtitle,
   rightContent,
@@ -29,24 +27,11 @@ function ItemRow({
 
   return (
     <div className={`${containerClass} ${className}`} onClick={onClick}>
-      {/* Image with fallback */}
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={name}
-          loading="lazy"
-          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.nextElementSibling.style.display = 'flex';
-          }}
-        />
-      ) : null}
+      {/* Item Emoji Icon */}
       <div
         className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl"
-        style={{ display: imageUrl ? 'none' : 'flex' }}
       >
-        {fallbackEmoji}
+        {emoji}
       </div>
 
       {/* Item info */}
