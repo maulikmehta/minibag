@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
+import { Share2, Copy, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
@@ -38,6 +39,7 @@ function ParticipantBillScreen({
   // State for server-calculated bill
   const [billData, setBillData] = useState(null);
   const [loadingBill, setLoadingBill] = useState(true);
+  const [messageCopied, setMessageCopied] = useState(false);
 
   // Fetch bill items from server (eliminates empty items race condition)
   useEffect(() => {
@@ -145,10 +147,22 @@ function ParticipantBillScreen({
     return { participantCost: cost, billItems: items };
   }, [billData, participant, allItems, itemPayments, items, getItemName]);
 
-  // Handler for sending thank you message to host
+  // Handler for sending thank you message to host via WhatsApp
   const handleMessageHost = () => {
     const message = encodeURIComponent(t('whatsapp.thankYouMessage'));
-    window.open(`https://wa.me/?text=${message}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+  };
+
+  // Handler for copying thank you message to clipboard
+  const handleCopyMessage = async () => {
+    try {
+      const message = t('whatsapp.thankYouMessage');
+      await navigator.clipboard.writeText(message);
+      setMessageCopied(true);
+      setTimeout(() => setMessageCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy message:', error);
+    }
   };
 
   return (
@@ -194,12 +208,32 @@ function ParticipantBillScreen({
           </div>
         </div>
 
-        <button
-          onClick={handleMessageHost}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors"
-        >
-          Message Host
-        </button>
+        {/* Message Host Buttons - Styled like Send Invite */}
+        <div className="flex gap-3">
+          {/* WhatsApp Share Button */}
+          <button
+            onClick={handleMessageHost}
+            className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3.5 px-4 rounded-xl transition-colors"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Share2 size={18} strokeWidth={2} />
+              <span className="font-semibold">Message Host</span>
+            </div>
+          </button>
+
+          {/* Copy Message Icon Button */}
+          <button
+            onClick={handleCopyMessage}
+            className="w-14 h-14 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-600 rounded-xl transition-colors flex items-center justify-center"
+            title="Copy message"
+          >
+            {messageCopied ? (
+              <Check size={20} className="text-green-600" />
+            ) : (
+              <Copy size={20} />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

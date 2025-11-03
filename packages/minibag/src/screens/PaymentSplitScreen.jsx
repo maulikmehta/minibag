@@ -194,7 +194,7 @@ function PaymentSplitScreen({
 
     const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}`);
 
-    window.open(`https://wa.me/?text=${message}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
   };
 
   const handleCopyPaymentRequest = async (participant) => {

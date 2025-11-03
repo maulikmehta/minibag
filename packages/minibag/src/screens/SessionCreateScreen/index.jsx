@@ -426,6 +426,48 @@ export default function SessionCreateScreen({
               <p className="text-xs text-gray-500 mt-1">For payment tracking & receipts</p>
             </div>
 
+            {/* Language Preference */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-900 mb-3">
+                Choose your language
+              </label>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => onLanguageChange && onLanguageChange('en')}
+                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    i18n.language === 'en'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLanguageChange && onLanguageChange('hi')}
+                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    i18n.language === 'hi'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  हिंदी
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLanguageChange && onLanguageChange('gu')}
+                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    i18n.language === 'gu'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  ગુજરાતી
+                </button>
+              </div>
+            </div>
+
             {/* Nickname Selection */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-900 mb-3">

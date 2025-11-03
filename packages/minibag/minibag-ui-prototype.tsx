@@ -740,6 +740,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onJoinSuccess={() => setCurrentScreen('session-active')}
         onNavigateToHome={() => setCurrentScreen('home')}
         onNavigateToCreate={() => setCurrentScreen('host-create')}
+        i18n={i18n}
+        handleLanguageChange={handleLanguageChange}
       />
     );
   }
@@ -822,13 +824,13 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         if (error.name !== 'AbortError') {
           console.error('❌ Error sharing:', error);
           // Fallback to WhatsApp if share fails
-          const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+          const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
           window.open(whatsappUrl, '_blank');
         }
       }
     } else {
       // Fallback for browsers that don't support Web Share API (mostly desktop)
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
       window.open(whatsappUrl, '_blank');
     }
   };

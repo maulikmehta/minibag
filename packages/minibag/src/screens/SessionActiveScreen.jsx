@@ -392,7 +392,7 @@ export default function SessionActiveScreen({
             <ProgressBar
               currentStep={2}
               onStepClick={(step) => onNavigateToStep && onNavigateToStep(step)}
-              canNavigate={true}
+              canNavigate={!modeConfirmed}
             />
           )}
 

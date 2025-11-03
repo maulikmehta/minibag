@@ -10,12 +10,13 @@ import ModalWrapper from './shared/ModalWrapper.jsx';
  *
  * @param {string} itemId - ID of the item being paid for
  * @param {Array} items - Array of all items
+ * @param {Object} existingPayment - Existing payment data for editing (optional)
  * @param {function} onClose - Callback when modal is closed
  * @param {function} onConfirm - Callback when payment is confirmed (method, amount)
  */
-function PaymentModal({ itemId, items, onClose, onConfirm }) {
-  const [method, setMethod] = useState('upi');
-  const [amount, setAmount] = useState('');
+function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfirm }) {
+  const [method, setMethod] = useState(existingPayment?.method || 'upi');
+  const [amount, setAmount] = useState(existingPayment?.amount?.toString() || '');
   const veg = items.find(v => v.id === itemId);
 
   return (

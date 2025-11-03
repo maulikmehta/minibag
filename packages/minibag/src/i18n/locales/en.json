@@ -49,7 +49,7 @@
     "networkError": "Connection lost. Retrying..."
   },
   "whatsapp": {
-    "invitation": "🛒 Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you 😊\n\n{{url}}\n\nWe'll split the expense later!",
+    "invitation": "🛒 Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you 😊\n\n{{url}}",
     "thankYouMessage": "Thanks for shopping! 😊 When can I collect & pay?"
   },
   "tooltips": {

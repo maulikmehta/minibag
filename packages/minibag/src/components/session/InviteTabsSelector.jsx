@@ -33,6 +33,7 @@ export default function InviteTabsSelector({
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(expectedCount === null ? null : expectedCount);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [loadingInvites, setLoadingInvites] = useState(false);
 
   // Sync activeTab with expectedCount when it changes externally
   useEffect(() => {
@@ -58,7 +59,11 @@ export default function InviteTabsSelector({
     onChange(value);
 
     // Generate invites but don't start timeout yet (wait for OK button)
-    await commitSelection(value, { start_timeout: false });
+    if (value > 0) {
+      setLoadingInvites(true);
+      await commitSelection(value, { start_timeout: false });
+      setLoadingInvites(false);
+    }
   };
 
   const commitSelection = async (value, options = {}) => {
@@ -196,16 +201,16 @@ export default function InviteTabsSelector({
         <div className="px-2 pt-4 border-t border-gray-200">
           <button
             onClick={handleConfirm}
-            disabled={activeTab === null || locked}
+            disabled={activeTab === null || locked || loadingInvites}
             className={`
               w-full py-3 px-4 rounded-lg font-medium transition-all
-              ${activeTab === null || locked
+              ${activeTab === null || locked || loadingInvites
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800'
               }
             `}
           >
-            {activeTab === null ? 'Select a mode to continue' : 'OK'}
+            {activeTab === null ? 'Select a mode to continue' : loadingInvites ? 'Loading invites...' : 'OK'}
           </button>
         </div>
       )}

@@ -258,6 +258,7 @@ function ShoppingScreen({
         <PaymentModal
           itemId={selectedItemForPayment}
           items={items}
+          existingPayment={itemPayments[selectedItemForPayment]}
           onClose={() => {
             setShowPaymentModal(false);
             setSelectedItemForPayment(null);

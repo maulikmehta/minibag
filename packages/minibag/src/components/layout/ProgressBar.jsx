@@ -2,13 +2,14 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 /**
- * ProgressBar Component
+ * ProgressBar Component - Thin Bar Design
  *
  * Shows 4-step progress: List → Join → Bag → Bill
+ * - Thin horizontal bars with numbers and labels above
  * - All completed steps are highlighted/filled
- * - Current step is active
+ * - Current step is active with subtle glow
  * - Sequential navigation only (can tap previous steps, not future)
- * - When on step 2+, step 1 becomes a back arrow for navigation
+ * - When on step 2+, step 1 shows back arrow instead of number
  *
  * @param {number} currentStep - Current step (1-4)
  * @param {function} onStepClick - Callback when step is tapped (step: number)
@@ -32,71 +33,79 @@ function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
   };
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center">
-        {steps.map((step, index) => {
+    <div className="mb-4">
+      {/* Numbers and Labels - Single Line */}
+      <div className="flex items-center justify-between mb-2">
+        {steps.map((step) => {
           const isCompleted = step.number < currentStep;
           const isCurrent = step.number === currentStep;
           const isFuture = step.number > currentStep;
           const canTap = canNavigate && !isFuture;
 
           return (
-            <React.Fragment key={step.number}>
-              {/* Step 1: Show back arrow when on step 2+, otherwise show normal circle */}
+            <button
+              key={step.number}
+              onClick={() => handleStepClick(step.number)}
+              disabled={!canTap}
+              className={`flex items-center gap-1 flex-1 justify-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'} py-1 transition-opacity ${
+                !canTap ? 'opacity-50' : ''
+              }`}
+            >
+              {/* Step 1: Back arrow when on step 2+ */}
               {step.number === 1 && currentStep >= 2 ? (
-                <button
-                  onClick={() => handleStepClick(1)}
-                  disabled={!canNavigate}
-                  className={`flex flex-col items-center ${canNavigate ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
-                >
-                  {/* Back Arrow Circle */}
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-600 text-white transition-all">
-                    <ArrowLeft size={20} />
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+                    isCompleted || isCurrent ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    <ArrowLeft size={12} strokeWidth={2.5} />
                   </div>
-                  {/* Label */}
-                  <p className="text-xs mt-1.5 font-medium whitespace-nowrap text-gray-900">
+                  <span className={`text-sm font-semibold uppercase transition-colors ${
+                    isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                  }`}>
                     {step.label}
-                  </p>
-                </button>
+                  </span>
+                </div>
               ) : (
-                <button
-                  onClick={() => handleStepClick(step.number)}
-                  disabled={!canTap}
-                  className={`flex flex-col items-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
-                >
-                  {/* Circle */}
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                      isCompleted
-                        ? 'bg-green-600 text-white'
-                        : isCurrent
-                        ? 'bg-green-600 text-white ring-4 ring-green-100'
-                        : 'bg-gray-200 text-gray-500'
-                    }`}
-                  >
+                <div className="flex items-center gap-1.5">
+                  {/* Number or Checkmark with Circle Background */}
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                    isCompleted || isCurrent ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
                     {isCompleted ? '✓' : step.number}
                   </div>
                   {/* Label */}
-                  <p
-                    className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
-                      isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
-                    }`}
-                  >
+                  <span className={`text-sm font-semibold whitespace-nowrap uppercase transition-colors ${
+                    isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                  }`}>
                     {step.label}
-                  </p>
-                </button>
-              )}
-
-              {/* Connector Line - thin and touching circles */}
-              {index < steps.length - 1 && (
-                <div className="flex-1 h-0.5 relative">
-                  <div
-                    className={`h-full transition-all ${
-                      step.number < currentStep ? 'bg-green-600' : 'bg-gray-300'
-                    }`}
-                  />
+                  </span>
                 </div>
               )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Thin Progress Bars */}
+      <div className="flex items-center gap-1">
+        {steps.map((step, index) => {
+          const isCompleted = step.number < currentStep;
+          const isCurrent = step.number === currentStep;
+
+          return (
+            <React.Fragment key={step.number}>
+              {/* Progress Bar Segment - Thinner */}
+              <div
+                className={`flex-1 h-1 rounded-full transition-all ${
+                  isCompleted
+                    ? 'bg-green-600'
+                    : isCurrent
+                    ? 'bg-green-600 shadow-sm shadow-green-300'
+                    : 'bg-gray-200'
+                }`}
+              />
+              {/* Small Gap between bars (except last one) */}
+              {index < steps.length - 1 && <div className="w-1" />}
             </React.Fragment>
           );
         })}
