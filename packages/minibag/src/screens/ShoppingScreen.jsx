@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
@@ -170,22 +170,10 @@ function ShoppingScreen({
             return (
               <div
                 key={itemId}
-                className={`flex items-start gap-3 py-3 px-2 ${
+                className={`relative flex items-start gap-3 py-3 px-2 ${
                   isPaid ? 'bg-gray-50' : isSkipped ? 'bg-yellow-50' : ''
                 }`}
               >
-                {/* Skip Checkbox - Hidden when feature is disabled */}
-                {ENABLE_SKIP_ITEMS && (
-                  <div className="flex items-center mt-2">
-                    <input
-                      type="checkbox"
-                      checked={isSkipped}
-                      onChange={() => onSkipToggle && onSkipToggle(itemId)}
-                      className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
-                    />
-                  </div>
-                )}
-
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl mt-1">
                   {veg.emoji || '🥬'}
                 </div>
@@ -235,15 +223,29 @@ function ShoppingScreen({
                     Edit
                   </button>
                 ) : !isSkipped ? (
-                  <button
-                    onClick={() => {
-                      setSelectedItemForPayment(itemId);
-                      setShowPaymentModal(true);
-                    }}
-                    className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex-shrink-0 mt-1 transition-colors"
-                  >
-                    Pay
-                  </button>
+                  <div className="flex gap-2 flex-shrink-0 mt-1">
+                    {/* Skip button - X mark */}
+                    {ENABLE_SKIP_ITEMS && (
+                      <button
+                        onClick={() => onSkipToggle && onSkipToggle(itemId)}
+                        className="w-12 h-12 flex items-center justify-center bg-white border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
+                        title="Skip this item (didn't buy)"
+                        aria-label="Skip this item"
+                      >
+                        <X size={20} strokeWidth={2.5} />
+                      </button>
+                    )}
+                    {/* Pay button */}
+                    <button
+                      onClick={() => {
+                        setSelectedItemForPayment(itemId);
+                        setShowPaymentModal(true);
+                      }}
+                      className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                    >
+                      Pay
+                    </button>
+                  </div>
                 ) : null}
               </div>
             );
