@@ -205,21 +205,24 @@ export default function SessionActiveScreen({
           onLogoClick={onLogoClick}
         />
         <div className="p-6 pt-20">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-lg font-semibold text-gray-900">Shopping Session</p>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <Clock size={12} />
-                <span>2 hour session</span>
+          {/* Sticky Container: Header + Timer + Banner */}
+          <div className="sticky top-[56px] z-40 bg-white pb-4 -mx-6 px-6 border-b border-gray-100 mb-4">
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-lg font-semibold text-gray-900">Shopping Session</p>
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Clock size={12} />
+                  <span>2 hour session</span>
+                </div>
               </div>
+              {currentParticipant && (
+                <IdentityBanner
+                  currentParticipant={currentParticipant}
+                  currentUser={currentParticipant}
+                  phase="waiting"
+                />
+              )}
             </div>
-            {currentParticipant && (
-              <IdentityBanner
-                currentParticipant={currentParticipant}
-                currentUser={currentParticipant}
-                phase="waiting"
-              />
-            )}
           </div>
 
           {/* Avatar circles - Read-only for participants */}
@@ -382,30 +385,33 @@ export default function SessionActiveScreen({
       />
 
       <div className="p-6 pt-20">
-        {/* Progress Bar - Only show for host */}
-        {currentParticipant?.is_creator && (
-          <ProgressBar
-            currentStep={2}
-            onStepClick={(step) => onNavigateToStep && onNavigateToStep(step)}
-            canNavigate={true}
-          />
-        )}
-
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-lg font-semibold text-gray-900">Share & Collaborate</p>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Clock size={12} />
-              <span>2 hour session</span>
-            </div>
-          </div>
-          {currentParticipant && (
-            <IdentityBanner
-              currentParticipant={currentParticipant}
-              currentUser={currentParticipant}
-              phase="waiting"
+        {/* Sticky Container: Progress + Header + Timer + Banner */}
+        <div className="sticky top-[56px] z-40 bg-white pb-4 -mx-6 px-6 border-b border-gray-100 mb-4">
+          {/* Progress Bar - Only show for host */}
+          {currentParticipant?.is_creator && (
+            <ProgressBar
+              currentStep={2}
+              onStepClick={(step) => onNavigateToStep && onNavigateToStep(step)}
+              canNavigate={true}
             />
           )}
+
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-lg font-semibold text-gray-900">Share & Collaborate</p>
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <Clock size={12} />
+                <span>2 hour session</span>
+              </div>
+            </div>
+            {currentParticipant && (
+              <IdentityBanner
+                currentParticipant={currentParticipant}
+                currentUser={currentParticipant}
+                phase="waiting"
+              />
+            )}
+          </div>
         </div>
 
         {/* Shopping Preference Prompt - Only for Host */}
