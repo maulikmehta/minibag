@@ -1,12 +1,14 @@
 import React from 'react';
+import { ArrowLeft } from 'lucide-react';
 
 /**
  * ProgressBar Component
  *
- * Shows 4-step progress: Add Items → Session Active → Shopping → Bills
+ * Shows 4-step progress: List → Join → Bag → Bill
  * - All completed steps are highlighted/filled
  * - Current step is active
  * - Sequential navigation only (can tap previous steps, not future)
+ * - When on step 2+, step 1 becomes a back arrow for navigation
  *
  * @param {number} currentStep - Current step (1-4)
  * @param {function} onStepClick - Callback when step is tapped (step: number)
@@ -14,10 +16,10 @@ import React from 'react';
  */
 function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
   const steps = [
-    { number: 1, label: 'Add Items' },
-    { number: 2, label: 'Session' },
-    { number: 3, label: 'Shopping' },
-    { number: 4, label: 'Bills' }
+    { number: 1, label: 'List' },
+    { number: 2, label: 'Join' },
+    { number: 3, label: 'Bag' },
+    { number: 4, label: 'Bill' }
   ];
 
   const handleStepClick = (stepNumber) => {
@@ -40,33 +42,50 @@ function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
 
           return (
             <React.Fragment key={step.number}>
-              {/* Step Circle and Label */}
-              <button
-                onClick={() => handleStepClick(step.number)}
-                disabled={!canTap}
-                className={`flex flex-col items-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
-              >
-                {/* Circle */}
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                    isCompleted
-                      ? 'bg-green-600 text-white'
-                      : isCurrent
-                      ? 'bg-green-600 text-white ring-4 ring-green-100'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
+              {/* Step 1: Show back arrow when on step 2+, otherwise show normal circle */}
+              {step.number === 1 && currentStep >= 2 ? (
+                <button
+                  onClick={() => handleStepClick(1)}
+                  disabled={!canNavigate}
+                  className={`flex flex-col items-center ${canNavigate ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
                 >
-                  {isCompleted ? '✓' : step.number}
-                </div>
-                {/* Label */}
-                <p
-                  className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
-                    isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
-                  }`}
+                  {/* Back Arrow Circle */}
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-600 text-white transition-all">
+                    <ArrowLeft size={20} />
+                  </div>
+                  {/* Label */}
+                  <p className="text-xs mt-1.5 font-medium whitespace-nowrap text-gray-900">
+                    {step.label}
+                  </p>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleStepClick(step.number)}
+                  disabled={!canTap}
+                  className={`flex flex-col items-center ${canTap ? 'cursor-pointer' : 'cursor-not-allowed'} relative`}
                 >
-                  {step.label}
-                </p>
-              </button>
+                  {/* Circle */}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                      isCompleted
+                        ? 'bg-green-600 text-white'
+                        : isCurrent
+                        ? 'bg-green-600 text-white ring-4 ring-green-100'
+                        : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {isCompleted ? '✓' : step.number}
+                  </div>
+                  {/* Label */}
+                  <p
+                    className={`text-xs mt-1.5 font-medium whitespace-nowrap ${
+                      isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                    }`}
+                  >
+                    {step.label}
+                  </p>
+                </button>
+              )}
 
               {/* Connector Line - thin and touching circles */}
               {index < steps.length - 1 && (
