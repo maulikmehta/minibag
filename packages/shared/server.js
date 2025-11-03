@@ -79,10 +79,10 @@ app.use(helmet({
 // CORS configuration
 // - origin: Restricted to frontend URL only (prevents cross-origin attacks)
 // - credentials: true (allows httpOnly cookies for authentication)
-// - Development: http://localhost:5173
+// - Development: http://localhost:5173 or http://localhost:5174 (Vite may use either)
 // - Production: Should be set via FRONTEND_URL env variable
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 app.use(express.json());
@@ -211,6 +211,7 @@ app.get('/api/sessions/:session_id/bill-items', sessionsAPI.getBillItems); // Ag
 app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, sessionsAPI.joinSession); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
+app.get('/api/sessions/:session_id/invites', sessionsAPI.getSessionInvites);
 
 // Participants API routes
 app.put('/api/participants/:participant_id/items', participantsAPI.updateParticipantItems);
