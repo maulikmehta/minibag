@@ -727,17 +727,18 @@ export async function getShoppingItems(req, res) {
           base_price: item.catalog_item.base_price,
           emoji: item.catalog_item.emoji,
           totalQuantity: 0,
-          participants: []
+          participantQuantities: [] // Array of {nickname, quantity}
         };
       }
 
       aggregatedItems[itemId].totalQuantity += item.quantity;
 
-      // Add participant nickname to the list (avoid duplicates)
+      // Add participant with their quantity
       const participantNickname = item.participant.nickname;
-      if (!aggregatedItems[itemId].participants.includes(participantNickname)) {
-        aggregatedItems[itemId].participants.push(participantNickname);
-      }
+      aggregatedItems[itemId].participantQuantities.push({
+        nickname: participantNickname,
+        quantity: item.quantity
+      });
     });
 
     // Create participant summaries
@@ -901,7 +902,7 @@ export async function getBillItems(req, res) {
 
       Object.entries(participantItemsMap[participant.id]).forEach(([itemId, data]) => {
         const catalogItemId = data.catalogItemId;
-        const payment = paymentMap[catalogItemId];
+        const payment = paymentMap[itemId];  // FIX: Use string itemId to match payment map keys
 
         if (payment && itemTotals[catalogItemId]) {
           const totalQty = itemTotals[catalogItemId].totalQuantity;
@@ -942,7 +943,15 @@ export async function getBillItems(req, res) {
       sessionStatus: session.status,
       totalParticipants: participantBills.length,
       totalPaid: Math.round(totalPaid),
-      paymentsCount: payments?.length || 0
+      paymentsCount: payments?.length || 0,
+      participantDetails: participantBills.map(p => ({
+        nickname: p.nickname,
+        total_cost: p.total_cost,
+        items_count: p.items_count,
+        items: p.items
+      })),
+      paymentMap: Object.keys(paymentMap),
+      itemTotals: Object.keys(itemTotals)
     });
 
     res.json({
