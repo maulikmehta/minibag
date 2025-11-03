@@ -423,38 +423,38 @@ export default function JoinSessionScreen({
           </div>
         ) : (
           <>
-            {/* Back Button for Step 3 */}
-            <button
-              onClick={() => setOnboardingStep(2)}
-              className="w-full py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50 mb-3"
-            >
-              Back
-            </button>
-
-            {/* Join Button */}
-            <button
-              onClick={handleJoinSession}
-              disabled={joiningSession || !selectedNickname}
-              className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mb-3"
-            >
-              {joiningSession ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  Joining...
-                </>
-              ) : (
-                <>
-                  <Check size={20} />
-                  Join list
-                </>
-              )}
-            </button>
+            {/* Back and Join Buttons - Side by Side */}
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={() => setOnboardingStep(2)}
+                className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleJoinSession}
+                disabled={joiningSession || !selectedNickname}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
+              >
+                {joiningSession ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <Check size={18} />
+                    Join list
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Decline Button */}
             <button
               onClick={handleDeclineSession}
               disabled={joiningSession}
-              className="w-full px-6 py-4 border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-900 text-base font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-900 text-base font-medium rounded-lg transition-all flex items-center justify-center gap-2"
             >
               {joiningSession ? 'Processing...' : 'No thanks, maybe next time'}
             </button>
