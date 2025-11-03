@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import { aggregateAllItems } from '../utils/calculateItems';
+import { getShoppingItems } from '../services/api.js';
 
 // Feature flag: Set to false to disable skip items feature
 const ENABLE_SKIP_ITEMS = true;
@@ -64,6 +65,11 @@ function ShoppingScreen({
   // Track if we've already updated status to prevent duplicate calls
   const statusUpdatedRef = useRef(false);
 
+  // State for server-aggregated items
+  const [allItems, setAllItems] = useState({});
+  const [itemParticipants, setItemParticipants] = useState({}); // Per-participant quantities
+  const [loadingItems, setLoadingItems] = useState(true);
+
   // Update session status to 'shopping' when component mounts
   useEffect(() => {
     if (session?.session_id && onUpdateSessionStatus && !statusUpdatedRef.current) {
@@ -72,19 +78,46 @@ function ShoppingScreen({
     }
   }, [session?.session_id, onUpdateSessionStatus]);
 
-  // Calculate total quantities for all items (memoized for performance)
-  const allItems = useMemo(() => {
-    const aggregated = aggregateAllItems(hostItems, participants);
+  // Fetch aggregated items from server (eliminates empty items race condition)
+  useEffect(() => {
+    if (!session?.session_id) return;
 
-    // DEBUG: Log aggregation
-    console.log('🛒 Shopping Screen - Aggregated Items:', {
-      hostItems,
-      participants: participants.map(p => ({ id: p.id, name: p.name, items: p.items })),
-      aggregated
-    });
+    const fetchShoppingItems = async () => {
+      try {
+        setLoadingItems(true);
+        const data = await getShoppingItems(session.session_id);
 
-    return aggregated;
-  }, [hostItems, participants]);
+        // Transform API response to match expected format: {itemId: totalQty}
+        const aggregated = {};
+        const participantBreakdown = {};
+
+        Object.entries(data.aggregatedItems || {}).forEach(([itemId, itemData]) => {
+          aggregated[itemId] = itemData.totalQuantity;
+          participantBreakdown[itemId] = itemData.participantQuantities || [];
+        });
+
+        console.log('🛒 Shopping Screen - Server Aggregated Items:', {
+          raw: data.aggregatedItems,
+          transformed: aggregated,
+          participantBreakdown,
+          participantsCount: data.participants?.length
+        });
+
+        setAllItems(aggregated);
+        setItemParticipants(participantBreakdown);
+      } catch (error) {
+        console.error('❌ Failed to fetch shopping items, falling back to client aggregation:', error);
+        // Fallback to client-side aggregation if API fails
+        const fallbackAggregated = aggregateAllItems(hostItems, participants);
+        setAllItems(fallbackAggregated);
+        setItemParticipants({}); // No participant breakdown in fallback
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+
+    fetchShoppingItems();
+  }, [session?.session_id, hostItems, participants]);
 
   const hostNickname = currentParticipant?.nickname || 'You';
   const totalPaid = Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
@@ -171,6 +204,14 @@ function ShoppingScreen({
                   <p className="text-sm text-gray-500">
                     Total: {totalQty} {veg.unit}
                   </p>
+                  {/* Per-participant breakdown for bag management */}
+                  {itemParticipants[itemId] && itemParticipants[itemId].length > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {itemParticipants[itemId]
+                        .map(p => `${p.nickname} (${p.quantity}${veg?.unit || 'kg'})`)
+                        .join(', ')}
+                    </p>
+                  )}
                   {isPaid && !isSkipped && (
                     <p className="text-sm text-gray-900 mt-1">
                       ✓ ₹{payment.amount} • {payment.method === 'upi' ? 'UPI' : 'Cash'}

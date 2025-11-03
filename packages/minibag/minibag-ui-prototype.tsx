@@ -281,7 +281,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
    * Purpose: Verify the new endpoint returns identical data to current approach
    * before switching over completely.
    *
-   * TODO: Once data is verified to match, remove old endpoint calls and use only new
+   * TODO: Once data is verified to match, migrate to Option 2
    */
   React.useEffect(() => {
     const compareShoppingData = async () => {
@@ -1073,6 +1073,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   if (currentScreen === 'participant-bill') {
     return (
       <ParticipantBillScreen
+        session={session}
         participants={participants}
         hostItems={hostItems}
         itemPayments={itemPayments}

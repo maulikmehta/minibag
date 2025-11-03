@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
 import { useNotification } from '../hooks/useNotification.js';
 import { aggregateAllItems } from '../utils/calculateItems';
+import { getBillItems } from '../services/api.js';
 
 /**
  * ParticipantBillScreen Component
@@ -11,6 +12,7 @@ import { aggregateAllItems } from '../utils/calculateItems';
  * Shows itemized costs and payment options.
  * Accessed via WhatsApp link sent to participants.
  *
+ * @param {Object} session - Session object with session_id
  * @param {Array} participants - List of participants (uses first participant)
  * @param {Object} hostItems - Items added by host with quantities
  * @param {Object} itemPayments - Payment information for each item {itemId: {amount}}
@@ -19,6 +21,7 @@ import { aggregateAllItems } from '../utils/calculateItems';
  * @param {function} onGoHome - Callback to navigate to home screen
  */
 function ParticipantBillScreen({
+  session,
   participants,
   hostItems,
   itemPayments,
@@ -27,6 +30,40 @@ function ParticipantBillScreen({
   onGoHome
 }) {
   const notify = useNotification();
+
+  // State for server-calculated bill
+  const [billData, setBillData] = useState(null);
+  const [loadingBill, setLoadingBill] = useState(true);
+
+  // Fetch bill items from server (eliminates empty items race condition)
+  useEffect(() => {
+    if (!session?.session_id) {
+      setLoadingBill(false);
+      return;
+    }
+
+    const fetchBillData = async () => {
+      try {
+        setLoadingBill(true);
+        const data = await getBillItems(session.session_id);
+
+        console.log('📄 Participant Bill Screen - Server Bill Data:', {
+          participantsCount: data.participants?.length,
+          totalPaid: data.total_paid
+        });
+
+        setBillData(data);
+      } catch (error) {
+        console.error('❌ Failed to fetch bill items, falling back to client calculation:', error);
+        // Fallback to client-side calculations if API fails
+        setBillData(null);
+      } finally {
+        setLoadingBill(false);
+      }
+    };
+
+    fetchBillData();
+  }, [session?.session_id]);
 
   // Empty state - no participants
   if (participants.length === 0) {
@@ -51,14 +88,35 @@ function ParticipantBillScreen({
   // Get participant data (first participant)
   const participant = participants[0];
 
-  // Calculate total quantities for all items (memoized)
+  // Fallback: Calculate total quantities for all items (memoized)
   const allItems = useMemo(
     () => aggregateAllItems(hostItems, participants),
     [hostItems, participants]
   );
 
-  // Calculate participant's bill (memoized)
+  // Calculate participant's bill (from server data or fallback)
   const { participantCost, billItems } = useMemo(() => {
+    // Try to use server-calculated bill data first
+    if (billData?.participants && participant?.id) {
+      const serverBill = billData.participants.find(p => p.participant_id === participant.id);
+
+      if (serverBill) {
+        console.log('✅ Using server-calculated bill for participant:', serverBill.nickname);
+        return {
+          participantCost: serverBill.total_cost,
+          billItems: serverBill.items.map(item => ({
+            name: item.name,
+            qty: item.quantity,
+            pricePerKg: item.price_per_kg,
+            itemCost: item.item_cost,
+            emoji: item.emoji || '🥬'
+          }))
+        };
+      }
+    }
+
+    // Fallback: client-side calculation
+    console.log('⚠️ Falling back to client-side bill calculation for participant:', participant?.nickname);
     let cost = 0;
     const items = [];
 
@@ -81,7 +139,7 @@ function ParticipantBillScreen({
     });
 
     return { participantCost: cost, billItems: items };
-  }, [participant, allItems, itemPayments, items, getItemName]);
+  }, [billData, participant, allItems, itemPayments, items, getItemName]);
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">

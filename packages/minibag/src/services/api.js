@@ -262,6 +262,42 @@ export async function updateSessionStatus(sessionId, status) {
   return response.data;
 }
 
+/**
+ * Get pre-aggregated shopping items with participant summaries
+ * Uses server-side aggregation to eliminate empty items issue
+ * @param {string} sessionId - Session ID
+ * @returns {Promise<Object>} Aggregated items and participant summaries
+ */
+export async function getShoppingItems(sessionId) {
+  const response = await apiFetch(`/api/sessions/${sessionId}/shopping-items`);
+
+  console.log('🛒 [getShoppingItems] API Response:', {
+    sessionId,
+    itemsCount: Object.keys(response.data?.aggregatedItems || {}).length,
+    participantsCount: response.data?.participants?.length
+  });
+
+  return response.data;
+}
+
+/**
+ * Get pre-aggregated bill items with payment information
+ * Uses server-side aggregation for accurate bill calculations
+ * @param {string} sessionId - Session ID
+ * @returns {Promise<Object>} Bill items with participant costs and payments
+ */
+export async function getBillItems(sessionId) {
+  const response = await apiFetch(`/api/sessions/${sessionId}/bill-items`);
+
+  console.log('💰 [getBillItems] API Response:', {
+    sessionId,
+    participantsCount: response.data?.participants?.length,
+    totalCost: response.data?.totalCost
+  });
+
+  return response.data;
+}
+
 // ============================================================================
 // PAYMENTS API
 // ============================================================================

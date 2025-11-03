@@ -4,6 +4,7 @@ import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
 import { aggregateAllItems, calculateAllParticipantCosts, formatPrice } from '../utils/calculateItems';
+import { getBillItems } from '../services/api.js';
 
 /**
  * PaymentSplitScreen Component
@@ -50,6 +51,10 @@ function PaymentSplitScreen({
   // State for expanded participants in compact view
   const [expandedParticipants, setExpandedParticipants] = useState({});
 
+  // State for server-calculated bills
+  const [billData, setBillData] = useState(null);
+  const [loadingBills, setLoadingBills] = useState(true);
+
   // Update session status to 'completed' when component mounts (non-blocking)
   useEffect(() => {
     if (session?.session_id && onUpdateSessionStatus) {
@@ -60,20 +65,50 @@ function PaymentSplitScreen({
     }
   }, [session?.session_id, onUpdateSessionStatus]);
 
-  // Calculate total quantities for all items (memoized for performance)
+  // Fetch bill items from server (eliminates empty items race condition)
+  useEffect(() => {
+    if (!session?.session_id) return;
+
+    const fetchBillItems = async () => {
+      try {
+        setLoadingBills(true);
+        const data = await getBillItems(session.session_id);
+
+        console.log('💰 Payment Split Screen - Server Bill Data:', {
+          participantsCount: data.participants?.length,
+          totalPaid: data.total_paid
+        });
+
+        setBillData(data);
+      } catch (error) {
+        console.error('❌ Failed to fetch bill items, falling back to client calculation:', error);
+        // Fallback to client-side calculations if API fails
+        setBillData(null);
+      } finally {
+        setLoadingBills(false);
+      }
+    };
+
+    fetchBillItems();
+  }, [session?.session_id]);
+
+  // Fallback: Calculate total quantities for all items (memoized for performance)
   const allItems = useMemo(
     () => aggregateAllItems(hostItems, participants),
     [hostItems, participants]
   );
 
-  // Calculate total paid amount
-  const totalPaid = useMemo(
-    () => Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0),
-    [itemPayments]
-  );
+  // Use server data if available, otherwise calculate client-side
+  const totalPaid = billData?.total_paid || Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
 
-  // Calculate host cost (memoized)
+  // Calculate host cost (from server data or fallback to client calculation)
   const hostCost = useMemo(() => {
+    if (billData?.participants) {
+      const host = billData.participants.find(p => p.is_creator);
+      return host?.total_cost || 0;
+    }
+
+    // Fallback: client-side calculation
     let cost = 0;
     Object.entries(hostItems).forEach(([itemId, qty]) => {
       const payment = itemPayments[itemId];
@@ -84,10 +119,31 @@ function PaymentSplitScreen({
       }
     });
     return cost;
-  }, [hostItems, allItems, itemPayments]);
+  }, [billData, hostItems, allItems, itemPayments]);
 
-  // Calculate participant costs with item details (memoized)
+  // Calculate participant costs with item details (from server data or fallback)
   const participantCosts = useMemo(() => {
+    if (billData?.participants) {
+      // Use server-calculated bills
+      const costs = {};
+      billData.participants.filter(p => !p.is_creator).forEach(p => {
+        const pName = p.nickname || 'Participant';
+        costs[pName] = {
+          total: p.total_cost,
+          items: p.items.map(item => ({
+            id: item.item_id,
+            name: item.name,
+            qty: item.quantity,
+            pricePerKg: item.price_per_kg,
+            cost: item.item_cost,
+            emoji: item.emoji || '🥬'
+          }))
+        };
+      });
+      return costs;
+    }
+
+    // Fallback: client-side calculation
     const costs = {};
     participants.forEach(p => {
       const pName = p.nickname || p.name || 'Participant';
@@ -117,7 +173,7 @@ function PaymentSplitScreen({
       costs[pName] = { total: cost, items: itemDetails };
     });
     return costs;
-  }, [participants, allItems, itemPayments, items, getItemName]);
+  }, [billData, participants, allItems, itemPayments, items, getItemName]);
 
   const totalToReceive = useMemo(
     () => Object.values(participantCosts).reduce((sum, data) => sum + data.total, 0),
