@@ -2,6 +2,7 @@ import React from 'react';
 import { Share2, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../../hooks/useNotification.js';
+import { buildInviteUrl, copyInviteToClipboard } from '../../utils/inviteHelpers.js';
 
 /**
  * Component for session invitation controls
@@ -25,20 +26,8 @@ export default function SessionInviteControls({
   const handleCopyLink = async () => {
     if (!session || disabled) return;
 
-    const shareUrl = `${window.location.origin}/join/${session.session_id}`;
-    // Use the same message as WhatsApp share
-    const shareText = t('whatsapp.invitation', {
-      url: shareUrl,
-      defaultValue: `Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you.\n\nJoin here: ${shareUrl}`
-    });
-
-    try {
-      await navigator.clipboard.writeText(shareText);
-      notify.success('Invitation copied to clipboard!');
-    } catch (error) {
-      // Fallback for browsers that don't support clipboard API
-      notify.info('Copy failed. Please copy manually from the link.');
-    }
+    const inviteUrl = buildInviteUrl(session.session_id);
+    await copyInviteToClipboard(inviteUrl, t, notify);
   };
 
   return (
