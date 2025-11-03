@@ -25,16 +25,35 @@ export function useParticipantSync({
       const isHost = currentParticipant?.is_creator;
 
       if (isHost) {
-        // Host sees full identity: "FirstName @ ALIAS joined"
+        // Build display name
         const firstName = participant.real_name?.split(' ')[0] || participant.nickname;
         const alias = (participant.nickname || '').toUpperCase();
         const displayName = participant.real_name
           ? `${firstName} @ ${alias}`
           : alias;
-        onShowNotification(`${displayName} joined the session`);
+
+        // Check if they declined
+        if (participant.marked_not_coming) {
+          // If they have an invite, show which invite was declined
+          if (participant.invite?.invite_number) {
+            onShowNotification(`Invite ${participant.invite.invite_number} declined`);
+          } else {
+            onShowNotification(`${displayName} declined the invitation`);
+          }
+        } else {
+          // They joined - show which invite if available
+          if (participant.invite?.invite_number) {
+            onShowNotification(`Invite ${participant.invite.invite_number}: ${displayName} joined`);
+          } else {
+            onShowNotification(`${displayName} joined the session`);
+          }
+        }
       } else {
         // Participants see generic message (privacy)
-        onShowNotification('Someone joined the session');
+        if (!participant.marked_not_coming) {
+          onShowNotification('Someone joined the session');
+        }
+        // Don't show notification for declines to non-hosts
       }
     };
 

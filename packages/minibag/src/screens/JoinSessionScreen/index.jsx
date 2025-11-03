@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, MapPin, Clock, ShoppingBag, Users, Loader2 } from 'lucide-react';
+import { Check, X, Users, Loader2, Clock } from 'lucide-react';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
 
@@ -9,6 +9,9 @@ export default function JoinSessionScreen({
   sessionError,
   joinSessionId,
   participants,
+  items,
+  getItemName,
+  hostItems,
   joinSession,
   onJoinSuccess,
   onNavigateToHome,
@@ -22,6 +25,16 @@ export default function JoinSessionScreen({
   const [nicknameOptions, setNicknameOptions] = useState([]);
   const [selectedNickname, setSelectedNickname] = useState(null);
   const [loadingNicknames, setLoadingNicknames] = useState(false);
+  const [inviteToken, setInviteToken] = useState(null);
+
+  // Extract invite token from URL query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inv = urlParams.get('inv');
+    if (inv) {
+      setInviteToken(inv);
+    }
+  }, []);
 
   // Fetch nickname options when screen loads
   useEffect(() => {
@@ -79,7 +92,8 @@ export default function JoinSessionScreen({
         real_name: participantName,
         selected_nickname_id: selectedNickname.id,
         selected_nickname: selectedNickname.nickname,
-        selected_avatar_emoji: selectedNickname.avatar_emoji
+        selected_avatar_emoji: selectedNickname.avatar_emoji,
+        invite_token: inviteToken // Include invite token if present
       });
 
       console.log('✅ Joined session:', result);
@@ -103,8 +117,8 @@ export default function JoinSessionScreen({
 
   // Handle declining a session
   const handleDeclineSession = async () => {
-    // If no name/nickname selected, just navigate away
-    if (!participantName.trim() || !selectedNickname) {
+    // If no nickname available yet, just navigate away silently
+    if (!selectedNickname) {
       onNavigateToHome();
       return;
     }
@@ -113,26 +127,37 @@ export default function JoinSessionScreen({
       setJoiningSession(true);
 
       // Join session with marked_not_coming: true to notify host of decline
+      // Use provided name or placeholder for anonymous declines
       await joinSession(joinSessionId, [], {
-        real_name: participantName,
+        real_name: participantName.trim() || 'Declined User',
         selected_nickname_id: selectedNickname.id,
         selected_nickname: selectedNickname.nickname,
         selected_avatar_emoji: selectedNickname.avatar_emoji,
-        marked_not_coming: true
+        marked_not_coming: true,
+        invite_token: inviteToken // Include invite token if present
       });
 
       console.log('✅ Declined session - host notified');
 
-      // Navigate to home
+      // Show confirmation message and navigate immediately
+      notify.info('You\'ve declined the invitation. The host has been notified.');
       onNavigateToHome();
     } catch (error) {
       console.error('❌ Failed to decline session:', error);
       // Still navigate away even if API fails
+      notify.info('You\'ve declined the invitation.');
       onNavigateToHome();
     } finally {
       setJoiningSession(false);
     }
   };
+
+  // Extract host nickname for personalized messaging
+  const host = participants?.find(p => p.is_creator);
+  const hostNickname = host?.nickname || session?.creator_nickname || 'Someone';
+
+  // Filter items to show only what host has selected
+  const hostSelectedItems = items?.filter(item => hostItems && hostItems[item.id]) || [];
 
   // Check if session failed to load or doesn't exist
   const sessionNotFound = !sessionLoading && !session && joinSessionId;
@@ -215,31 +240,9 @@ export default function JoinSessionScreen({
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Join shopping list</h1>
           <p className="text-sm text-gray-600">
-            Someone invited you to their Minibag!
+            {hostNickname} invited you to their Minibag!
           </p>
         </div>
-
-        {/* Session Info (if loaded) */}
-        {session && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="flex items-center gap-3 mb-3">
-              <MapPin size={16} className="text-gray-600" />
-              <p className="text-sm text-gray-900 font-medium">{session.location_text || 'Local area'}</p>
-            </div>
-            <div className="flex items-center gap-3 mb-3">
-              <Clock size={16} className="text-gray-600" />
-              <p className="text-sm text-gray-600">
-                {session.scheduled_time ? new Date(session.scheduled_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Soon'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <ShoppingBag size={16} className="text-gray-600" />
-              <p className="text-sm text-gray-600">
-                {session.items?.length || 0} items in list
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Name Input */}
         <div className="mb-6">
@@ -301,6 +304,30 @@ export default function JoinSessionScreen({
             How you'll appear to other shoppers
           </p>
         </div>
+
+        {/* Items Preview Section */}
+        {hostSelectedItems.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-900 mb-3">
+              Items in this list ({hostSelectedItems.length})
+            </p>
+            <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+              {hostSelectedItems.map(item => (
+                <div key={item.id} className="flex items-center gap-3 py-3 px-3">
+                  {/* Emoji */}
+                  <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
+                    {item.emoji || '🥬'}
+                  </div>
+
+                  {/* Name */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">{getItemName(item)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Join Button */}
         <button

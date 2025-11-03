@@ -35,6 +35,31 @@ export const NOTIFICATION_PRIORITY = {
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [bannerNotification, setBannerNotification] = useState(null);
+  const [bannerQueue, setBannerQueue] = useState([]);
+
+  // Track active timers to prevent memory leaks
+  const timersRef = React.useRef({
+    banner: null,
+    toasts: new Map()
+  });
+
+  /**
+   * Show next banner notification from queue
+   * Notifications stay visible until next one arrives (no auto-dismiss)
+   */
+  const showNextBanner = useCallback(() => {
+    setBannerQueue(prev => {
+      if (prev.length === 0) {
+        // No more notifications in queue
+        return prev;
+      }
+
+      const [next, ...rest] = prev;
+      setBannerNotification(next);
+
+      return rest;
+    });
+  }, []);
 
   /**
    * Add a new notification to the queue
@@ -68,15 +93,11 @@ export function NotificationProvider({ children }) {
     // Route to banner or toast based on priority
     if (notificationPriority === NOTIFICATION_PRIORITY.LOW ||
         notificationPriority === NOTIFICATION_PRIORITY.NORMAL) {
-      // Show in banner for low/normal priority
+      // Add to banner queue - new notifications immediately replace current one
       setBannerNotification(notification);
 
-      // Auto-dismiss banner
-      if (duration > 0) {
-        setTimeout(() => {
-          setBannerNotification(prev => prev?.id === id ? null : prev);
-        }, duration);
-      }
+      // If there are more notifications coming, they'll replace this one
+      // No auto-dismiss timer - stays until next notification arrives
     } else {
       // Show in toast for high/critical priority
       setNotifications(prev => {
@@ -91,11 +112,15 @@ export function NotificationProvider({ children }) {
         return updated;
       });
 
-      // Auto-dismiss toast
+      // Auto-dismiss toast with timer tracking
       if (duration > 0) {
-        setTimeout(() => {
+        const timerId = setTimeout(() => {
           removeNotification(id);
+          timersRef.current.toasts.delete(id);
         }, duration);
+
+        // Track timer to allow cleanup
+        timersRef.current.toasts.set(id, timerId);
       }
     }
 
@@ -108,6 +133,13 @@ export function NotificationProvider({ children }) {
    */
   const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+
+    // Clear associated timer if exists
+    const timer = timersRef.current.toasts.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.toasts.delete(id);
+    }
   }, []);
 
   /**
@@ -115,6 +147,10 @@ export function NotificationProvider({ children }) {
    */
   const clearAll = useCallback(() => {
     setNotifications([]);
+
+    // Clear all toast timers
+    timersRef.current.toasts.forEach(timer => clearTimeout(timer));
+    timersRef.current.toasts.clear();
   }, []);
 
   /**
@@ -122,6 +158,20 @@ export function NotificationProvider({ children }) {
    */
   const clearBanner = useCallback(() => {
     setBannerNotification(null);
+  }, []);
+
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      // Clear banner timer
+      if (timersRef.current.banner) {
+        clearTimeout(timersRef.current.banner);
+      }
+
+      // Clear all toast timers
+      timersRef.current.toasts.forEach(timer => clearTimeout(timer));
+      timersRef.current.toasts.clear();
+    };
   }, []);
 
   const value = {

@@ -110,24 +110,15 @@ function IdentityBanner({
       };
     }
 
-    // Default identity message based on phase (always visible)
+    // Default identity message based on phase
     const alias = identity.alias;
     const displayName = identity.displayName;
 
     switch (phase) {
       case 'waiting':
-        return {
-          text: (
-            <>
-              You're joined as <span className="font-semibold">{displayName}</span>
-              {isHost && ' (Host)'}
-            </>
-          ),
-          emoji: currentParticipant?.avatar_emoji || '👤',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          textColor: 'text-green-800'
-        };
+        // No default message for waiting phase
+        // "You're joined" notification is shown once when session starts
+        return null;
 
       case 'shopping':
         return {

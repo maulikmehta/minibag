@@ -28,7 +28,9 @@ export default function SessionParticipantList({
   currentParticipantId = null,
   readOnly = false
 }) {
-  const participantCount = participants.length + 1; // +1 for host
+  // Filter out declined participants
+  const activeParticipants = participants.filter(p => !p.marked_not_coming);
+  const participantCount = activeParticipants.length + 1; // +1 for host
 
   return (
     <div className="mb-6">
@@ -49,7 +51,7 @@ export default function SessionParticipantList({
 
         {/* Participant slots - show 3 slots total */}
         {[0, 1, 2].map((slotIndex) => {
-          const participant = participants[slotIndex];
+          const participant = activeParticipants[slotIndex];
 
           if (participant) {
             // Active participant slot

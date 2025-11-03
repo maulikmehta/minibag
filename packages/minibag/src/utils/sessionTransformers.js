@@ -70,7 +70,8 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
     real_name: apiParticipant.real_name,
     avatar_emoji: apiParticipant.avatar_emoji,
     is_creator: apiParticipant.is_creator,
-    items: transformParticipantItems(apiParticipant.items, catalogItems)
+    items: transformParticipantItems(apiParticipant.items, catalogItems),
+    marked_not_coming: apiParticipant.marked_not_coming || false
   };
 }
 
@@ -112,14 +113,14 @@ export function extractHostItems(apiParticipants, catalogItems = []) {
 export function extractNonHostParticipants(apiParticipants, catalogItems = []) {
   console.log('👥 extractNonHostParticipants called:', {
     totalParticipants: apiParticipants?.length,
-    nonHostCount: apiParticipants?.filter(p => !p.is_creator).length
+    nonHostCount: apiParticipants?.filter(p => !p.is_creator && !p.marked_not_coming).length
   });
 
   if (!apiParticipants || !Array.isArray(apiParticipants)) {
     return [];
   }
 
-  const nonHostParticipants = apiParticipants.filter(p => !p.is_creator);
+  const nonHostParticipants = apiParticipants.filter(p => !p.is_creator && !p.marked_not_coming);
   console.log('👥 Non-host participants:', nonHostParticipants.map(p => ({
     id: p.id,
     nickname: p.nickname,
