@@ -283,7 +283,7 @@ function PaymentSplitScreen({
                     <div key={itemId} className="flex justify-between items-center py-2">
                       <div>
                         <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                        <p className="text-xs text-gray-500">{qty}kg</p>
+                        <p className="text-sm text-gray-700">{qty}kg</p>
                       </div>
                       <p className="text-sm text-gray-400">-</p>
                     </div>
@@ -296,7 +296,7 @@ function PaymentSplitScreen({
                   <div key={itemId} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                     <div>
                       <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                      <p className="text-xs text-gray-500">{qty}kg × ₹{pricePerKg.toFixed(0)}/kg</p>
+                      <p className="text-sm text-gray-700">{qty}kg × ₹{pricePerKg.toFixed(0)}/kg</p>
                     </div>
                     <p className="text-base text-gray-900 font-medium">₹{itemCost.toFixed(0)}</p>
                   </div>
@@ -354,11 +354,11 @@ function PaymentSplitScreen({
                   <div className="border-t border-gray-200">
                     <div className="p-4 bg-white space-y-2">
                       {costData.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 text-sm">
+                        <div key={item.id} className="flex items-center gap-3 text-sm">
                           <span className="text-lg">{item.emoji}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-gray-900 truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">{item.qty}kg × ₹{item.pricePerKg.toFixed(0)}/kg</p>
+                            <p className="text-sm text-gray-700">{item.qty}kg × ₹{item.pricePerKg.toFixed(0)}/kg</p>
                           </div>
                           <p className="text-gray-900 font-medium">₹{item.cost.toFixed(0)}</p>
                         </div>

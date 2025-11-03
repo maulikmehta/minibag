@@ -189,12 +189,12 @@ function ShoppingScreen({
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-700">
                     Total: {totalQty} {veg.unit}
                   </p>
                   {/* Per-participant breakdown for bag management */}
                   {itemParticipants[itemId] && itemParticipants[itemId].length > 0 && (
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-sm text-gray-700 mt-0.5">
                       {itemParticipants[itemId]
                         .map(p => `${p.nickname} (${p.quantity}${veg?.unit || 'kg'})`)
                         .join(', ')}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Check, X, Loader2 } from 'lucide-react';
+import { Plus, Minus, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
@@ -531,22 +531,13 @@ export default function SessionCreateScreen({
 
             {/* Navigation Buttons */}
             <div className="flex gap-3 mt-6">
-              {onboardingStep === 1 ? (
-                <button
-                  onClick={() => {
-                    setShowHostNicknameModal(false);
-                    setOnboardingStep(1);
-                  }}
-                  className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              ) : (
+              {onboardingStep > 1 && (
                 <button
                   onClick={() => setOnboardingStep(onboardingStep - 1)}
-                  className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+                  title="Back"
                 >
-                  Back
+                  <ChevronLeft size={20} strokeWidth={2} />
                 </button>
               )}
 
@@ -561,15 +552,16 @@ export default function SessionCreateScreen({
                     setOnboardingStep(onboardingStep + 1);
                   }}
                   disabled={onboardingStep === 1 && !hostName.trim()}
-                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
+                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
                 >
                   Next
+                  <ChevronRight size={18} strokeWidth={2.5} />
                 </button>
               ) : (
                 <button
                   onClick={handleCreateSession}
                   disabled={creatingSession || !selectedHostNickname}
-                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
                 >
                   {creatingSession ? (
                     <>
