@@ -74,6 +74,52 @@ function isSessionExpired(session) {
 }
 
 /**
+ * Generate a unique invite token (8 chars for readability)
+ */
+function generateInviteToken() {
+  return crypto.randomBytes(4).toString('hex'); // abc12345 (8 chars)
+}
+
+/**
+ * Create or regenerate invites for a session
+ * Deletes existing invites and creates new ones
+ * @param {string} sessionId - UUID of the session
+ * @param {number} count - Number of invites to create (1-3)
+ */
+async function regenerateInvites(sessionId, count) {
+  if (count < 1 || count > 3) {
+    throw new Error('Invite count must be between 1 and 3');
+  }
+
+  // Delete existing invites for this session
+  await supabase
+    .from('invites')
+    .delete()
+    .eq('session_id', sessionId);
+
+  // Generate new invites
+  const invites = [];
+  for (let i = 1; i <= count; i++) {
+    invites.push({
+      session_id: sessionId,
+      invite_token: generateInviteToken(),
+      invite_number: i,
+      status: 'pending'
+    });
+  }
+
+  // Insert all invites
+  const { data, error } = await supabase
+    .from('invites')
+    .insert(invites)
+    .select();
+
+  if (error) throw error;
+
+  return data;
+}
+
+/**
  * Check if all items in a session are financially settled
  * (either paid or skipped)
  * Returns true if all participant items have corresponding payment records
@@ -586,7 +632,7 @@ export async function getSession(req, res) {
     // Check if session has expired
     const is_session_expired = isSessionExpired(session);
 
-    // Get participants with their items
+    // Get participants with their items and invite info
     const { data: participants, error: participantsError } = await supabase
       .from('participants')
       .select(`
@@ -594,6 +640,12 @@ export async function getSession(req, res) {
         items:participant_items(
           *,
           catalog_item:catalog_items(*)
+        ),
+        invite:invites!participants_claimed_invite_id_fkey(
+          id,
+          invite_number,
+          invite_token,
+          status
         )
       `)
       .eq('session_id', session.id);
@@ -996,7 +1048,11 @@ export async function joinSession(req, res) {
       selected_nickname,
       selected_avatar_emoji,
       // Security: PIN for authentication
-      session_pin = null // Required if session has PIN protection
+      session_pin = null, // Required if session has PIN protection
+      // Decline invitation flag
+      marked_not_coming = false, // If true, participant is declining the invitation
+      // Invite tracking
+      invite_token = null // Token from invite link URL parameter
     } = req.body;
 
     // Get session
@@ -1081,6 +1137,42 @@ export async function joinSession(req, res) {
       });
     }
 
+    // Validate and claim invite if invite_token provided
+    let invite = null;
+    if (invite_token) {
+      // Lookup invite
+      const { data: inviteData, error: inviteError } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('session_id', session.id)
+        .eq('invite_token', invite_token)
+        .single();
+
+      if (inviteError || !inviteData) {
+        return res.status(404).json({
+          success: false,
+          error: 'Invalid invite link. Please check the link and try again.'
+        });
+      }
+
+      invite = inviteData;
+
+      // Check if invite already claimed or expired
+      if (invite.status === 'claimed') {
+        return res.status(400).json({
+          success: false,
+          error: 'This invite has already been used by someone else.'
+        });
+      }
+
+      if (invite.status === 'expired') {
+        return res.status(410).json({
+          success: false,
+          error: 'This invite has expired. Please ask the host for a new invite link.'
+        });
+      }
+    }
+
     // Get nickname - either from user selection or auto-assign
     let nickname, avatar_emoji;
     if (selected_nickname && selected_avatar_emoji) {
@@ -1095,24 +1187,41 @@ export async function joinSession(req, res) {
     }
 
     // Mark nickname as used if it was selected from pool
-    if (selected_nickname_id) {
+    // BUT NOT if they're declining (no point wasting nicknames)
+    if (selected_nickname_id && !marked_not_coming) {
       await markNicknameAsUsed(selected_nickname_id, session.id);
     }
 
     // Create participant
-    const { data: participant, error: participantError } = await supabase
+    const { data: participant, error: participantError} = await supabase
       .from('participants')
       .insert({
         session_id: session.id,
         nickname,
         avatar_emoji,
         real_name, // Store real name if provided
-        is_creator: false
+        is_creator: false,
+        marked_not_coming, // If participant is declining the invitation
+        marked_not_coming_at: marked_not_coming ? new Date().toISOString() : null,
+        claimed_invite_id: invite?.id || null // Link to invite if used
       })
       .select()
       .single();
 
     if (participantError) throw participantError;
+
+    // Update invite status if invite was used
+    if (invite) {
+      const newStatus = marked_not_coming ? 'declined' : 'claimed';
+      await supabase
+        .from('invites')
+        .update({
+          status: newStatus,
+          claimed_by: participant.id,
+          claimed_at: new Date().toISOString()
+        })
+        .eq('id', invite.id);
+    }
 
     // Add items if provided
     if (items.length > 0) {
@@ -1259,7 +1368,7 @@ export async function updateSessionStatus(req, res) {
 export async function updateExpectedParticipants(req, res) {
   try {
     const { session_id } = req.params;
-    const { expected_participants } = req.body;
+    const { expected_participants, start_timeout = true } = req.body;
 
     // Validation - allow null, or number between 0 and 3
     if (expected_participants !== null &&
@@ -1270,11 +1379,31 @@ export async function updateExpectedParticipants(req, res) {
       });
     }
 
+    // Get current session to preserve existing timestamp if needed
+    const { data: currentSession, error: fetchError } = await supabase
+      .from('sessions')
+      .select('expected_participants_set_at')
+      .eq('session_id', session_id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     // Determine expected_participants_set_at timestamp
-    // Timer starts when host sets to 1-3, clears when set to null or 0
-    const expected_participants_set_at = (expected_participants >= 1 && expected_participants <= 3)
-      ? new Date().toISOString()
-      : null;
+    // Timer starts when host sets to 1-3 AND start_timeout is true
+    // If start_timeout is false, preserve existing timestamp
+    let expected_participants_set_at;
+    if (expected_participants >= 1 && expected_participants <= 3) {
+      if (start_timeout) {
+        // Start or restart the timer
+        expected_participants_set_at = new Date().toISOString();
+      } else {
+        // Preserve existing timestamp (or null if not set yet)
+        expected_participants_set_at = currentSession.expected_participants_set_at;
+      }
+    } else {
+      // Clear timer for solo mode (0) or null
+      expected_participants_set_at = null;
+    }
 
     // Update session
     const { data: session, error: updateError } = await supabase
@@ -1297,12 +1426,83 @@ export async function updateExpectedParticipants(req, res) {
       });
     }
 
+    // Generate/delete invites based on expected_participants
+    let invites = [];
+    if (expected_participants >= 1 && expected_participants <= 3) {
+      // Generate individual invite links
+      invites = await regenerateInvites(session.id, expected_participants);
+    } else {
+      // Delete all invites when switching to solo (0) or null
+      await supabase
+        .from('invites')
+        .delete()
+        .eq('session_id', session.id);
+    }
+
     res.json({
       success: true,
-      data: session
+      data: {
+        ...session,
+        invites // Include invites in response
+      }
     });
   } catch (error) {
     console.error('Error updating expected participants:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * GET /api/sessions/:session_id/invites
+ * Get all invite links for a session with their status
+ */
+export async function getSessionInvites(req, res) {
+  try {
+    const { session_id } = req.params;
+
+    // Get session first
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('session_id', session_id)
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    // Get all invites with participant info
+    const { data: invites, error: invitesError } = await supabase
+      .from('invites')
+      .select(`
+        *,
+        participant:participants!invites_claimed_by_fkey(
+          id,
+          nickname,
+          real_name,
+          marked_not_coming,
+          items_confirmed
+        )
+      `)
+      .eq('session_id', session.id)
+      .order('invite_number');
+
+    if (invitesError) throw invitesError;
+
+    res.json({
+      success: true,
+      data: invites || []
+    });
+  } catch (error) {
+    console.error('Error fetching invites:', error);
     res.status(500).json({
       success: false,
       error: error.message

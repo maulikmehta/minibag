@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { Plus, Minus, Clock, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ItemList from '../components/items/ItemList.jsx';
@@ -6,10 +6,11 @@ import ItemRow from '../components/items/ItemRow.jsx';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import SessionParticipantList from '../components/session/SessionParticipantList.jsx';
-import ExpectedParticipantsInput from '../components/session/ExpectedParticipantsInput.jsx';
+import InviteTabsSelector from '../components/session/InviteTabsSelector.jsx';
 import SessionInviteControls from '../components/session/SessionInviteControls.jsx';
 import CheckpointStatus from '../components/session/CheckpointStatus.jsx';
 import IdentityBanner from '../components/session/IdentityBanner.jsx';
+import ModalWrapper from '../components/shared/ModalWrapper.jsx';
 import { useNotification } from '../hooks/useNotification.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
@@ -46,6 +47,22 @@ export default function SessionActiveScreen({
   // Use new notification system
   const notify = useNotification();
 
+  // Track if we've shown the initial "joined" notification
+  const hasShownJoinedNotification = useRef(false);
+
+  // Show one-time "You're joined" notification when session loads
+  useEffect(() => {
+    if (currentParticipant && session && !hasShownJoinedNotification.current) {
+      const isHost = currentParticipant?.is_creator || false;
+      const displayName = currentParticipant?.nickname || currentParticipant?.real_name?.split(' ')[0] || 'You';
+
+      const message = `You're joined as ${displayName}${isHost ? ' (Host)' : ''}`;
+      notify.success(message);
+
+      hasShownJoinedNotification.current = true;
+    }
+  }, [currentParticipant, session, notify]);
+
   useParticipantSync({
     session,
     currentParticipant,
@@ -63,6 +80,46 @@ export default function SessionActiveScreen({
     isInviteExpired
   } = useExpectedParticipants(session, participants);
 
+  // Determine if current user is host (needed early for invites fetch)
+  const isHost = currentParticipant?.is_creator || false;
+
+  // Modal state for shopping mode selection
+  const [showModeModal, setShowModeModal] = useState(false);
+  // Track if host has confirmed their mode choice (clicked OK)
+  const [modeConfirmed, setModeConfirmed] = useState(false);
+
+  // Initialize modeConfirmed if mode was already chosen (page refresh scenario)
+  // Either timeout started OR solo mode was selected
+  useEffect(() => {
+    if (session?.expected_participants_set_at || session?.expected_participants === 0) {
+      setModeConfirmed(true);
+    }
+  }, [session?.expected_participants_set_at, session?.expected_participants]);
+
+  // Fetch invites for the session
+  const [invites, setInvites] = useState([]);
+  useEffect(() => {
+    if (!session?.session_id || !isHost) return;
+
+    const fetchInvites = async () => {
+      try {
+        const response = await fetch(`/api/sessions/${session.session_id}/invites`);
+        const data = await response.json();
+        if (data.success) {
+          setInvites(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch invites:', error);
+      }
+    };
+
+    fetchInvites();
+
+    // Poll for invite status updates every 3 seconds
+    const interval = setInterval(fetchInvites, 3000);
+    return () => clearInterval(interval);
+  }, [session?.session_id, isHost, expectedCount]);
+
   // Compute all items from host + participants (memoized for performance)
   const allItems = useMemo(
     () => aggregateAllItems(hostItems, participants),
@@ -76,9 +133,6 @@ export default function SessionActiveScreen({
 
   // Get session info
   const sessionCode = session?.session_id || 'loading...';
-
-  // Determine if current user is host
-  const isHost = currentParticipant?.is_creator || false;
 
   // Check how many participants have confirmed their lists
   // Only count participants who are actually participating (not marked as not coming)
@@ -354,6 +408,62 @@ export default function SessionActiveScreen({
           )}
         </div>
 
+        {/* Shopping Preference Prompt - Only for Host */}
+        {currentParticipant?.is_creator && !modeConfirmed && (
+          <div className="mb-6">
+            <button
+              onClick={() => setShowModeModal(true)}
+              className="w-full p-4 bg-white border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Users size={24} className="text-green-600" />
+                  <div className="text-left">
+                    <p className="text-base font-medium text-gray-900">
+                      Who are we shopping for?
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Choose solo or invite friends
+                    </p>
+                  </div>
+                </div>
+                <span className="text-green-600 group-hover:translate-x-1 transition-transform">
+                  →
+                </span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Shopping Mode Selection Modal */}
+        {currentParticipant?.is_creator && (
+          <ModalWrapper
+            isOpen={showModeModal}
+            onClose={() => setShowModeModal(false)}
+            title="Choose shopping mode"
+            maxWidth="max-w-md"
+          >
+            <InviteTabsSelector
+              sessionId={session?.session_id}
+              expectedCount={expectedCount}
+              invites={invites}
+              locked={session?.invites_locked || false}
+              onChange={setExpectedCount}
+              showConfirmButton={true}
+              onInvitesUpdate={setInvites}
+              onConfirm={(selectedMode) => {
+                setShowModeModal(false);
+                setModeConfirmed(true); // Mark mode as confirmed - hide prompt
+                notify.success(
+                  selectedMode === 0
+                    ? 'Ready to shop solo!'
+                    : `Waiting for ${selectedMode} friend${selectedMode > 1 ? 's' : ''} to join`
+                );
+              }}
+            />
+          </ModalWrapper>
+        )}
+
         {/* Avatar circles with gradient - 4 slots total */}
         <div data-tour="participants-list">
           <SessionParticipantList
@@ -422,34 +532,6 @@ export default function SessionActiveScreen({
             <p className="text-2xl text-gray-900">{getTotalWeight(allItems)}kg</p>
           </div>
         </div>
-
-        {/* Invite or Continue Solo Section - Only for Host */}
-        {currentParticipant?.is_creator && (
-          <div className="mb-6 space-y-3">
-            <p className="text-sm font-medium text-gray-700 mb-3">
-              {participants.length >= 3
-                ? 'List is full (4/4 people)'
-                : participants.length === 0
-                  ? 'Shop with friends or continue solo'
-                  : 'Invite more friends'}
-            </p>
-
-            {/* Expected Participants Input - Item list style with +/- buttons */}
-            <ExpectedParticipantsInput
-              sessionId={session?.session_id}
-              expectedCount={expectedCount}
-              onChange={setExpectedCount}
-            />
-
-            {/* Invite buttons - WhatsApp + Copy Link */}
-            <SessionInviteControls
-              session={session}
-              participantCount={participants.length}
-              onShare={handleShare}
-              disabled={!session || participants.length >= 3}
-            />
-          </div>
-        )}
 
         {/* Test button removed for field testing */}
       </div>

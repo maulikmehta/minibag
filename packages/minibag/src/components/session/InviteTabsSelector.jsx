@@ -15,13 +15,19 @@ import { buildInviteUrl, copyInviteToClipboard, shareInvite } from '../../utils/
  * @param {Array} props.invites - Array of invite objects from API
  * @param {boolean} props.locked - Whether tabs are locked (someone responded)
  * @param {Function} props.onChange - Callback when mode changes
+ * @param {boolean} props.showConfirmButton - Whether to show OK button (for modal mode)
+ * @param {Function} props.onConfirm - Callback when OK button clicked
+ * @param {Function} props.onInvitesUpdate - Callback to update invites immediately after API call
  */
 export default function InviteTabsSelector({
   sessionId,
   expectedCount,
   invites = [],
   locked = false,
-  onChange
+  onChange,
+  showConfirmButton = false,
+  onConfirm,
+  onInvitesUpdate
 }) {
   const notify = useNotification();
   const { t } = useTranslation();
@@ -51,21 +57,54 @@ export default function InviteTabsSelector({
     setActiveTab(value);
     onChange(value);
 
+    // Generate invites but don't start timeout yet (wait for OK button)
+    await commitSelection(value, { start_timeout: false });
+  };
+
+  const commitSelection = async (value, options = {}) => {
+    const selectedValue = value ?? activeTab;
+    const { start_timeout = true } = options;
+
     // Call API to update expected_participants and get invite links
     try {
       const response = await fetch(`/api/sessions/${sessionId}/expected`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expected_participants: value })
+        body: JSON.stringify({
+          expected_participants: selectedValue,
+          start_timeout
+        })
       });
 
       const data = await response.json();
       if (!data.success) {
         throw new Error(data.error);
       }
+
+      // Update invites immediately with response data (no need to wait for polling)
+      if (data.data?.invites && onInvitesUpdate) {
+        onInvitesUpdate(data.data.invites);
+      }
+
+      return true;
     } catch (error) {
       console.error('Failed to update mode:', error);
       notify.error('Failed to update mode. Please try again.');
+      return false;
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (activeTab === null) {
+      notify.warning('Please select a shopping mode');
+      return;
+    }
+
+    // NOW start the 20-minute timeout by calling API with start_timeout: true
+    const success = await commitSelection(activeTab, { start_timeout: true });
+
+    if (success && onConfirm) {
+      onConfirm(activeTab);
     }
   };
 
@@ -149,6 +188,25 @@ export default function InviteTabsSelector({
           <p className="text-xs text-amber-800 text-center">
             🔒 Mode locked - someone has already responded to an invite
           </p>
+        </div>
+      )}
+
+      {/* OK Button for Modal Mode */}
+      {showConfirmButton && (
+        <div className="px-2 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleConfirm}
+            disabled={activeTab === null || locked}
+            className={`
+              w-full py-3 px-4 rounded-lg font-medium transition-all
+              ${activeTab === null || locked
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800'
+              }
+            `}
+          >
+            {activeTab === null ? 'Select a mode to continue' : 'OK'}
+          </button>
         </div>
       )}
     </div>
