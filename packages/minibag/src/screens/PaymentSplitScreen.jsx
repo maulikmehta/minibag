@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, Copy, Check } from 'lucide-react';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
@@ -50,6 +50,9 @@ function PaymentSplitScreen({
 }) {
   // State for expanded participants in compact view
   const [expandedParticipants, setExpandedParticipants] = useState({});
+
+  // State for copied payment request
+  const [copiedParticipantId, setCopiedParticipantId] = useState(null);
 
   // State for server-calculated bills
   const [billData, setBillData] = useState(null);
@@ -189,10 +192,29 @@ function PaymentSplitScreen({
       .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
       .join('%0A');
 
-    const billUrl = `${window.location.origin}/bill/${session.session_id}/${participant.id || pName.toLowerCase()}`;
-    const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}\n\nView & pay: ${billUrl}`);
+    const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}`);
 
     window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
+  const handleCopyPaymentRequest = async (participant) => {
+    const pName = participant.nickname || participant.name || 'Participant';
+    const costData = participantCosts[pName];
+    if (!costData) return;
+
+    const itemsList = costData.items
+      .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
+      .join('\n');
+
+    const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}`;
+
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopiedParticipantId(participant.id || pName);
+      setTimeout(() => setCopiedParticipantId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
   };
 
   const toggleParticipantExpand = (pName) => {
@@ -344,15 +366,37 @@ function PaymentSplitScreen({
                     </div>
 
                     <div className="p-4 border-t border-gray-200 bg-gray-50">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSendPaymentRequest(p);
-                        }}
-                        className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        Send payment request
-                      </button>
+                      <div className="flex gap-2">
+                        {/* Share Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendPaymentRequest(p);
+                          }}
+                          className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-xl transition-colors"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <Share2 size={18} strokeWidth={2} />
+                            <span className="font-semibold text-sm">Send bill</span>
+                          </div>
+                        </button>
+
+                        {/* Copy Icon Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyPaymentRequest(p);
+                          }}
+                          className="w-14 h-14 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-600 rounded-xl transition-colors flex items-center justify-center"
+                          title="Copy payment request"
+                        >
+                          {copiedParticipantId === (p.id || pName) ? (
+                            <Check size={20} className="text-green-600" />
+                          ) : (
+                            <Copy size={20} />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

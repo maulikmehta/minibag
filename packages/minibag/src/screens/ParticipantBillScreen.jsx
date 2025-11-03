@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
-import { useNotification } from '../hooks/useNotification.js';
 import { aggregateAllItems } from '../utils/calculateItems';
 import { getBillItems } from '../services/api.js';
 
@@ -19,6 +19,8 @@ import { getBillItems } from '../services/api.js';
  * @param {Array} items - Catalog items array
  * @param {function} getItemName - Function to get localized item name
  * @param {function} onGoHome - Callback to navigate to home screen
+ * @param {Object} i18n - i18n instance for language management
+ * @param {function} handleLanguageChange - Language change handler
  */
 function ParticipantBillScreen({
   session,
@@ -27,9 +29,11 @@ function ParticipantBillScreen({
   itemPayments,
   items,
   getItemName,
-  onGoHome
+  onGoHome,
+  i18n,
+  handleLanguageChange
 }) {
-  const notify = useNotification();
+  const { t } = useTranslation();
 
   // State for server-calculated bill
   const [billData, setBillData] = useState(null);
@@ -141,9 +145,18 @@ function ParticipantBillScreen({
     return { participantCost: cost, billItems: items };
   }, [billData, participant, allItems, itemPayments, items, getItemName]);
 
+  // Handler for sending thank you message to host
+  const handleMessageHost = () => {
+    const message = encodeURIComponent(t('whatsapp.thankYouMessage'));
+    window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen pb-24">
-      <AppHeader />
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={handleLanguageChange}
+      />
       <div className="p-6">
         <p className="text-2xl font-bold text-gray-900 mb-4">Your Bill</p>
 
@@ -158,10 +171,10 @@ function ParticipantBillScreen({
         </div>
 
         {/* Compact Total at Top */}
-        <div className="mb-6 p-4 bg-gray-900 rounded-lg text-center">
-          <p className="text-xs text-gray-300 mb-1">Total Amount</p>
-          <p className="text-4xl font-bold text-white">₹{participantCost.toFixed(0)}</p>
-          <p className="text-xs text-gray-400 mt-1">{billItems.length} {billItems.length === 1 ? 'item' : 'items'}</p>
+        <div className="mb-6 p-4 border border-gray-300 rounded-lg bg-blue-50 text-center">
+          <p className="text-xs text-gray-600 mb-1">Total Amount</p>
+          <p className="text-3xl font-bold text-blue-700">₹{participantCost.toFixed(0)}</p>
+          <p className="text-xs text-gray-500 mt-1">{billItems.length} {billItems.length === 1 ? 'item' : 'items'}</p>
         </div>
 
         {/* Compact Item List */}
@@ -181,29 +194,12 @@ function ParticipantBillScreen({
           </div>
         </div>
 
-        <div className="space-y-3">
-          <button
-            onClick={() => {
-              notify.info(`UPI payment for ₹${participantCost.toFixed(0)} (Demo: would open PhonePe/GPay)`);
-            }}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors"
-          >
-            Pay ₹{participantCost.toFixed(0)} via UPI
-          </button>
-
-          <button
-            onClick={() => {
-              notify.success('Marked as paid via cash (Demo: would notify host)');
-            }}
-            className="w-full border-2 border-gray-900 py-4 rounded-lg text-base text-gray-900"
-          >
-            Paid in cash
-          </button>
-        </div>
-
-        <p className="text-sm text-gray-600 text-center mt-6">
-          Payment will be sent to Host's UPI
-        </p>
+        <button
+          onClick={handleMessageHost}
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors"
+        >
+          Message Host
+        </button>
       </div>
     </div>
   );

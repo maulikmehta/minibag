@@ -264,8 +264,14 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   }, [session, apiParticipants, currentParticipant, loadParticipantItemsFromLocalStorage]);
 
   // Redirect to session-active if session is restored from localStorage
+  // Skip redirect for declined participants (marked_not_coming)
   React.useEffect(() => {
     if (session && currentParticipant && currentScreen === 'home' && !joinSessionId && !billSessionId) {
+      // Don't auto-navigate declined participants
+      if (currentParticipant.marked_not_coming) {
+        console.log('Skipping auto-navigation for declined participant');
+        return;
+      }
       console.log('Session restored from localStorage, redirecting to session-active');
       setCurrentScreen('session-active');
     }
@@ -451,7 +457,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
             avatar_emoji: participant.avatar_emoji,
             is_creator: participant.is_creator,
             items: {}, // Will be updated when they add items
-            items_confirmed: participant.items_confirmed || false
+            items_confirmed: participant.items_confirmed || false,
+            marked_not_coming: participant.marked_not_coming || false
           }];
         });
       };
@@ -726,6 +733,9 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         sessionError={sessionError}
         joinSessionId={joinSessionId}
         participants={participants}
+        items={VEGETABLES}
+        getItemName={getItemName}
+        hostItems={hostItems}
         joinSession={joinSession}
         onJoinSuccess={() => setCurrentScreen('session-active')}
         onNavigateToHome={() => setCurrentScreen('home')}
@@ -1080,6 +1090,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         items={items}
         getItemName={getItemName}
         onGoHome={() => setCurrentScreen('home')}
+        i18n={i18n}
+        handleLanguageChange={handleLanguageChange}
       />
     );
   }
