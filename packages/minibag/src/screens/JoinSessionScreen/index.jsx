@@ -28,6 +28,7 @@ export default function JoinSessionScreen({
   const [selectedNickname, setSelectedNickname] = useState(null);
   const [loadingNicknames, setLoadingNicknames] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
+  const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
 
   // Extract invite token from URL query parameter
   useEffect(() => {
@@ -236,7 +237,7 @@ export default function JoinSessionScreen({
       <AppHeader />
       <div className="p-6">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
             <Users size={32} className="text-green-600" strokeWidth={2.5} />
           </div>
@@ -246,32 +247,46 @@ export default function JoinSessionScreen({
           </p>
         </div>
 
-        {/* Name Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            What's your name?
-          </label>
-          <input
-            type="text"
-            value={participantName}
-            onChange={(e) => {
-              // Allow only letters and spaces
-              const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-              setParticipantName(value);
-            }}
-            placeholder="Enter your name"
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-            maxLength={50}
-            autoFocus
-            required
-          />
-          <p className="mt-2 text-xs text-gray-500">
-            We'll use this for payment splits & receipts
-          </p>
+        {/* Dot Navigation */}
+        <div className="flex gap-2 justify-center mb-6">
+          {[1, 2, 3].map((step) => (
+            <div
+              key={step}
+              className={`w-2 h-2 rounded-full transition-all ${
+                step <= onboardingStep ? 'bg-green-600' : 'bg-gray-300'
+              }`}
+            />
+          ))}
         </div>
 
-        {/* Language Preference */}
-        {i18n && handleLanguageChange && (
+        {/* Step 1: Name Input */}
+        {onboardingStep === 1 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              What's your name?
+            </label>
+            <input
+              type="text"
+              value={participantName}
+              onChange={(e) => {
+                // Allow only letters and spaces
+                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                setParticipantName(value);
+              }}
+              placeholder="Enter your name"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
+              maxLength={50}
+              autoFocus
+              required
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              We'll use this for payment splits & receipts
+            </p>
+          </div>
+        )}
+
+        {/* Step 2: Language Preference */}
+        {onboardingStep === 2 && i18n && handleLanguageChange && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-900 mb-3">
               Choose your language
@@ -314,94 +329,137 @@ export default function JoinSessionScreen({
           </div>
         )}
 
-        {/* Nickname Selection */}
-        <div className="mb-6" data-tour="participant-nickname-selection">
-          <label className="block text-sm font-medium text-gray-900 mb-3">
-            Choose your shopping buddy name
-          </label>
-          {loadingNicknames ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={24} className="animate-spin text-green-600" />
-            </div>
-          ) : (
-            <div className="flex justify-center gap-8">
-              {nicknameOptions.map((option, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setSelectedNickname(option)}
-                  className="flex flex-col items-center"
-                >
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                    selectedNickname?.nickname === option.nickname
-                      ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                      : 'border-2 border-gray-300 hover:border-gray-400'
-                  }`}>
-                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                      <span className="text-2xl">{option.avatar_emoji}</span>
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
-                </button>
-              ))}
-            </div>
-          )}
-          <p className="mt-3 text-xs text-gray-500 text-center">
-            How you'll appear to other shoppers
-          </p>
-        </div>
-
-        {/* Items Preview Section */}
-        {hostSelectedItems.length > 0 && (
-          <div className="mb-6">
-            <p className="text-sm font-medium text-gray-900 mb-3">
-              Items in this list ({hostSelectedItems.length})
-            </p>
-            <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
-              {hostSelectedItems.map(item => (
-                <div key={item.id} className="flex items-center gap-3 py-3 px-3">
-                  {/* Emoji */}
-                  <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
-                    {item.emoji || '🥬'}
-                  </div>
-
-                  {/* Name */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">{getItemName(item)}</p>
-                  </div>
+        {/* Step 3: Nickname Selection + Items */}
+        {onboardingStep === 3 && (
+          <>
+            {/* Nickname Selection */}
+            <div className="mb-6" data-tour="participant-nickname-selection">
+              <label className="block text-sm font-medium text-gray-900 mb-3">
+                Pick your bag tag
+              </label>
+              {loadingNicknames ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={24} className="animate-spin text-green-600" />
                 </div>
-              ))}
+              ) : (
+                <div className="flex justify-center gap-8">
+                  {nicknameOptions.map((option, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setSelectedNickname(option)}
+                      className="flex flex-col items-center"
+                    >
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                        selectedNickname?.nickname === option.nickname
+                          ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                          : 'border-2 border-gray-300 hover:border-gray-400'
+                      }`}>
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                          <span className="text-2xl">{option.avatar_emoji}</span>
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-xs text-gray-500 text-center">
+                How you'll appear to other shoppers
+              </p>
             </div>
-          </div>
+
+            {/* Items Preview Section */}
+            {hostSelectedItems.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-900 mb-3">
+                  Items in this list ({hostSelectedItems.length})
+                </p>
+                <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+                  {hostSelectedItems.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 py-3 px-3">
+                      {/* Emoji */}
+                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
+                        {item.emoji || '🥬'}
+                      </div>
+
+                      {/* Name */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900">{getItemName(item)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Join Button */}
-        <button
-          onClick={handleJoinSession}
-          disabled={joiningSession || !participantName.trim() || !selectedNickname}
-          className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mb-3"
-        >
-          {joiningSession ? (
-            <>
-              <Loader2 size={20} className="animate-spin" />
-              Joining...
-            </>
-          ) : (
-            <>
-              <Check size={20} />
-              Join list
-            </>
-          )}
-        </button>
+        {/* Navigation Buttons */}
+        {onboardingStep < 3 ? (
+          <div className="flex gap-3">
+            {onboardingStep > 1 && (
+              <button
+                onClick={() => setOnboardingStep(onboardingStep - 1)}
+                className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+              >
+                Back
+              </button>
+            )}
+            <button
+              onClick={() => {
+                // Validate current step before proceeding
+                if (onboardingStep === 1 && !participantName.trim()) {
+                  notify.warning('Please enter your name');
+                  return;
+                }
+                setOnboardingStep(onboardingStep + 1);
+              }}
+              disabled={onboardingStep === 1 && !participantName.trim()}
+              className={`${onboardingStep === 1 ? 'w-full' : 'flex-1'} py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors`}
+            >
+              Next
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Back Button for Step 3 */}
+            <button
+              onClick={() => setOnboardingStep(2)}
+              className="w-full py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50 mb-3"
+            >
+              Back
+            </button>
 
-        {/* Decline Button */}
-        <button
-          onClick={handleDeclineSession}
-          disabled={joiningSession}
-          className="w-full px-6 py-4 border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-900 text-base font-medium rounded-xl transition-all flex items-center justify-center gap-2"
-        >
-          {joiningSession ? 'Processing...' : 'No thanks, maybe next time'}
-        </button>
+            {/* Join Button */}
+            <button
+              onClick={handleJoinSession}
+              disabled={joiningSession || !selectedNickname}
+              className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mb-3"
+            >
+              {joiningSession ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Joining...
+                </>
+              ) : (
+                <>
+                  <Check size={20} />
+                  Join list
+                </>
+              )}
+            </button>
+
+            {/* Decline Button */}
+            <button
+              onClick={handleDeclineSession}
+              disabled={joiningSession}
+              className="w-full px-6 py-4 border-2 border-gray-300 hover:border-gray-400 bg-white text-gray-900 text-base font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              {joiningSession ? 'Processing...' : 'No thanks, maybe next time'}
+            </button>
+          </>
+        )}
 
         {/* Error Display */}
         {sessionError && (

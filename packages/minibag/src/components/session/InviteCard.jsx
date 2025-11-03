@@ -21,6 +21,12 @@ export default function InviteCard({
   const getInviteStatus = (invite) => {
     if (!invite) return 'Pending...';
 
+    // Show "Copied!" when this invite was just copied
+    const index = inviteNumber - 1;
+    if (copiedIndex === index && invite.status === 'pending') {
+      return 'Copied!';
+    }
+
     switch (invite.status) {
       case 'claimed':
         return invite.participant?.nickname
@@ -37,6 +43,12 @@ export default function InviteCard({
 
   const getInviteStatusColor = (invite) => {
     if (!invite) return 'text-gray-500';
+
+    // Show green when copied
+    const index = inviteNumber - 1;
+    if (copiedIndex === index && invite.status === 'pending') {
+      return 'text-green-600';
+    }
 
     switch (invite.status) {
       case 'claimed':

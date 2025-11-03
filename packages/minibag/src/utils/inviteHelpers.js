@@ -33,18 +33,20 @@ export function buildInviteMessage(inviteUrl, t) {
  * Copy invite message to clipboard
  * @param {string} inviteUrl - The invite URL
  * @param {Function} t - The i18n translation function
- * @param {Object} notify - The notification object (with success/error methods)
+ * @param {Object} notify - The notification object (optional, for error only)
  * @returns {Promise<boolean>} True if copy succeeded, false otherwise
  */
-export async function copyInviteToClipboard(inviteUrl, t, notify) {
+export async function copyInviteToClipboard(inviteUrl, t, notify = null) {
   try {
     const shareText = buildInviteMessage(inviteUrl, t);
     await navigator.clipboard.writeText(shareText);
-    notify.success('Invite message copied!');
+    // No success notification - UI will show inline feedback
     return true;
   } catch (error) {
     console.error('Failed to copy:', error);
-    notify.error('Failed to copy link');
+    if (notify) {
+      notify.error('Failed to copy link');
+    }
     return false;
   }
 }

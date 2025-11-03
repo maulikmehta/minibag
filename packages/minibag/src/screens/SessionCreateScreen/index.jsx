@@ -39,6 +39,14 @@ export default function SessionCreateScreen({
   const [hostNicknameOptions, setHostNicknameOptions] = useState([]);
   const [selectedHostNickname, setSelectedHostNickname] = useState(null);
   const [loadingHostNicknames, setLoadingHostNicknames] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
+
+  // Reset onboarding step when modal opens
+  useEffect(() => {
+    if (showHostNicknameModal) {
+      setOnboardingStep(1);
+    }
+  }, [showHostNicknameModal]);
 
   // Update local state when navigating back with existing items
   useEffect(() => {
@@ -402,132 +410,180 @@ export default function SessionCreateScreen({
               <X size={24} />
             </button>
 
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Start Your List</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Start Your List</h2>
 
-            {/* Name Input */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                What's your name?
-              </label>
-              <input
-                type="text"
-                value={hostName}
-                onChange={(e) => {
-                  // Allow only letters and spaces
-                  const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                  setHostName(value);
-                }}
-                placeholder="Enter your name"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-                maxLength={50}
-                autoFocus
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">For payment tracking & receipts</p>
+            {/* Dot Navigation */}
+            <div className="flex gap-2 justify-center mb-6">
+              {[1, 2, 3].map((step) => (
+                <div
+                  key={step}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    step <= onboardingStep ? 'bg-green-600' : 'bg-gray-300'
+                  }`}
+                />
+              ))}
             </div>
 
-            {/* Language Preference */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-900 mb-3">
-                Choose your language
-              </label>
-              <div className="flex gap-3 justify-center">
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange && onLanguageChange('en')}
-                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    i18n.language === 'en'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange && onLanguageChange('hi')}
-                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    i18n.language === 'hi'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  हिंदी
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange && onLanguageChange('gu')}
-                  className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    i18n.language === 'gu'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  ગુજરાતી
-                </button>
+            {/* Step 1: Name Input */}
+            {onboardingStep === 1 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  What's your name?
+                </label>
+                <input
+                  type="text"
+                  value={hostName}
+                  onChange={(e) => {
+                    // Allow only letters and spaces
+                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                    setHostName(value);
+                  }}
+                  placeholder="Enter your name"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
+                  maxLength={50}
+                  autoFocus
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">For payment tracking & receipts</p>
               </div>
-            </div>
+            )}
 
-            {/* Nickname Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-900 mb-3">
-                Choose your shopping buddy name
-              </label>
-              {loadingHostNicknames ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-green-600" />
+            {/* Step 2: Language Preference */}
+            {onboardingStep === 2 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  Choose your language
+                </label>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => onLanguageChange && onLanguageChange('en')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'en'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onLanguageChange && onLanguageChange('hi')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'hi'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    हिंदी
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onLanguageChange && onLanguageChange('gu')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'gu'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ગુજરાતી
+                  </button>
                 </div>
-              ) : (
-                <div className="flex justify-center gap-8">
-                  {hostNicknameOptions.map((option, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => setSelectedHostNickname(option)}
-                      className="flex flex-col items-center"
-                    >
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                        selectedHostNickname?.nickname === option.nickname
-                          ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                          : 'border-2 border-gray-300 hover:border-gray-400'
-                      }`}>
-                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <span className="text-2xl">{option.avatar_emoji}</span>
-                        </div>
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-gray-500 mt-3 text-center">How you'll appear to other shoppers</p>
-            </div>
+              </div>
+            )}
 
-            {/* Create Button */}
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowHostNicknameModal(false)}
-                className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateSession}
-                disabled={creatingSession || !selectedHostNickname || !hostName.trim()}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
-              >
-                {creatingSession ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Creating...
-                  </>
+            {/* Step 3: Nickname Selection */}
+            {onboardingStep === 3 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  Pick your bag tag
+                </label>
+                {loadingHostNicknames ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={24} className="animate-spin text-green-600" />
+                  </div>
                 ) : (
-                  <>
-                    <Check size={18} strokeWidth={2.5} />
-                    Start List
-                  </>
+                  <div className="flex justify-center gap-8">
+                    {hostNicknameOptions.map((option, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => setSelectedHostNickname(option)}
+                        className="flex flex-col items-center"
+                      >
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                          selectedHostNickname?.nickname === option.nickname
+                            ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                            : 'border-2 border-gray-300 hover:border-gray-400'
+                        }`}>
+                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                            <span className="text-2xl">{option.avatar_emoji}</span>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </button>
+                <p className="text-xs text-gray-500 mt-3 text-center">How you'll appear to other shoppers</p>
+              </div>
+            )}
+
+            {/* Navigation Buttons */}
+            <div className="flex gap-3 mt-6">
+              {onboardingStep === 1 ? (
+                <button
+                  onClick={() => {
+                    setShowHostNicknameModal(false);
+                    setOnboardingStep(1);
+                  }}
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  onClick={() => setOnboardingStep(onboardingStep - 1)}
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+                >
+                  Back
+                </button>
+              )}
+
+              {onboardingStep < 3 ? (
+                <button
+                  onClick={() => {
+                    // Validate current step before proceeding
+                    if (onboardingStep === 1 && !hostName.trim()) {
+                      notify.warning('Please enter your name');
+                      return;
+                    }
+                    setOnboardingStep(onboardingStep + 1);
+                  }}
+                  disabled={onboardingStep === 1 && !hostName.trim()}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  onClick={handleCreateSession}
+                  disabled={creatingSession || !selectedHostNickname}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {creatingSession ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={18} strokeWidth={2.5} />
+                      Start List
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
