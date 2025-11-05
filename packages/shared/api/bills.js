@@ -192,16 +192,11 @@ export async function getBillByToken(req, res) {
       });
     }
 
-    console.log('[getBillByToken] Payments fetched:', { count: payments?.length, sessionId: session.session_id });
-
     // Extract unique item_ids from payments
     const itemIds = [...new Set(payments.map(p => p.item_id))];
 
-    console.log('[getBillByToken] Item IDs extracted:', { count: itemIds.length, itemIds });
-
     // Handle case where there are no items
     if (itemIds.length === 0) {
-      console.log('[getBillByToken] No items to fetch from catalog');
       // Return empty bill
       if (tokenData.participant_id) {
         return await getParticipantBill(res, tokenData, session, [], payments);
@@ -223,12 +218,6 @@ export async function getBillByToken(req, res) {
         error: 'Failed to fetch catalog items'
       });
     }
-
-    console.log('[getBillByToken] Catalog items fetched:', {
-      requested: itemIds,
-      found: catalogItems.map(c => c.item_id),
-      count: catalogItems.length
-    });
 
     // If participant_id is set, fetch participant-specific bill
     if (tokenData.participant_id) {
@@ -412,10 +401,6 @@ async function getHostBill(res, tokenData, session, catalogItems, payments) {
     }
   });
 
-  console.log('[getHostBill] Bill items count:', billItems.length);
-  console.log('[getHostBill] Total amount:', totalAmount);
-  console.log('[getHostBill] Item names:', billItems.map(i => i.item_name));
-  console.log('[getHostBill] Full items:', JSON.stringify(billItems, null, 2));
 
   res.json({
     success: true,
