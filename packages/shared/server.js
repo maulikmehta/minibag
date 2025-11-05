@@ -14,12 +14,16 @@ import crypto from 'crypto';
 import logger from './utils/logger.js';
 import { requestIdMiddleware, httpLogger, errorLogger } from './middleware/requestLogger.js';
 
+// Sentry Error Tracking
+import { initSentry, getSentryRequestHandler, getSentryTracingHandler, getSentryErrorHandler } from './utils/sentry.js';
+
 // API route imports
 import * as catalogAPI from './api/catalog.js';
 import * as sessionsAPI from './api/sessions.js';
 import * as paymentsAPI from './api/payments.js';
 import * as analyticsAPI from './api/analytics.js';
 import * as participantsAPI from './api/participants.js';
+import * as billsAPI from './api/bills.js';
 
 // Validation middleware imports
 import {
@@ -39,13 +43,27 @@ const __dirname = dirname(__filename);
 // Load environment variables
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 
+// Initialize Sentry as early as possible
+initSentry();
+
 const app = express();
 const server = createServer(app);
 
-// Socket.IO setup
+// Socket.IO setup with same CORS origins as Express
+const socketAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://minibag.cc',
+  'https://www.minibag.cc'
+];
+
+if (process.env.FRONTEND_URL && !socketAllowedOrigins.includes(process.env.FRONTEND_URL)) {
+  socketAllowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: socketAllowedOrigins,
     credentials: true
   }
 });
@@ -81,8 +99,22 @@ app.use(helmet({
 // - credentials: true (allows httpOnly cookies for authentication)
 // - Development: http://localhost:5173 or http://localhost:5174 (Vite may use either)
 // - Production: Should be set via FRONTEND_URL env variable
+// - minibag.cc: Production domain for field testing
+// Always include localhost for development, plus FRONTEND_URL if set
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://minibag.cc',
+  'https://www.minibag.cc'
+];
+
+// Add FRONTEND_URL to allowed origins if it's set and not already in the list
+if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
@@ -94,6 +126,12 @@ app.use(requestIdMiddleware);
 
 // HTTP request/response logging with Pino
 app.use(httpLogger);
+
+// Sentry request handler (must be first middleware)
+app.use(getSentryRequestHandler());
+
+// Sentry tracing handler (before routes)
+app.use(getSentryTracingHandler());
 
 // Add request timeout (30 seconds)
 app.use((req, res, next) => {
@@ -225,6 +263,10 @@ app.get('/api/sessions/:session_id/split', paymentsAPI.getPaymentSplit);
 app.put('/api/payments/:payment_id', paymentsAPI.updatePayment);
 app.delete('/api/payments/:payment_id', paymentsAPI.deletePayment);
 
+// Bills API routes
+app.post('/api/sessions/:session_id/bill-token', billsAPI.generateBillToken);
+app.get('/api/bill/:token', billsAPI.getBillByToken);
+
 // Analytics API routes
 app.get('/api/analytics/overview', analyticsAPI.getAnalyticsOverview);
 app.get('/api/analytics/sessions/weekly', analyticsAPI.getWeeklySessionTrends);
@@ -236,6 +278,9 @@ app.get('/api/analytics/sessions/completions', analyticsAPI.getSessionCompletion
 io.on('connection', (socket) => {
   setupSocketHandlers(socket, io);
 });
+
+// Sentry error handler (must be before other error handlers)
+app.use(getSentryErrorHandler());
 
 // Error logging middleware (logs errors before handling them)
 app.use(errorLogger);
