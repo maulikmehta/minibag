@@ -36,7 +36,7 @@ export async function generateBillToken(req, res) {
         .from('participants')
         .select('id')
         .eq('id', participant_id)
-        .eq('session_id', session_id)
+        .eq('session_id', session.id) // Use session UUID, not short session_id
         .single();
 
       if (participantError || !participant) {
@@ -131,12 +131,21 @@ export async function getBillByToken(req, res) {
   try {
     const { token } = req.params;
 
+    console.log('🎫 [getBillByToken] Fetching bill for token:', token);
+
     // Fetch and validate token
     const { data: tokenData, error: tokenError } = await supabase
       .from('bill_access_tokens')
       .select('*')
       .eq('access_token', token)
       .single();
+
+    console.log('🎫 [getBillByToken] Token data:', {
+      hasToken: !!tokenData,
+      participantId: tokenData?.participant_id,
+      sessionId: tokenData?.session_id,
+      expiresAt: tokenData?.expires_at
+    });
 
     if (tokenError || !tokenData) {
       return res.status(404).json({
@@ -221,8 +230,10 @@ export async function getBillByToken(req, res) {
 
     // If participant_id is set, fetch participant-specific bill
     if (tokenData.participant_id) {
+      console.log('📄 [getBillByToken] Calling getParticipantBill for participant:', tokenData.participant_id);
       return await getParticipantBill(res, tokenData, session, catalogItems, payments);
     } else {
+      console.log('📄 [getBillByToken] Calling getHostBill (no participant_id)');
       // Return host/solo bill (full session)
       return await getHostBill(res, tokenData, session, catalogItems, payments);
     }
@@ -278,6 +289,15 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     }
   });
 
+  console.log('🔍 [getParticipantBill] Debug:', {
+    participantId: tokenData.participant_id,
+    participantNickname: participant.nickname,
+    participantItemsCount: participantItems?.length,
+    paymentsCount: payments?.length,
+    paymentMapKeys: Object.keys(paymentMap),
+    participantItemsSample: participantItems?.slice(0, 2)
+  });
+
   // Fetch all participant items for total quantity calculation
   const { data: allParticipantItems, error: allItemsError } = await supabase
     .from('participant_items')
@@ -312,12 +332,37 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
 
   participantItems.forEach(item => {
     const catalog = catalogMap[item.item_id];
-    const payment = paymentMap[item.item_id];
+    if (!catalog) {
+      console.log('⚠️ No catalog entry for item UUID:', item.item_id);
+      return;  // Skip if no catalog entry
+    }
 
-    if (catalog && payment && !skippedItems[item.item_id]) {
-      const totalQty = itemTotals[item.item_id];
+    // Use TEXT item_id from catalog for payment lookup (not UUID from participant_items)
+    const itemId = catalog.item_id;
+    const payment = paymentMap[itemId];
+
+    console.log('📊 Processing item:', {
+      itemUUID: item.item_id,
+      catalogItemId: itemId,
+      catalogName: catalog.name,
+      hasPayment: !!payment,
+      isSkipped: !!skippedItems[itemId],
+      quantity: item.quantity
+    });
+
+    if (payment && !skippedItems[itemId]) {
+      const totalQty = itemTotals[item.item_id];  // UUID is correct for itemTotals
       const pricePerKg = payment.amount / totalQty;
       const itemCost = pricePerKg * item.quantity;
+
+      console.log('✅ Adding bill item:', {
+        name: catalog.name,
+        totalQty,
+        paymentAmount: payment.amount,
+        pricePerKg,
+        participantQty: item.quantity,
+        itemCost
+      });
 
       billItems.push({
         item_name: catalog.name,
@@ -329,6 +374,13 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
       });
 
       totalAmount += itemCost;
+    } else {
+      console.log('❌ Skipping item:', {
+        reason: !payment ? 'No payment' : 'Item skipped',
+        itemId,
+        hasPayment: !!payment,
+        isSkipped: !!skippedItems[itemId]
+      });
     }
   });
 
