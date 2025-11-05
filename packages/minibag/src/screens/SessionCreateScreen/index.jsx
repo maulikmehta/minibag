@@ -33,6 +33,10 @@ export default function SessionCreateScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [creatingSession, setCreatingSession] = useState(false);
 
+  // Animation states for visual feedback
+  const [floatingLabels, setFloatingLabels] = useState({});
+  const [flashingItems, setFlashingItems] = useState({});
+
   // Nickname modal state
   const [hostName, setHostName] = useState('');
   const [showHostNicknameModal, setShowHostNicknameModal] = useState(false);
@@ -102,6 +106,43 @@ export default function SessionCreateScreen({
   // Handle language change
   const handleLanguageChange = (languageCode) => {
     i18n.changeLanguage(languageCode);
+  };
+
+  // Helper function to update item quantity with animations
+  const updateItemQuantity = (itemId, newQuantity, increment = 0) => {
+    // Update quantity
+    if (newQuantity <= 0) {
+      const { [itemId]: _, ...rest } = hostItems;
+      setHostItems(rest);
+    } else {
+      setHostItems({ ...hostItems, [itemId]: newQuantity });
+    }
+
+    // Show floating label for increments/decrements
+    if (increment !== 0) {
+      setFloatingLabels(prev => ({
+        ...prev,
+        [itemId]: increment > 0 ? `+${increment}kg` : `${increment}kg`
+      }));
+
+      setTimeout(() => {
+        setFloatingLabels(prev => {
+          const updated = { ...prev };
+          delete updated[itemId];
+          return updated;
+        });
+      }, 600);
+    }
+
+    // Flash the row
+    setFlashingItems(prev => ({ ...prev, [itemId]: true }));
+    setTimeout(() => {
+      setFlashingItems(prev => {
+        const updated = { ...prev };
+        delete updated[itemId];
+        return updated;
+      });
+    }, 300);
   };
 
   // Show host nickname selection modal
@@ -269,10 +310,19 @@ export default function SessionCreateScreen({
             return (
               <div
                 key={veg.id}
-                className={`flex items-center gap-3 py-3 px-2 ${
+                className={`flex items-center gap-3 py-3 px-2 relative transition-colors ${
                   isSelected ? 'bg-gray-50' : ''
-                }`}
+                } ${flashingItems[veg.id] ? 'animate-flash-green' : ''}`}
               >
+                {/* Floating label for quantity changes */}
+                {floatingLabels[veg.id] && (
+                  <span
+                    className="floating-label"
+                    style={{ top: '10px', right: '20%' }}
+                  >
+                    {floatingLabels[veg.id]}
+                  </span>
+                )}
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
                   {veg.emoji || '🥬'}
                 </div>
@@ -282,20 +332,15 @@ export default function SessionCreateScreen({
                 </div>
 
                 {isSelected ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 relative">
                     <button
                       onClick={() => {
                         if (isListLocked) return;
                         const newVal = Math.max(0, quantity - 0.5);
-                        if (newVal === 0) {
-                          const { [veg.id]: _, ...rest } = hostItems;
-                          setHostItems(rest);
-                        } else {
-                          setHostItems({ ...hostItems, [veg.id]: newVal });
-                        }
+                        updateItemQuantity(veg.id, newVal, -0.5);
                       }}
                       disabled={isListLocked}
-                      className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-90"
                     >
                       <Minus size={16} strokeWidth={2} />
                     </button>
@@ -337,11 +382,11 @@ export default function SessionCreateScreen({
                       onClick={() => {
                         if (isListLocked) return;
                         if (totalWeight < 10) {
-                          setHostItems({ ...hostItems, [veg.id]: quantity + 0.5 });
+                          updateItemQuantity(veg.id, quantity + 0.5, 0.5);
                         }
                       }}
                       disabled={totalWeight >= 10 || isListLocked}
-                      className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:hover:bg-gray-400 flex-shrink-0 transition-colors"
+                      className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex-shrink-0 transition-all duration-150 active:scale-90"
                     >
                       <Plus size={16} className="text-white" strokeWidth={2.5} />
                     </button>
@@ -351,13 +396,13 @@ export default function SessionCreateScreen({
                     onClick={() => {
                       if (isListLocked) return;
                       if (totalWeight < 10) {
-                        setHostItems({ ...hostItems, [veg.id]: 0.5 });
+                        updateItemQuantity(veg.id, 0.5, 0.5);
                         setSearchQuery(''); // Clear search after adding item
                       }
                     }}
                     disabled={totalWeight >= 10 || isListLocked}
                     data-tour="quantity-controls"
-                    className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
+                    className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-button text-sm font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 transition-all duration-150 active:scale-95"
                   >
                     Add
                   </button>
@@ -379,7 +424,7 @@ export default function SessionCreateScreen({
                 }
               }}
               disabled={creatingSession}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:hover:bg-gray-500 disabled:cursor-not-allowed transition-colors"
             >
               {creatingSession ? (
                 <>
@@ -401,32 +446,20 @@ export default function SessionCreateScreen({
 
       {/* Host Nickname Selection Modal */}
       {showHostNicknameModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-          <div className="bg-white rounded-lg max-w-sm w-full p-6 relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6 animate-fade-in">
+          <div className="bg-white rounded-modal max-w-sm w-full p-4 relative animate-modal-enter shadow-2xl">
             <button
               onClick={() => setShowHostNicknameModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
             >
               <X size={24} />
             </button>
 
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Start Your List</h2>
-
-            {/* Dot Navigation */}
-            <div className="flex gap-2 justify-center mb-6">
-              {[1, 2, 3].map((step) => (
-                <div
-                  key={step}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    step <= onboardingStep ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Start Your List</h2>
 
             {/* Step 1: Name Input */}
             {onboardingStep === 1 && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
                   What's your name?
                 </label>
@@ -439,26 +472,26 @@ export default function SessionCreateScreen({
                     setHostName(value);
                   }}
                   placeholder="Enter your name"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
+                  className="input"
                   maxLength={50}
                   autoFocus
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">For payment tracking & receipts</p>
+                <p className="text-xs text-gray-500 mt-0.5">For payment tracking</p>
               </div>
             )}
 
             {/* Step 2: Language Preference */}
             {onboardingStep === 2 && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-900 mb-3">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
                   Choose your language
                 </label>
                 <div className="flex gap-3 justify-center">
                   <button
                     type="button"
                     onClick={() => onLanguageChange && onLanguageChange('en')}
-                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 ${
                       i18n.language === 'en'
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -469,7 +502,7 @@ export default function SessionCreateScreen({
                   <button
                     type="button"
                     onClick={() => onLanguageChange && onLanguageChange('hi')}
-                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 ${
                       i18n.language === 'hi'
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -480,7 +513,7 @@ export default function SessionCreateScreen({
                   <button
                     type="button"
                     onClick={() => onLanguageChange && onLanguageChange('gu')}
-                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 ${
                       i18n.language === 'gu'
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -494,7 +527,7 @@ export default function SessionCreateScreen({
 
             {/* Step 3: Nickname Selection */}
             {onboardingStep === 3 && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-900 mb-3">
                   Pick your bag tag
                 </label>
@@ -530,11 +563,11 @@ export default function SessionCreateScreen({
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-3 mt-4">
               {onboardingStep > 1 && (
                 <button
                   onClick={() => setOnboardingStep(onboardingStep - 1)}
-                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-button text-gray-900 hover:bg-gray-50 transition-all duration-150 active:scale-90"
                   title="Back"
                 >
                   <ChevronLeft size={20} strokeWidth={2} />
@@ -552,16 +585,16 @@ export default function SessionCreateScreen({
                     setOnboardingStep(onboardingStep + 1);
                   }}
                   disabled={onboardingStep === 1 && !hostName.trim()}
-                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
                 >
-                  Next
+                  <span>Next ({onboardingStep}/3)</span>
                   <ChevronRight size={18} strokeWidth={2.5} />
                 </button>
               ) : (
                 <button
                   onClick={handleCreateSession}
                   disabled={creatingSession || !selectedHostNickname}
-                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
                 >
                   {creatingSession ? (
                     <>

@@ -64,7 +64,11 @@ export default function CheckpointStatus({
       <button
         onClick={handleClick}
         disabled={disabled || showLoading}
-        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className={`w-full py-4 rounded-button text-base font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${
+          disabled && !showLoading
+            ? 'bg-gray-400 text-white cursor-not-allowed'
+            : 'bg-green-600 hover:bg-green-700 text-white active:scale-95'
+        } ${!checkpointComplete && !showLoading ? 'animate-pulse-glow' : ''}`}
         title={
           expectedCount === null
             ? 'Set how many friends joining above'
@@ -78,13 +82,15 @@ export default function CheckpointStatus({
         {showLoading && (
           <Loader2 size={20} className="animate-spin" />
         )}
-        {showLoading
-          ? 'Starting...'
-          : (expectedCount === null
-              ? 'Start shopping'
-              : !checkpointComplete
-                ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
-                : 'Start shopping')}
+        <span className={!checkpointComplete && !showLoading ? 'animate-gradient-pulse' : ''}>
+          {showLoading
+            ? 'Starting...'
+            : (expectedCount === null
+                ? 'Start shopping'
+                : !checkpointComplete
+                  ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
+                  : 'Start shopping')}
+        </span>
       </button>
     </div>
   );

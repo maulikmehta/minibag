@@ -99,7 +99,7 @@ function ParticipantAvatar({
       onTouchStart={handlePressStart}
       onTouchEnd={handlePressEnd}
       onContextMenu={handleContextMenu}
-      className="flex flex-col items-center flex-shrink-0 relative"
+      className="flex flex-col items-center flex-shrink-0 relative transition-transform duration-150 active:scale-95"
     >
       {/* First name popup */}
       {showPopup && firstName && (
@@ -110,7 +110,7 @@ function ParticipantAvatar({
         </div>
       )}
 
-      <div className={`${sizeClasses} rounded-full flex items-center justify-center mb-2 transition-all ${borderClass} bg-white relative`}>
+      <div className={`${sizeClasses} rounded-full flex items-center justify-center mb-2 transition-all ${borderClass} bg-white relative ${hasItems ? 'animate-bounce-in' : ''}`}>
         <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
           <span className={`${textSize} font-medium text-gray-900`}>
             {displayText}
@@ -119,7 +119,7 @@ function ParticipantAvatar({
 
         {/* Confirmation checkmark badge */}
         {isConfirmed && (
-          <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white">
+          <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white animate-pop">
             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
             </svg>

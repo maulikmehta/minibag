@@ -56,10 +56,14 @@ function HomeScreen({
 
       <div className="fixed bottom-8 right-8 z-40">
         {showPlusMenu && (
-          <div className="absolute bottom-20 right-0 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden mb-3 w-52">
+          <div
+            className="absolute bottom-20 right-0 bg-white rounded-modal shadow-2xl border border-gray-200 overflow-hidden mb-3 w-52 animate-modal-enter"
+            role="menu"
+            aria-label="Actions menu"
+          >
             <button
               onClick={() => { setShowPlusMenu(false); onCreateSession(); }}
-              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 border-b border-gray-200 transition-colors"
+              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 border-b border-gray-200 transition-all duration-150 active:bg-green-100"
             >
               <p className="text-base font-medium text-gray-900">New List</p>
               <p className="text-xs text-gray-500 mt-0.5">Start a new shopping list</p>
@@ -71,7 +75,7 @@ function HomeScreen({
                 setShowSignUpModal(true);
               }}
               data-tour="shopping-history"
-              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 border-b border-gray-200 transition-colors"
+              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 border-b border-gray-200 transition-all duration-150 active:bg-green-100"
             >
               <p className="text-base font-medium text-gray-900">Shopping History</p>
               <p className="text-xs text-gray-500 mt-0.5">View past shopping lists</p>
@@ -83,7 +87,7 @@ function HomeScreen({
                 setShowSignUpModal(true);
               }}
               data-tour="go-pro"
-              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 transition-colors"
+              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 transition-all duration-150 active:bg-green-100"
             >
               <p className="text-base font-medium text-gray-900">Go Pro</p>
               <p className="text-xs text-gray-500 mt-0.5">Unlock premium features</p>
@@ -94,16 +98,23 @@ function HomeScreen({
         <button
           onClick={() => setShowPlusMenu(!showPlusMenu)}
           data-tour="fab-menu"
-          className={`w-16 h-16 bg-green-600 hover:bg-green-700 rounded-full shadow-xl hover:shadow-2xl flex items-center justify-center transition-all ${
+          className={`w-16 h-16 bg-green-600 hover:bg-green-700 rounded-full shadow-xl hover:shadow-2xl flex items-center justify-center transition-all active:scale-90 ${
             showPlusMenu ? 'rotate-45 scale-110' : ''
           }`}
+          aria-label={showPlusMenu ? 'Close menu' : 'Open menu'}
+          aria-expanded={showPlusMenu}
+          aria-haspopup="menu"
         >
           <Plus size={32} className="text-white" strokeWidth={2.5} />
         </button>
       </div>
 
       {showPlusMenu && (
-        <div onClick={() => setShowPlusMenu(false)} className="fixed inset-0 z-30" />
+        <div
+          onClick={() => setShowPlusMenu(false)}
+          className="fixed inset-0 z-30"
+          aria-hidden="true"
+        />
       )}
 
       {/* Sign up modal */}

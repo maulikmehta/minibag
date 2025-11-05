@@ -4,7 +4,7 @@ import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
 import { aggregateAllItems, calculateAllParticipantCosts, formatPrice } from '../utils/calculateItems';
-import { getBillItems } from '../services/api.js';
+import { getBillItems, generateBillToken } from '../services/api.js';
 
 /**
  * PaymentSplitScreen Component
@@ -183,18 +183,34 @@ function PaymentSplitScreen({
     [participantCosts]
   );
 
-  const handleSendPaymentRequest = (participant) => {
+  const handleSendPaymentRequest = async (participant) => {
     const pName = participant.nickname || participant.name || 'Participant';
     const costData = participantCosts[pName];
     if (!costData) return;
 
-    const itemsList = costData.items
-      .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
-      .join('%0A');
+    try {
+      // Generate bill token for this participant
+      const billTokenData = await generateBillToken(session.session_id, participant.id);
+      const billUrl = billTokenData.bill_url;
 
-    const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}`);
+      const itemsList = costData.items
+        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
+        .join('%0A');
 
-    window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+      const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}\n\n📄 View & Download Bill:\n${billUrl}`);
+
+      window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+    } catch (error) {
+      console.error('Failed to generate bill token:', error);
+      // Fallback to message without bill URL
+      const itemsList = costData.items
+        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
+        .join('%0A');
+
+      const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}`);
+
+      window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+    }
   };
 
   const handleCopyPaymentRequest = async (participant) => {
@@ -202,18 +218,36 @@ function PaymentSplitScreen({
     const costData = participantCosts[pName];
     if (!costData) return;
 
-    const itemsList = costData.items
-      .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
-      .join('\n');
-
-    const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}`;
-
     try {
+      // Generate bill token for this participant
+      const billTokenData = await generateBillToken(session.session_id, participant.id);
+      const billUrl = billTokenData.bill_url;
+
+      const itemsList = costData.items
+        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
+        .join('\n');
+
+      const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}\n\n📄 View & Download Bill:\n${billUrl}`;
+
       await navigator.clipboard.writeText(message);
       setCopiedParticipantId(participant.id || pName);
       setTimeout(() => setCopiedParticipantId(null), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      console.error('Failed to copy or generate bill token:', error);
+      // Fallback to message without bill URL
+      const itemsList = costData.items
+        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
+        .join('\n');
+
+      const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}`;
+
+      try {
+        await navigator.clipboard.writeText(message);
+        setCopiedParticipantId(participant.id || pName);
+        setTimeout(() => setCopiedParticipantId(null), 2000);
+      } catch (fallbackError) {
+        console.error('Failed to copy (fallback):', fallbackError);
+      }
     }
   };
 
@@ -222,6 +256,18 @@ function PaymentSplitScreen({
       ...prev,
       [pName]: !prev[pName]
     }));
+  };
+
+  const handleViewBill = async () => {
+    try {
+      // Generate bill token for host (solo mode - participantId is null)
+      const billTokenData = await generateBillToken(session.session_id, null);
+      // Open bill in new tab
+      window.open(billTokenData.bill_url, '_blank');
+    } catch (error) {
+      console.error('Failed to generate bill token:', error);
+      alert('Failed to generate bill. Please try again.');
+    }
   };
 
   return (
@@ -314,10 +360,10 @@ function PaymentSplitScreen({
             const isExpanded = expandedParticipants[pName];
 
             return (
-              <div key={p.id || pName} className="border border-gray-300 rounded-lg overflow-hidden">
+              <div key={p.id || pName} className="border border-gray-300 rounded-card overflow-hidden">
                 {/* Compact Header */}
                 <div
-                  className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => toggleParticipantExpand(pName)}
                 >
                   <div className="flex justify-between items-center">
@@ -352,7 +398,7 @@ function PaymentSplitScreen({
                 {/* Collapsible Item Details */}
                 {isExpanded && costData && (
                   <div className="border-t border-gray-200">
-                    <div className="p-4 bg-white space-y-2">
+                    <div className="p-3 bg-white space-y-2">
                       {costData.items.map(item => (
                         <div key={item.id} className="flex items-center gap-3 text-sm">
                           <span className="text-lg">{item.emoji}</span>
@@ -365,7 +411,7 @@ function PaymentSplitScreen({
                       ))}
                     </div>
 
-                    <div className="p-4 border-t border-gray-200 bg-gray-50">
+                    <div className="p-3 border-t border-gray-200 bg-gray-50">
                       <div className="flex gap-2">
                         {/* Share Button */}
                         <button
@@ -373,7 +419,7 @@ function PaymentSplitScreen({
                             e.stopPropagation();
                             handleSendPaymentRequest(p);
                           }}
-                          className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-xl transition-colors"
+                          className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-button transition-all duration-150 active:scale-95"
                         >
                           <div className="flex items-center justify-center gap-2">
                             <Share2 size={18} strokeWidth={2} />
@@ -387,13 +433,17 @@ function PaymentSplitScreen({
                             e.stopPropagation();
                             handleCopyPaymentRequest(p);
                           }}
-                          className="w-14 h-14 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-600 rounded-xl transition-colors flex items-center justify-center"
+                          className={`w-14 h-14 border-2 rounded-button transition-all duration-200 flex items-center justify-center ${
+                            copiedParticipantId === (p.id || pName)
+                              ? 'bg-green-50 border-green-600 animate-pop'
+                              : 'border-gray-300 bg-white hover:bg-gray-50 active:scale-90'
+                          }`}
                           title="Copy payment request"
                         >
                           {copiedParticipantId === (p.id || pName) ? (
                             <Check size={20} className="text-green-600" />
                           ) : (
-                            <Copy size={20} />
+                            <Copy size={20} className="text-gray-600" />
                           )}
                         </button>
                       </div>
@@ -436,18 +486,37 @@ function PaymentSplitScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-sm text-gray-600">You'll receive</p>
-            <p className="text-2xl text-gray-900">₹{totalToReceive.toFixed(0)}</p>
+        {participants.length === 0 ? (
+          // Solo mode: Two buttons in 50/50 ratio
+          <div className="flex gap-3">
+            <button
+              onClick={handleViewBill}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+            >
+              View Bill
+            </button>
+            <button
+              onClick={onDone}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+            >
+              Done
+            </button>
           </div>
-          <button
-            onClick={onDone}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors"
-          >
-            Done
-          </button>
-        </div>
+        ) : (
+          // Group mode: Original layout with amount and Done button
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600">You'll receive</p>
+              <p className="text-2xl text-gray-900">₹{totalToReceive.toFixed(0)}</p>
+            </div>
+            <button
+              onClick={onDone}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

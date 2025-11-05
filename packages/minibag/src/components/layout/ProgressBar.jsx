@@ -68,8 +68,10 @@ function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
               ) : (
                 <div className="flex items-center gap-1.5">
                   {/* Number or Checkmark with Circle Background */}
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                    isCompleted || isCurrent ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+                    isCompleted ? 'bg-green-600 text-white animate-pop' :
+                    isCurrent ? 'bg-green-600 text-white animate-progress-glow' :
+                    'bg-gray-300 text-gray-600'
                   }`}>
                     {isCompleted ? '✓' : step.number}
                   </div>
@@ -100,7 +102,7 @@ function ProgressBar({ currentStep = 1, onStepClick, canNavigate = true }) {
                   isCompleted
                     ? 'bg-green-600'
                     : isCurrent
-                    ? 'bg-green-600 shadow-sm shadow-green-300'
+                    ? 'bg-green-600 animate-progress-glow'
                     : 'bg-gray-200'
                 }`}
               />

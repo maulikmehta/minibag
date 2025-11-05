@@ -25,12 +25,12 @@ function ModalWrapper({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-      <div className={`bg-white rounded-lg ${maxWidth} w-full p-6 relative`}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6 animate-fade-in">
+      <div className={`bg-white rounded-modal ${maxWidth} w-full p-6 relative animate-modal-enter shadow-2xl`}>
         {showCloseButton && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
           >
             <X size={20} />
           </button>

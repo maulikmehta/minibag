@@ -325,7 +325,7 @@ export default function SessionActiveScreen({
                               }
                             }}
                             disabled={myTotalWeight >= 10}
-                            className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:hover:bg-gray-400 flex-shrink-0 transition-colors"
+                            className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-500 disabled:hover:bg-gray-500 flex-shrink-0 transition-colors"
                           >
                             <Plus size={16} className="text-white" strokeWidth={2.5} />
                           </button>
@@ -338,7 +338,7 @@ export default function SessionActiveScreen({
                             }
                           }}
                           disabled={myTotalWeight >= 10}
-                          className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 transition-colors"
+                          className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-500 disabled:hover:bg-gray-500 transition-colors"
                         >
                           Add
                         </button>
@@ -348,8 +348,8 @@ export default function SessionActiveScreen({
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg">
-                <Users size={32} className="text-gray-400 mx-auto mb-2" />
+              <div className="text-center py-12 border border-dashed border-gray-300 rounded-card">
+                <Users size={32} className="text-gray-400 mx-auto mb-2 animate-pulse-glow" />
                 <p className="text-gray-500">Host hasn't selected any items yet</p>
                 <p className="text-xs text-gray-400 mt-1">You'll see items here when host adds them</p>
               </div>
@@ -361,7 +361,7 @@ export default function SessionActiveScreen({
           <button
             onClick={onNavigateToTracking}
             disabled={Object.keys(myItems).length === 0}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg text-base font-semibold transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
           >
             Confirm my list
           </button>

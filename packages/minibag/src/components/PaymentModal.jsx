@@ -29,7 +29,7 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
         <div className="flex gap-3">
           <button
             onClick={() => setMethod('upi')}
-            className={`flex-1 py-3 rounded-lg border-2 text-base font-semibold transition-all ${
+            className={`flex-1 py-3 rounded-button border-2 text-base font-semibold transition-all duration-150 active:scale-95 ${
               method === 'upi'
                 ? 'bg-green-600 text-white border-green-600'
                 : 'bg-white text-gray-900 border-gray-300 hover:border-green-600 hover:text-green-600'
@@ -39,7 +39,7 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
           </button>
           <button
             onClick={() => setMethod('cash')}
-            className={`flex-1 py-3 rounded-lg border-2 text-base font-semibold transition-all ${
+            className={`flex-1 py-3 rounded-button border-2 text-base font-semibold transition-all duration-150 active:scale-95 ${
               method === 'cash'
                 ? 'bg-green-600 text-white border-green-600'
                 : 'bg-white text-gray-900 border-gray-300 hover:border-green-600 hover:text-green-600'
@@ -69,14 +69,14 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
       <div className="flex gap-3">
         <button
           onClick={onClose}
-          className="flex-1 py-3 border-2 border-gray-300 rounded-lg text-base text-gray-900 hover:bg-gray-50"
+          className="flex-1 py-3 border-2 border-gray-300 rounded-button text-base text-gray-900 hover:bg-gray-50 transition-all duration-150 active:scale-95"
         >
           Cancel
         </button>
         <button
           onClick={() => amount && onConfirm(method, amount)}
           disabled={!amount}
-          className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+          className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
         >
           <Check size={18} strokeWidth={2.5} />
           Confirm
