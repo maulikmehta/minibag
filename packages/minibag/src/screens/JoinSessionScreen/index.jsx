@@ -29,6 +29,7 @@ export default function JoinSessionScreen({
   const [loadingNicknames, setLoadingNicknames] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
   const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
+  const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
 
   // Extract invite token from URL query parameter
   useEffect(() => {
@@ -39,11 +40,18 @@ export default function JoinSessionScreen({
     }
   }, []);
 
-  // Fetch nickname options when screen loads
+  // Fetch nickname options when screen loads or when name is entered
   useEffect(() => {
     if (nicknameOptions.length === 0 && !loadingNicknames) {
       setLoadingNicknames(true);
-      fetch('/api/sessions/nickname-options')
+
+      // Extract first letter from participant name if available
+      const firstLetter = participantName.trim() ? participantName.trim().charAt(0).toUpperCase() : null;
+      const url = firstLetter
+        ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
+        : '/api/sessions/nickname-options';
+
+      fetch(url)
         .then(res => res.json())
         .then(data => {
           if (data.success && data.data) {
@@ -67,7 +75,7 @@ export default function JoinSessionScreen({
           setLoadingNicknames(false);
         });
     }
-  }, [nicknameOptions.length, loadingNicknames]);
+  }, [nicknameOptions.length, loadingNicknames, participantName]);
 
   // Handle joining a session
   const handleJoinSession = async () => {
@@ -347,17 +355,42 @@ export default function JoinSessionScreen({
                     <button
                       key={index}
                       type="button"
-                      onClick={() => setSelectedNickname(option)}
+                      onClick={() => {
+                        setSelectedNickname(option);
+                        // Trigger big checkmark animation
+                        setShowBigCheck(option.nickname);
+                        setTimeout(() => setShowBigCheck(null), 600);
+                      }}
                       className="flex flex-col items-center"
                     >
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                        selectedNickname?.nickname === option.nickname
-                          ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                          : 'border-2 border-gray-300 hover:border-gray-400'
-                      }`}>
-                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <span className="text-2xl">{option.avatar_emoji}</span>
+                      <div className="relative">
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                          selectedNickname?.nickname === option.nickname
+                            ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                            : 'border-2 border-gray-300 hover:border-gray-400'
+                        }`}>
+                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                            <span className="text-2xl">{option.avatar_emoji}</span>
+                          </div>
                         </div>
+
+                        {/* Big checkmark overlay - tap feedback (inside circle) */}
+                        {showBigCheck === option.nickname && (
+                          <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-float-up pointer-events-none">
+                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Small persistent badge (outside circle, top-right) */}
+                        {selectedNickname?.nickname === option.nickname && (
+                          <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white animate-pop">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
                       <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
                     </button>

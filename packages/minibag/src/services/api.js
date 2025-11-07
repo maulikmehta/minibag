@@ -61,6 +61,8 @@ async function apiFetch(endpoint, options = {}) {
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     },
     credentials: 'include', // IMPORTANT: Send cookies for httpOnly authentication
   };

@@ -231,6 +231,27 @@ body {
   }
 }
 
+/* Float up (alternative) - for avatar tap feedback */
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Utility classes for animations */
+.animate-pop {
+  animation: popScale 300ms ease-in-out;
+}
+
+.animate-float-up {
+  animation: float-up 600ms ease-out forwards;
+}
+
 /* Bounce in - for participants joining */
 @keyframes bounceIn {
   0% {

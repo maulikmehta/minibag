@@ -248,45 +248,85 @@ const AVATAR_EMOJIS = ['👨', '👩', '🧑', '👨‍🦱', '👩‍🦱', '�
 
 /**
  * Get 2 available nicknames from pool (1 male, 1 female)
+ * Optionally matches first letter of user's name for personalization
  * Used to present options to user during join/create
  */
-async function getTwoNicknameOptions() {
-  // Get 1 male nickname
-  const { data: maleOption, error: maleError } = await supabase
-    .from('nicknames_pool')
-    .select('*')
-    .eq('is_available', true)
-    .eq('gender', 'male')
-    .limit(1)
-    .single();
+async function getTwoNicknameOptions(firstLetter = null) {
+  let maleOption = null;
+  let femaleOption = null;
 
-  // Get 1 female nickname
-  const { data: femaleOption, error: femaleError } = await supabase
-    .from('nicknames_pool')
-    .select('*')
-    .eq('is_available', true)
-    .eq('gender', 'female')
-    .limit(1)
-    .single();
+  // If firstLetter provided, try to find matching nicknames
+  if (firstLetter) {
+    const upperLetter = firstLetter.toUpperCase();
 
-  // Prepare options array
+    // Try to get male nickname starting with letter
+    const { data: matchedMale } = await supabase
+      .from('nicknames_pool')
+      .select('*')
+      .eq('is_available', true)
+      .eq('gender', 'male')
+      .ilike('nickname', `${upperLetter}%`)
+      .limit(1)
+      .single();
+
+    // Try to get female nickname starting with letter
+    const { data: matchedFemale } = await supabase
+      .from('nicknames_pool')
+      .select('*')
+      .eq('is_available', true)
+      .eq('gender', 'female')
+      .ilike('nickname', `${upperLetter}%`)
+      .limit(1)
+      .single();
+
+    // Use matched nicknames if found
+    if (matchedMale) maleOption = matchedMale;
+    if (matchedFemale) femaleOption = matchedFemale;
+  }
+
+  // Fallback: If we don't have both genders with matching letter, get any available
+  if (!maleOption) {
+    const { data: anyMale } = await supabase
+      .from('nicknames_pool')
+      .select('*')
+      .eq('is_available', true)
+      .eq('gender', 'male')
+      .limit(1)
+      .single();
+
+    if (anyMale) maleOption = anyMale;
+  }
+
+  if (!femaleOption) {
+    const { data: anyFemale } = await supabase
+      .from('nicknames_pool')
+      .select('*')
+      .eq('is_available', true)
+      .eq('gender', 'female')
+      .limit(1)
+      .single();
+
+    if (anyFemale) femaleOption = anyFemale;
+  }
+
+  // Build options array
   const options = [];
 
-  if (!maleError && maleOption) {
+  if (maleOption) {
     options.push({
       id: maleOption.id,
       nickname: maleOption.nickname,
       avatar_emoji: maleOption.avatar_emoji,
-      gender: 'male'
+      gender: maleOption.gender
     });
   }
 
-  if (!femaleError && femaleOption) {
+  if (femaleOption) {
     options.push({
       id: femaleOption.id,
       nickname: femaleOption.nickname,
       avatar_emoji: femaleOption.avatar_emoji,
-      gender: 'female'
+      gender: femaleOption.gender
     });
   }
 
@@ -319,17 +359,35 @@ async function getTwoNicknameOptions() {
  * Mark a nickname as used in the pool
  */
 async function markNicknameAsUsed(nicknameId, sessionId) {
-  if (!nicknameId) return; // Skip if fallback was used
+  if (!nicknameId) return { data: null, error: null }; // Return proper structure
 
-  await supabase
-    .from('nicknames_pool')
-    .update({
-      is_available: false,
-      currently_used_in: sessionId,
-      times_used: supabase.raw('times_used + 1'),
-      last_used: new Date().toISOString()
-    })
-    .eq('id', nicknameId);
+  try {
+    // Fetch current nickname data to get times_used value
+    const { data: nickname, error: fetchError } = await supabase
+      .from('nicknames_pool')
+      .select('times_used')
+      .eq('id', nicknameId)
+      .single();
+
+    if (fetchError) {
+      return { data: null, error: fetchError };
+    }
+
+    // Update with incremented value
+    const { data, error } = await supabase
+      .from('nicknames_pool')
+      .update({
+        is_available: false,
+        currently_used_in: sessionId,
+        times_used: (nickname?.times_used || 0) + 1,
+        last_used: new Date().toISOString()
+      })
+      .eq('id', nicknameId);
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
+  }
 }
 
 /**
@@ -1600,12 +1658,14 @@ export async function getSessionInvites(req, res) {
 }
 
 /**
- * GET /api/sessions/nickname-options
+ * GET /api/sessions/nickname-options?firstLetter=R
  * Get 2 available nickname options (1 male, 1 female) for user selection
+ * Optionally pass firstLetter query param for personalized nickname matching
  */
 export async function getNicknameOptions(req, res) {
   try {
-    const options = await getTwoNicknameOptions();
+    const { firstLetter } = req.query;
+    const options = await getTwoNicknameOptions(firstLetter);
 
     res.json({
       success: true,

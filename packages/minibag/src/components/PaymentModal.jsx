@@ -25,7 +25,7 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
       <p className="text-sm text-gray-600 mb-6">for {veg?.name}</p>
 
       <div className="mb-6">
-        <p className="text-sm text-gray-600 mb-3">Payment method</p>
+        <p className="text-sm text-gray-600 mb-3">Paid via</p>
         <div className="flex gap-3">
           <button
             onClick={() => setMethod('upi')}
@@ -66,20 +66,14 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <button
-          onClick={onClose}
-          className="flex-1 py-3 border-2 border-gray-300 rounded-button text-base text-gray-900 hover:bg-gray-50 transition-all duration-150 active:scale-95"
-        >
-          Cancel
-        </button>
+      <div className="flex justify-end">
         <button
           onClick={() => amount && onConfirm(method, amount)}
           disabled={!amount}
-          className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
+          className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+          title="Confirm payment"
         >
-          <Check size={18} strokeWidth={2.5} />
-          Confirm
+          <Check size={20} strokeWidth={2} />
         </button>
       </div>
     </ModalWrapper>

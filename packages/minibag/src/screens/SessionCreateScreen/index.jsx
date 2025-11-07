@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Check, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Minus, Check, X, Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
@@ -44,6 +44,7 @@ export default function SessionCreateScreen({
   const [selectedHostNickname, setSelectedHostNickname] = useState(null);
   const [loadingHostNicknames, setLoadingHostNicknames] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
+  const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
 
   // Reset onboarding step when modal opens
   useEffect(() => {
@@ -159,7 +160,13 @@ export default function SessionCreateScreen({
     setShowHostNicknameModal(true);
 
     try {
-      const response = await fetch('/api/sessions/nickname-options');
+      // Extract first letter from host name if available
+      const firstLetter = hostName.trim() ? hostName.trim().charAt(0).toUpperCase() : null;
+      const url = firstLetter
+        ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
+        : '/api/sessions/nickname-options';
+
+      const response = await fetch(url);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -333,63 +340,73 @@ export default function SessionCreateScreen({
 
                 {isSelected ? (
                   <div className="flex items-center gap-2 relative">
-                    <button
-                      onClick={() => {
-                        if (isListLocked) return;
-                        const newVal = Math.max(0, quantity - 0.5);
-                        updateItemQuantity(veg.id, newVal, -0.5);
-                      }}
-                      disabled={isListLocked}
-                      className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-90"
-                    >
-                      <Minus size={16} strokeWidth={2} />
-                    </button>
-                    <div className="flex items-center gap-1">
+                    <div className="relative">
                       <input
                         type="number"
                         inputMode="decimal"
-                        step="0.25"
+                        step="0.5"
                         min="0.25"
                         max="10"
                         value={quantity}
                         onChange={(e) => {
                           if (isListLocked) return;
                           const val = parseFloat(e.target.value);
+
+                          // Allow empty input for editing
+                          if (e.target.value === '') {
+                            setHostItems({ ...hostItems, [veg.id]: '' });
+                            return;
+                          }
+
                           if (!isNaN(val) && val > 0) {
-                            const otherItemsWeight = getTotalWeight(hostItems) - quantity;
+                            const otherItemsWeight = getTotalWeight(hostItems) - (quantity || 0);
                             if (otherItemsWeight + val <= 10) {
                               setHostItems({ ...hostItems, [veg.id]: val });
                             }
-                          } else if (e.target.value === '') {
-                            // Allow empty for editing
-                            setHostItems({ ...hostItems, [veg.id]: 0.25 });
                           }
                         }}
                         onBlur={(e) => {
                           if (isListLocked) return;
-                          // Ensure valid value on blur
                           const val = parseFloat(e.target.value);
-                          if (isNaN(val) || val <= 0) {
+                          if (isNaN(val) || val <= 0 || e.target.value === '') {
                             setHostItems({ ...hostItems, [veg.id]: 0.25 });
                           }
                         }}
                         disabled={isListLocked}
-                        className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          appearance: 'textfield',
+                          MozAppearance: 'textfield',
+                          WebkitAppearance: 'none'
+                        }}
+                        className="w-20 pl-2 pr-7 text-lg text-gray-900 text-center border border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none py-1.5 disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
-                      <span className="text-sm text-gray-600">kg</span>
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">kg</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        if (isListLocked) return;
-                        if (totalWeight < 10) {
-                          updateItemQuantity(veg.id, quantity + 0.5, 0.5);
-                        }
-                      }}
-                      disabled={totalWeight >= 10 || isListLocked}
-                      className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex-shrink-0 transition-all duration-150 active:scale-90"
-                    >
-                      <Plus size={16} className="text-white" strokeWidth={2.5} />
-                    </button>
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => {
+                          if (isListLocked) return;
+                          if (totalWeight < 10) {
+                            updateItemQuantity(veg.id, quantity + 0.5, 0.5);
+                          }
+                        }}
+                        disabled={totalWeight >= 10 || isListLocked}
+                        className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
+                      >
+                        <ChevronUp size={16} strokeWidth={2} className="text-gray-700" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (isListLocked) return;
+                          const newVal = Math.max(0, quantity - 0.5);
+                          updateItemQuantity(veg.id, newVal, -0.5);
+                        }}
+                        disabled={isListLocked}
+                        className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
+                      >
+                        <ChevronDown size={16} strokeWidth={2} className="text-gray-700" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
@@ -541,17 +558,42 @@ export default function SessionCreateScreen({
                       <button
                         key={index}
                         type="button"
-                        onClick={() => setSelectedHostNickname(option)}
+                        onClick={() => {
+                          setSelectedHostNickname(option);
+                          // Trigger big checkmark animation
+                          setShowBigCheck(option.nickname);
+                          setTimeout(() => setShowBigCheck(null), 600);
+                        }}
                         className="flex flex-col items-center"
                       >
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                          selectedHostNickname?.nickname === option.nickname
-                            ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                            : 'border-2 border-gray-300 hover:border-gray-400'
-                        }`}>
-                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                            <span className="text-2xl">{option.avatar_emoji}</span>
+                        <div className="relative">
+                          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                            selectedHostNickname?.nickname === option.nickname
+                              ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                              : 'border-2 border-gray-300 hover:border-gray-400'
+                          }`}>
+                            <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                              <span className="text-2xl">{option.avatar_emoji}</span>
+                            </div>
                           </div>
+
+                          {/* Big checkmark overlay - tap feedback (inside circle) */}
+                          {showBigCheck === option.nickname && (
+                            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-float-up pointer-events-none">
+                              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Small persistent badge (outside circle, top-right) */}
+                          {selectedHostNickname?.nickname === option.nickname && (
+                            <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white animate-pop">
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
                         </div>
                         <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
                       </button>

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { Plus, Minus, Clock, Users } from 'lucide-react';
+import { Plus, Minus, Clock, Users, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ItemList from '../components/items/ItemList.jsx';
 import ItemRow from '../components/items/ItemRow.jsx';
@@ -278,57 +278,67 @@ export default function SessionActiveScreen({
 
                       {isSelected ? (
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              const newVal = Math.max(0, quantity - 0.5);
-                              updateMyItemQuantity(veg.id, newVal);
-                            }}
-                            className="w-9 h-9 rounded-full border border-gray-400 flex items-center justify-center flex-shrink-0"
-                          >
-                            <Minus size={16} strokeWidth={2} />
-                          </button>
-                          <div className="flex items-center gap-1">
+                          <div className="relative">
                             <input
                               type="number"
                               inputMode="decimal"
-                              step="0.25"
+                              step="0.5"
                               min="0.25"
                               max="10"
                               value={quantity}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value);
+
+                                // Allow empty input for editing
+                                if (e.target.value === '') {
+                                  updateMyItemQuantity(veg.id, '');
+                                  return;
+                                }
+
                                 if (!isNaN(val) && val > 0) {
-                                  const otherItemsWeight = myTotalWeight - quantity;
+                                  const otherItemsWeight = myTotalWeight - (quantity || 0);
                                   if (otherItemsWeight + val <= 10) {
                                     updateMyItemQuantity(veg.id, val);
                                   }
-                                } else if (e.target.value === '') {
-                                  // Allow empty for editing
-                                  updateMyItemQuantity(veg.id, 0.25);
                                 }
                               }}
                               onBlur={(e) => {
-                                // Ensure valid value on blur
                                 const val = parseFloat(e.target.value);
-                                if (isNaN(val) || val <= 0) {
+                                if (isNaN(val) || val <= 0 || e.target.value === '') {
                                   updateMyItemQuantity(veg.id, 0.25);
                                 }
                               }}
-                              className="w-14 text-base text-gray-900 text-center border-b-2 border-gray-300 focus:border-gray-900 focus:outline-none py-1"
+                              style={{
+                                appearance: 'textfield',
+                                MozAppearance: 'textfield',
+                                WebkitAppearance: 'none'
+                              }}
+                              className="w-20 pl-2 pr-7 text-lg text-gray-900 text-center border border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none py-1.5 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
-                            <span className="text-sm text-gray-600">kg</span>
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none">kg</span>
                           </div>
-                          <button
-                            onClick={() => {
-                              if (myTotalWeight < 10) {
-                                updateMyItemQuantity(veg.id, quantity + 0.5);
-                              }
-                            }}
-                            disabled={myTotalWeight >= 10}
-                            className="w-9 h-9 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center disabled:bg-gray-500 disabled:hover:bg-gray-500 flex-shrink-0 transition-colors"
-                          >
-                            <Plus size={16} className="text-white" strokeWidth={2.5} />
-                          </button>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={() => {
+                                if (myTotalWeight < 10) {
+                                  updateMyItemQuantity(veg.id, quantity + 0.5);
+                                }
+                              }}
+                              disabled={myTotalWeight >= 10}
+                              className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
+                            >
+                              <ChevronUp size={16} strokeWidth={2} className="text-gray-700" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newVal = Math.max(0, quantity - 0.5);
+                                updateMyItemQuantity(veg.id, newVal);
+                              }}
+                              className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center transition-all duration-150 active:scale-95"
+                            >
+                              <ChevronDown size={16} strokeWidth={2} className="text-gray-700" />
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <button
@@ -502,6 +512,7 @@ export default function SessionActiveScreen({
                   emoji={veg?.emoji || '🥬'}
                   name={getItemName(veg)}
                   subtitle={`${qty}kg`}
+                  layout="horizontal"
                 />
               );
             })}

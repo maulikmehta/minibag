@@ -293,6 +293,15 @@ app.get('/metrics', (req, res) => {
 // Apply general rate limiting to all API routes
 app.use('/api/', apiLimiter);
 
+// Disable caching for all API routes to prevent stale data issues
+// CRITICAL: Session data, participant lists, and invite status must always be fresh
+app.use('/api/', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // Catalog API routes
 app.get('/api/catalog/categories', catalogAPI.getCategories);
 app.get('/api/catalog/items', catalogAPI.getItems);
