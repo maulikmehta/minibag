@@ -58,7 +58,7 @@ WHERE schemaname = 'public'
 ORDER BY tablename, indexname;
 ```
 
-You should see 35+ indexes starting with `idx_`.
+You should see 34+ indexes starting with `idx_`.
 
 ## Impact
 
@@ -101,11 +101,10 @@ You should see 35+ indexes starting with `idx_`.
 - `idx_invites_status` - Active invites
 - `idx_invites_token_status` - Valid token lookup
 
-### Payments (4 indexes)
+### Payments (3 indexes)
 - `idx_payments_session_id` - Payments in session
-- `idx_payments_participant_id` - Payments by participant
-- `idx_payments_skip` - Non-skipped items
-- `idx_payments_session_skip` - Session payment calculations
+- `idx_payments_skipped` - Non-skipped items
+- `idx_payments_session_skipped` - Session payment calculations
 
 ### Nicknames Pool (4 indexes)
 - `idx_nicknames_pool_is_available` - Available nicknames
@@ -124,10 +123,10 @@ You should see 35+ indexes starting with `idx_`.
 - `idx_categories_is_active` - Active categories
 
 ### Bill Access Tokens (4 indexes)
-- `idx_bill_access_tokens_token` - Token lookup
+- `idx_bill_access_tokens_access_token` - Token lookup
 - `idx_bill_access_tokens_session_id` - Tokens for session
 - `idx_bill_access_tokens_expires_at` - Cleanup expired
-- `idx_bill_access_tokens_token_expires` - Valid token check
+- `idx_bill_access_tokens_access_token_expires` - Valid token check
 
 ## Troubleshooting
 
@@ -203,9 +202,8 @@ DROP INDEX IF EXISTS idx_invites_status;
 DROP INDEX IF EXISTS idx_invites_token_status;
 
 DROP INDEX IF EXISTS idx_payments_session_id;
-DROP INDEX IF EXISTS idx_payments_participant_id;
-DROP INDEX IF EXISTS idx_payments_skip;
-DROP INDEX IF EXISTS idx_payments_session_skip;
+DROP INDEX IF EXISTS idx_payments_skipped;
+DROP INDEX IF EXISTS idx_payments_session_skipped;
 
 DROP INDEX IF EXISTS idx_nicknames_pool_is_available;
 DROP INDEX IF EXISTS idx_nicknames_pool_gender;
@@ -220,10 +218,10 @@ DROP INDEX IF EXISTS idx_catalog_items_category_active;
 DROP INDEX IF EXISTS idx_categories_order_index;
 DROP INDEX IF EXISTS idx_categories_is_active;
 
-DROP INDEX IF EXISTS idx_bill_access_tokens_token;
+DROP INDEX IF EXISTS idx_bill_access_tokens_access_token;
 DROP INDEX IF EXISTS idx_bill_access_tokens_session_id;
 DROP INDEX IF EXISTS idx_bill_access_tokens_expires_at;
-DROP INDEX IF EXISTS idx_bill_access_tokens_token_expires;
+DROP INDEX IF EXISTS idx_bill_access_tokens_access_token_expires;
 ```
 
 ## Questions?

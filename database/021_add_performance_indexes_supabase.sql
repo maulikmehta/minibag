@@ -92,17 +92,13 @@ ON invites(invite_token, status);
 CREATE INDEX IF NOT EXISTS idx_payments_session_id
 ON payments(session_id);
 
--- Index on participant_id for fetching payments by a participant
-CREATE INDEX IF NOT EXISTS idx_payments_participant_id
-ON payments(participant_id);
-
--- Index on skip for filtering skipped items
-CREATE INDEX IF NOT EXISTS idx_payments_skip
-ON payments(skip);
+-- Index on skipped for filtering skipped items
+CREATE INDEX IF NOT EXISTS idx_payments_skipped
+ON payments(skipped);
 
 -- Compound index for common query pattern: non-skipped payments in a session
-CREATE INDEX IF NOT EXISTS idx_payments_session_skip
-ON payments(session_id, skip);
+CREATE INDEX IF NOT EXISTS idx_payments_session_skipped
+ON payments(session_id, skipped);
 
 -- ============================================================================
 -- Nicknames Pool Table Indexes
@@ -157,9 +153,9 @@ ON catalog_categories(is_active);
 -- Bill Access Tokens Table Indexes
 -- ============================================================================
 
--- Index on token for quick token lookups
-CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_token
-ON bill_access_tokens(token);
+-- Index on access_token for quick token lookups
+CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_access_token
+ON bill_access_tokens(access_token);
 
 -- Index on session_id for finding tokens for a session
 CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_session_id
@@ -170,8 +166,8 @@ CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_expires_at
 ON bill_access_tokens(expires_at);
 
 -- Compound index for common query: valid tokens
-CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_token_expires
-ON bill_access_tokens(token, expires_at);
+CREATE INDEX IF NOT EXISTS idx_bill_access_tokens_access_token_expires
+ON bill_access_tokens(access_token, expires_at);
 
 -- ============================================================================
 -- Verification Query
