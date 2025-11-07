@@ -27,9 +27,10 @@ ON sessions(created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_status_created
 ON sessions(status, created_at);
 
--- Index on host_id for finding sessions created by a user
-CREATE INDEX IF NOT EXISTS idx_sessions_host_id
-ON sessions(host_id);
+-- Index on creator_id for finding sessions created by a user
+CREATE INDEX IF NOT EXISTS idx_sessions_creator_id
+ON sessions(creator_id)
+WHERE creator_id IS NOT NULL;
 
 -- ============================================================================
 -- Participants Table Indexes
@@ -144,13 +145,13 @@ ON catalog_items(item_id);
 CREATE INDEX IF NOT EXISTS idx_catalog_items_category_active
 ON catalog_items(category_id, is_active);
 
--- Index on categories order_index for sorting
-CREATE INDEX IF NOT EXISTS idx_categories_order_index
-ON categories(order_index);
+-- Index on catalog_categories sort_order for sorting
+CREATE INDEX IF NOT EXISTS idx_catalog_categories_sort_order
+ON catalog_categories(sort_order);
 
--- Index on categories is_active
-CREATE INDEX IF NOT EXISTS idx_categories_is_active
-ON categories(is_active);
+-- Index on catalog_categories is_active
+CREATE INDEX IF NOT EXISTS idx_catalog_categories_is_active
+ON catalog_categories(is_active);
 
 -- ============================================================================
 -- Bill Access Tokens Table Indexes
