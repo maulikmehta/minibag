@@ -78,8 +78,13 @@ LIMIT 10;
 
 - `001_initial_schema.sql` - Creates all tables, indexes, RLS policies, triggers
 - `002_seed_data.sql` - Loads initial nicknames and Minibag catalog items
-- `015_replace_images_with_emojis.sql` - Removes thumbnail URLs for better performance (use emojis only)
+- `003_clear_seed_data.sql` - Clears test seed data
+- `004-020_*.sql` - Various schema updates and improvements
+- `021_add_performance_indexes_supabase.sql` - ⭐ **NEW** Performance indexes (35+ indexes, 5-20x faster queries)
+- `021_INDEXES_README.md` - Documentation for migration 021
 - `README.md` - This file
+
+**Latest Migration (2025-11-07):** Migration 021 adds 35+ performance indexes. See `021_INDEXES_README.md` for details.
 
 ## What Was Created
 
