@@ -1,9 +1,23 @@
-import { expect, afterEach, vi } from 'vitest';
+import { expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-// import '@testing-library/jest-dom/vitest'; // Install with: npm install --save-dev @testing-library/jest-dom
+import '@testing-library/jest-dom/vitest';
+import { server } from './helpers/msw.js';
 
-// Cleanup after each test
+// MSW Setup
+beforeAll(() => {
+  // Start MSW server before all tests
+  server.listen({ onUnhandledRequest: 'warn' });
+});
+
+afterAll(() => {
+  // Clean up MSW server after all tests
+  server.close();
+});
+
 afterEach(() => {
+  // Reset handlers after each test to ensure test isolation
+  server.resetHandlers();
+  // Cleanup React Testing Library
   cleanup();
 });
 
