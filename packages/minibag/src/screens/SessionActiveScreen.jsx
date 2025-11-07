@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { Plus, Minus, Clock, Users, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ItemList from '../components/items/ItemList.jsx';
@@ -88,6 +88,20 @@ export default function SessionActiveScreen({
   // Track if host has confirmed their mode choice (clicked OK)
   const [modeConfirmed, setModeConfirmed] = useState(false);
 
+  // Memoize modal handlers
+  const handleOpenModeModal = useCallback(() => setShowModeModal(true), []);
+  const handleCloseModeModal = useCallback(() => setShowModeModal(false), []);
+
+  const handleModeConfirm = useCallback((selectedMode) => {
+    setShowModeModal(false);
+    setModeConfirmed(true); // Mark mode as confirmed - hide prompt
+    notify.success(
+      selectedMode === 0
+        ? 'Ready to shop solo!'
+        : `Waiting for ${selectedMode} friend${selectedMode > 1 ? 's' : ''} to join`
+    );
+  }, [notify]);
+
   // Initialize modeConfirmed if mode was already chosen (page refresh scenario)
   // Either timeout started OR solo mode was selected
   useEffect(() => {
@@ -98,27 +112,31 @@ export default function SessionActiveScreen({
 
   // Fetch invites for the session
   const [invites, setInvites] = useState([]);
-  useEffect(() => {
+
+  // Memoize fetchInvites to prevent recreation on every render
+  const fetchInvites = useCallback(async () => {
     if (!session?.session_id || !isHost) return;
 
-    const fetchInvites = async () => {
-      try {
-        const response = await fetch(`/api/sessions/${session.session_id}/invites`);
-        const data = await response.json();
-        if (data.success) {
-          setInvites(data.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch invites:', error);
+    try {
+      const response = await fetch(`/api/sessions/${session.session_id}/invites`);
+      const data = await response.json();
+      if (data.success) {
+        setInvites(data.data);
       }
-    };
+    } catch (error) {
+      console.error('Failed to fetch invites:', error);
+    }
+  }, [session?.session_id, isHost]);
+
+  useEffect(() => {
+    if (!session?.session_id || !isHost) return;
 
     fetchInvites();
 
     // Poll for invite status updates every 3 seconds
     const interval = setInterval(fetchInvites, 3000);
     return () => clearInterval(interval);
-  }, [session?.session_id, isHost, expectedCount]);
+  }, [fetchInvites, session?.session_id, isHost]);
 
   // Compute all items from host + participants (memoized for performance)
   const allItems = useMemo(
@@ -126,26 +144,37 @@ export default function SessionActiveScreen({
     [hostItems, participants]
   );
 
-  // Get selected participant's items
-  const selectedItems = selectedParticipant === 'host'
-    ? hostItems
-    : (participants.find(p => (p.nickname || p.name) === selectedParticipant)?.items || {});
+  // Get selected participant's items (memoized to prevent re-renders)
+  const selectedItems = useMemo(() => {
+    if (selectedParticipant === 'host') return hostItems;
+    return participants.find(p => (p.nickname || p.name) === selectedParticipant)?.items || {};
+  }, [selectedParticipant, hostItems, participants]);
 
   // Get session info
   const sessionCode = session?.session_id || 'loading...';
 
-  // Check how many participants have confirmed their lists
+  // Check how many participants have confirmed their lists (memoized for performance)
   // Only count participants who are actually participating (not marked as not coming)
-  const activeParticipants = participants.filter(p => !p.marked_not_coming);
-  const confirmedParticipants = activeParticipants.filter(p => p.items_confirmed).length;
+  const activeParticipants = useMemo(
+    () => participants.filter(p => !p.marked_not_coming),
+    [participants]
+  );
+
+  const confirmedParticipants = useMemo(
+    () => activeParticipants.filter(p => p.items_confirmed).length,
+    [activeParticipants]
+  );
+
   const hasConfirmedParticipants = confirmedParticipants > 0;
 
   // Check if ALL JOINED participants (not host, not declined) have confirmed their lists
   // Host already confirmed when clicking "Start List" button
   // participants array already excludes host (is_creator is filtered out in sessionTransformers.js)
-  const joinedParticipants = participants.filter(p => !p.marked_not_coming);
-  const allJoinedParticipantsConfirmed = joinedParticipants.length === 0 ||
-                                         joinedParticipants.every(p => p.items_confirmed);
+  const joinedParticipants = activeParticipants; // Same as activeParticipants
+  const allJoinedParticipantsConfirmed = useMemo(
+    () => joinedParticipants.length === 0 || joinedParticipants.every(p => p.items_confirmed),
+    [joinedParticipants]
+  );
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -156,11 +185,16 @@ export default function SessionActiveScreen({
   // Get current user's nickname (for "You're joined as..." message)
   const myNickname = currentParticipant?.nickname || 'You';
 
-  // Get current participant's items (for non-host users)
-  const myParticipantData = !isHost
-    ? participants.find(p => p.id === currentParticipant?.id)
-    : null;
-  const myItems = myParticipantData?.items || {};
+  // Get current participant's items (for non-host users) - memoized
+  const myParticipantData = useMemo(() => {
+    if (isHost) return null;
+    return participants.find(p => p.id === currentParticipant?.id) || null;
+  }, [isHost, participants, currentParticipant?.id]);
+
+  const myItems = useMemo(
+    () => myParticipantData?.items || {},
+    [myParticipantData]
+  );
 
   // Calculate total weight for current participant
   const myTotalWeight = useMemo(
@@ -174,8 +208,8 @@ export default function SessionActiveScreen({
     [items, hostItems]
   );
 
-  // Handle item quantity changes for participants
-  const updateMyItemQuantity = (itemId, newQuantity) => {
+  // Handle item quantity changes for participants (memoized callback)
+  const updateMyItemQuantity = useCallback((itemId, newQuantity) => {
     if (!myParticipantData) return;
 
     const updatedParticipants = participants.map(p => {
@@ -191,7 +225,7 @@ export default function SessionActiveScreen({
       return p;
     });
     onUpdateParticipants(updatedParticipants);
-  };
+  }, [myParticipantData, participants, currentParticipant?.id, onUpdateParticipants]);
 
   // PARTICIPANT VIEW - Simplified, locked to their own items
   if (!isHost) {
@@ -428,7 +462,7 @@ export default function SessionActiveScreen({
         {currentParticipant?.is_creator && !modeConfirmed && (
           <div className="mb-6">
             <button
-              onClick={() => setShowModeModal(true)}
+              onClick={handleOpenModeModal}
               className="w-full p-4 bg-white border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors group"
             >
               <div className="flex items-center justify-between">
@@ -455,7 +489,7 @@ export default function SessionActiveScreen({
         {currentParticipant?.is_creator && (
           <ModalWrapper
             isOpen={showModeModal}
-            onClose={() => setShowModeModal(false)}
+            onClose={handleCloseModeModal}
             title="Choose shopping mode"
             maxWidth="max-w-md"
           >
@@ -467,15 +501,7 @@ export default function SessionActiveScreen({
               onChange={setExpectedCount}
               showConfirmButton={true}
               onInvitesUpdate={setInvites}
-              onConfirm={(selectedMode) => {
-                setShowModeModal(false);
-                setModeConfirmed(true); // Mark mode as confirmed - hide prompt
-                notify.success(
-                  selectedMode === 0
-                    ? 'Ready to shop solo!'
-                    : `Waiting for ${selectedMode} friend${selectedMode > 1 ? 's' : ''} to join`
-                );
-              }}
+              onConfirm={handleModeConfirm}
             />
           </ModalWrapper>
         )}

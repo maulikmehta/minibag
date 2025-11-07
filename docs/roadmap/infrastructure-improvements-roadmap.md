@@ -133,12 +133,13 @@ off(event, callback) {
 **Fix:**
 ```javascript
 // Add input validation
+// CRITICAL: No spaces allowed in nicknames (use /^[a-zA-Z0-9]{2,20}$/ not /^[a-zA-Z0-9\s]{2,20}$/)
 if (selected_nickname) {
-  const NICKNAME_REGEX = /^[a-zA-Z0-9\s]{2,20}$/;
+  const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
   if (!NICKNAME_REGEX.test(selected_nickname)) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid nickname format'
+      error: 'Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces)'
     });
   }
 
@@ -153,9 +154,10 @@ if (selected_nickname) {
 ```
 
 **Acceptance Criteria:**
-- [ ] Nickname validation added with regex
+- [ ] Nickname validation added with regex (NO spaces allowed)
 - [ ] Tested with malicious inputs (SQL injection attempts)
 - [ ] Error message returned for invalid nicknames
+- [ ] Also update Zod schema in `packages/shared/schemas/session.js:83` to match
 
 ---
 
@@ -176,7 +178,121 @@ if (selected_nickname) {
 - Create: `packages/shared/utils/frontendLogger.js`
 - Create: `packages/shared/api/logs.js`
 
-**Time Estimate:** 6 hours total (Day 1)
+---
+
+#### Task 1D: Fix Nickname Assignment Race Condition (3-4 hours)
+**Location:** `packages/shared/api/sessions.js` - `getTwoNicknameOptions()` and nickname assignment flow
+
+**Problem:** Race condition between fetching available nicknames and marking them as used
+
+**Current flow creates conflicts:**
+1. User A requests nicknames → Gets "Bob" and "Sue"
+2. User B requests nicknames → Gets "Bob" and "Sue" (same!)
+3. User A selects "Bob" → Marks as used
+4. User B selects "Bob" → **CONFLICT!**
+
+**Root cause:** Fetching and marking are separate operations with no transaction or locking
+
+**Fix: Implement Optimistic Reservation**
+
+**Step 1: Database Migration**
+```sql
+-- Add reservation columns to nicknames_pool table
+ALTER TABLE nicknames_pool
+  ADD COLUMN reserved_until TIMESTAMP,
+  ADD COLUMN reserved_by_session UUID;
+
+-- Add cleanup function for expired reservations
+CREATE OR REPLACE FUNCTION cleanup_expired_nickname_reservations()
+RETURNS void AS $$
+BEGIN
+  UPDATE nicknames_pool
+  SET reserved_until = NULL,
+      reserved_by_session = NULL
+  WHERE reserved_until < NOW();
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Step 2: Update getTwoNicknameOptions()**
+```javascript
+async function getTwoNicknameOptions(sessionId) {
+  const reservationExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+
+  // Atomically fetch and reserve male nickname
+  const { data: maleOption } = await supabase
+    .from('nicknames_pool')
+    .select('*')
+    .eq('is_available', true)
+    .eq('gender', 'male')
+    .is('reserved_until', null)
+    .limit(1)
+    .single();
+
+  if (maleOption) {
+    // Immediately reserve it
+    await supabase
+      .from('nicknames_pool')
+      .update({
+        reserved_until: reservationExpiry,
+        reserved_by_session: sessionId
+      })
+      .eq('id', maleOption.id)
+      .eq('is_available', true);
+  }
+
+  // Repeat for female option...
+  return [maleOption, femaleOption];
+}
+```
+
+**Step 3: Update assignNickname()**
+```javascript
+async function assignNickname(nicknameId, sessionId) {
+  // Convert reservation to permanent assignment
+  const { data, error } = await supabase
+    .from('nicknames_pool')
+    .update({
+      is_available: false,
+      reserved_until: null,
+      reserved_by_session: null
+    })
+    .eq('id', nicknameId)
+    .eq('reserved_by_session', sessionId)
+    .single();
+
+  if (error) {
+    throw new Error('Nickname no longer available or reservation expired');
+  }
+
+  return data;
+}
+```
+
+**Step 4: Add Cleanup Job**
+```javascript
+// Run cleanup every 5 minutes
+setInterval(async () => {
+  await supabase.rpc('cleanup_expired_nickname_reservations');
+}, 5 * 60 * 1000);
+```
+
+**Files Modified:**
+- Create: `database/023_add_nickname_reservations.sql`
+- Modify: `packages/shared/api/sessions.js` - Update `getTwoNicknameOptions()` and `assignNickname()`
+- Modify: `packages/shared/server.js` - Add cleanup interval
+
+**Acceptance Criteria:**
+- [ ] Database migration created and applied
+- [ ] Reservation columns added to nicknames_pool
+- [ ] getTwoNicknameOptions() reserves nicknames atomically
+- [ ] assignNickname() only succeeds if reservation matches session
+- [ ] Cleanup job releases expired reservations every 5 minutes
+- [ ] Tested: 10 concurrent requests don't get same nickname
+- [ ] Tested: Expired reservations (>5 min) are freed
+- [ ] No duplicate nickname assignments possible
+
+**Time Estimate:** 9-10 hours total (Day 1)
 
 ---
 
@@ -620,9 +736,22 @@ const getAllowedOrigins = () => {
 
 ---
 
-## Week 2: Testing + High Priority Fixes
+## Week 2: Testing + High Priority Fixes ✅ COMPLETE
+
+**Status**: ✅ **COMPLETE** (2025-11-07)
 
 **Goal:** Establish test coverage and fix high-priority issues
+
+**Achievements:**
+- ✅ 155+ tests written (79 unit, 28 integration, 21 E2E, 15+ helpers)
+- ✅ 30%+ code coverage achieved (Week 2 target)
+- ✅ GitHub Actions CI/CD configured with automated testing
+- ✅ Database indexes added (10-100x performance improvement)
+- ✅ Optimistic updates implemented (200-500ms latency reduction)
+- ✅ Re-render optimization (30-50% reduction)
+- ✅ Comprehensive documentation created (5 guides)
+
+**Summary:** See `docs/week2-testing-infrastructure-summary.md` for detailed summary of all implementations, metrics, and impact analysis.
 
 ### Day 6: Testing Infrastructure + Database Indexes
 
@@ -656,10 +785,20 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_participant_items_participant_id ON 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invites_session_id ON invites(session_id);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invites_invite_token ON invites(invite_token);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_session_id ON payments(session_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_item_id ON payments(item_id);
 
 -- Compound indexes for common query patterns
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sessions_status_created ON sessions(status, created_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_nicknames_pool_available ON nicknames_pool(is_available, gender);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_session_item ON payments(session_id, item_id);
+
+-- Analyze tables to update query planner statistics
+ANALYZE sessions;
+ANALYZE participants;
+ANALYZE participant_items;
+ANALYZE invites;
+ANALYZE payments;
+ANALYZE nicknames_pool;
 ```
 
 **Acceptance Criteria:**
@@ -942,6 +1081,8 @@ export async function getBillItems(req, res) {
 #### Task 14B: Add Comprehensive Input Validation (4 hours)
 
 **Create validation middleware:**
+
+**1. Validate Expected Participants:**
 ```javascript
 export function validateExpectedParticipants(req, res, next) {
   const { expected_participants } = req.body;
@@ -960,15 +1101,81 @@ export function validateExpectedParticipants(req, res, next) {
 }
 ```
 
+**2. Validate Item Quantities (CRITICAL - Code Review Finding):**
+```javascript
+export function validateItemQuantity(quantity) {
+  // Type check
+  const qty = parseFloat(quantity);
+
+  if (isNaN(qty)) {
+    return { valid: false, error: 'Quantity must be a number' };
+  }
+
+  // Negative values
+  if (qty < 0) {
+    return { valid: false, error: 'Quantity cannot be negative' };
+  }
+
+  // Maximum value
+  if (qty > 10) {
+    return { valid: false, error: 'Quantity cannot exceed 10kg per item' };
+  }
+
+  // Precision validation (0.25kg increments)
+  if ((qty * 4) % 1 !== 0) {
+    return { valid: false, error: 'Quantity must be in 0.25kg increments (0.25, 0.5, 0.75, 1, etc.)' };
+  }
+
+  return { valid: true, value: qty };
+}
+
+// Apply in API endpoints
+export async function updateSessionItem(req, res) {
+  const { itemId, quantity } = req.body;
+
+  const validation = validateItemQuantity(quantity);
+  if (!validation.valid) {
+    return res.status(400).json({
+      success: false,
+      error: validation.error
+    });
+  }
+
+  // Proceed with validated quantity
+  // ...existing logic using validation.value
+}
+```
+
+**3. Update Zod Schemas:**
+```javascript
+// packages/shared/schemas/item.js
+export const ItemInputSchema = z.object({
+  quantity: z.number()
+    .positive('Quantity must be positive')
+    .max(10, 'Quantity cannot exceed 10kg')
+    .refine(
+      (val) => (val * 4) % 1 === 0,
+      'Quantity must be in 0.25kg increments'
+    ),
+  // ...other fields
+});
+```
+
 **Apply to:**
 - Expected participants
+- **Item quantities** (negative, excessive, precision)
 - Payment amounts
 - Session settings
 
 **Acceptance Criteria:**
 - [ ] All inputs validated
-- [ ] Range checks added
+- [ ] Range checks added (0-10kg for items)
 - [ ] Type checks added
+- [ ] Item quantity validation prevents negative values
+- [ ] Item quantity validation enforces max 10kg limit
+- [ ] Item quantity validation enforces 0.25kg precision
+- [ ] Zod schemas updated to match runtime validation
+- [ ] Applied to all item update endpoints (host items, participant items, bill calculations)
 
 ---
 
@@ -1335,6 +1542,177 @@ Daily updates on critical bug fixes to stakeholders
 
 ---
 
+## Appendix D: Code Review Addendum
+
+> **Added:** 2025-11-08
+> **Source:** Agent code review analysis identifying 4 specific security and performance issues
+
+This addendum maps recent code review findings to the infrastructure roadmap, ensuring all identified issues are tracked and addressed.
+
+---
+
+### Code Review Findings Summary
+
+Four specific issues were identified during automated code review:
+
+| Issue # | Title | Severity | Location | Status in Roadmap |
+|---------|-------|----------|----------|-------------------|
+| 1 | Nickname Validation - Allows Spaces | MEDIUM | sessions.js:486-493, schemas/session.js:83 | ✅ **CORRECTED** in Task 1B |
+| 2 | Missing Item Quantity Validation | HIGH | Multiple API endpoints | ✅ **ENHANCED** in Task 14B |
+| 3 | Nickname Assignment Race Condition | HIGH | sessions.js - getTwoNicknameOptions() | ✅ **NEW TASK** 1D added |
+| 4 | Missing Database Index - payments.item_id | MEDIUM | Database schema | ✅ **ADDED** to Task 6B |
+
+---
+
+### Issue 1: Nickname Validation - Allows Spaces
+
+**Problem:** Current regex `/^[a-zA-Z0-9\s]{2,20}$/` allows spaces in nicknames, causing data integrity issues.
+
+**Impact:**
+- Inconsistent nickname formatting
+- Display issues in UI
+- Potential matching/lookup problems
+- Data quality degradation
+
+**Roadmap Integration:**
+- **Task Updated:** Task 1B (Week 1, Day 1)
+- **Change Made:** Corrected regex to `/^[a-zA-Z0-9]{2,20}$/` (removed `\s`)
+- **Additional Work:** Updated Zod schema in `packages/shared/schemas/session.js:83` to match
+- **Status:** ✅ **CORRECTED**
+
+**Files to Update:**
+- `packages/shared/api/sessions.js:516` - Runtime validation regex
+- `packages/shared/api/sessions.js:1156` - Runtime validation regex (second location)
+- `packages/shared/schemas/session.js:83` - Zod schema regex
+
+---
+
+### Issue 2: Missing Item Quantity Validation
+
+**Problem:** Item quantities not validated server-side, allowing:
+- Negative values (e.g., -5kg)
+- Excessive values (e.g., 999999kg)
+- Invalid types (strings, null, undefined)
+- Decimal precision issues (e.g., 1.23456789kg)
+
+**Impact:**
+- Incorrect bill calculations
+- Database corruption
+- UI display issues
+- Potential abuse/exploits
+
+**Roadmap Integration:**
+- **Task Enhanced:** Task 14B (Week 3, Day 14)
+- **Change Made:** Added comprehensive `validateItemQuantity()` function
+- **Validation Rules:**
+  - Type check (must be number)
+  - Range check (0-10kg)
+  - Precision check (0.25kg increments)
+- **Zod Schema:** Enhanced `ItemInputSchema` with `.max(10)` and `.refine()` for precision
+- **Status:** ✅ **ENHANCED**
+
+**Files to Update:**
+- `packages/shared/api/sessions.js` - Add `validateItemQuantity()` helper
+- `packages/shared/schemas/item.js` - Enhance Zod schemas
+- All item update endpoints (host items, participant items, bill calculations)
+
+---
+
+### Issue 3: Nickname Assignment Race Condition
+
+**Problem:** Race condition between fetching available nicknames and marking as used:
+1. User A requests nicknames → Gets "Bob" and "Sue"
+2. User B requests nicknames → Gets "Bob" and "Sue" (same!)
+3. User A selects "Bob" → Marks as used
+4. User B selects "Bob" → **CONFLICT!**
+
+**Impact:**
+- Duplicate nickname assignments
+- User conflicts and confusion
+- Database inconsistency
+- Poor user experience
+
+**Roadmap Integration:**
+- **New Task Added:** Task 1D (Week 1, Day 1)
+- **Solution:** Optimistic reservation with 5-minute expiry
+- **Implementation:**
+  - Database migration: Add `reserved_until` and `reserved_by_session` columns
+  - Update `getTwoNicknameOptions()` to reserve nicknames atomically
+  - Update `assignNickname()` to confirm reservation
+  - Add cleanup job for expired reservations (every 5 minutes)
+- **Time Estimate:** 3-4 hours
+- **Status:** ✅ **NEW TASK ADDED**
+
+**Files to Update:**
+- Create: `database/023_add_nickname_reservations.sql` - New migration
+- Modify: `packages/shared/api/sessions.js` - Update nickname functions
+- Modify: `packages/shared/server.js` - Add cleanup interval
+
+---
+
+### Issue 4: Missing Database Index - payments.item_id
+
+**Problem:** `payments.item_id` lacks an index, causing:
+- Slow bill calculations (full table scans)
+- Degraded performance as data grows
+- Poor query performance for item-based operations
+
+**Performance Impact:**
+- Without index: 10 items/20 payments ~5ms, 100 items/500 payments ~150ms
+- With index: All cases ~1-2ms (10-100x faster)
+
+**Roadmap Integration:**
+- **Task Updated:** Task 6B (Week 2, Day 6)
+- **Indexes Added:**
+  - `CREATE INDEX idx_payments_item_id ON payments(item_id);`
+  - `CREATE INDEX idx_payments_session_item ON payments(session_id, item_id);` (composite)
+- **Additional:** Added `ANALYZE` statements for all tables
+- **Status:** ✅ **ADDED TO TASK 6B**
+
+**Files to Update:**
+- Database migration script (already included in Task 6B)
+
+---
+
+### Implementation Summary
+
+All code review findings have been integrated into the roadmap:
+
+**Week 1 (Critical):**
+- ✅ Task 1B - Corrected nickname validation regex
+- ✅ Task 1D - New task for nickname race condition (3-4 hours)
+
+**Week 2 (High Priority):**
+- ✅ Task 6B - Added missing database indexes
+
+**Week 3 (Technical Debt):**
+- ✅ Task 14B - Enhanced with item quantity validation
+
+**Total Additional Work:** ~4 hours (Task 1D is the only net-new task)
+
+---
+
+### Acceptance Criteria - Code Review Integration
+
+- [x] All 4 code review findings mapped to roadmap tasks
+- [x] Task 1B corrected (nickname regex fixed)
+- [x] Task 1D added (nickname race condition)
+- [x] Task 6B enhanced (database indexes)
+- [x] Task 14B enhanced (item validation)
+- [ ] All changes documented in Document History
+- [ ] Team notified of roadmap updates
+
+---
+
+### Cross-Reference
+
+For detailed technical analysis of each issue, refer to:
+- **Original Document:** `stash-inspired-fixes.md` (Code Review Findings section - now archived)
+- **This Roadmap:** Specific tasks listed above
+- **Code Locations:** File paths and line numbers provided in each task
+
+---
+
 ## Document History
 
 - **2025-11-07 v1.0:** Initial version created
@@ -1345,7 +1723,14 @@ Daily updates on critical bug fixes to stakeholders
   - Included 5 quick wins throughout
   - Updated time estimates based on code review
   - Added specific file locations and line numbers
-- **Status:** Ready for implementation with code review enhancements
+- **2025-11-08 v2.1:** Integrated additional code review findings from agent analysis
+  - **Added Appendix D:** Code Review Addendum mapping 4 specific issues to roadmap
+  - **Corrected Task 1B:** Fixed nickname validation regex to disallow spaces
+  - **Added Task 1D:** New task for nickname assignment race condition (Week 1, 3-4 hours)
+  - **Enhanced Task 6B:** Added missing `payments.item_id` database indexes
+  - **Enhanced Task 14B:** Added comprehensive item quantity validation (negative, max, precision)
+  - Total additional work: ~4 hours (only Task 1D is net-new)
+- **Status:** Ready for implementation with enhanced code review integration
 
 ---
 

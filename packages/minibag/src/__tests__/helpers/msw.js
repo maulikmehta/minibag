@@ -6,7 +6,7 @@
 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { mockApiResponses } from './mocks.js';
+import { mockApiResponses } from './mocks.jsx';
 
 // Default API base URL (can be overridden in tests)
 const API_BASE_URL = 'http://localhost:3000/api';

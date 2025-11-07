@@ -189,17 +189,62 @@ export function useSession(sessionId = null) {
   };
 
   /**
-   * Join an existing session
+   * Join an existing session with optimistic updates
    */
   const join = async (id, items = [], nicknameData = {}) => {
+    // Create optimistic participant data
+    const optimisticParticipant = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      session_id: id,
+      nickname: nicknameData.selected_nickname || 'You',
+      real_name: nicknameData.real_name,
+      avatar_emoji: nicknameData.selected_avatar_emoji || '👤',
+      is_creator: false,
+      items: items,
+      joined_at: new Date().toISOString(),
+      marked_not_coming: nicknameData.marked_not_coming || false,
+      _optimistic: true // Mark as optimistic for UI feedback
+    };
+
+    // Store previous state for rollback
+    const previousSession = session;
+    const previousParticipants = participants;
+    const previousCurrentParticipant = currentParticipant;
+    const previousConnected = connected;
+
     try {
       setLoading(true);
       setError(null);
 
+      // OPTIMISTIC UPDATE: Immediately update UI before API call
+      setCurrentParticipant(optimisticParticipant);
+
+      // Only add to participants if not marked as not coming
+      if (!nicknameData.marked_not_coming) {
+        setParticipants(prev => [...prev, optimisticParticipant]);
+      }
+
+      logger.info('Optimistic join - UI updated immediately', {
+        sessionId: id,
+        nickname: nicknameData.selected_nickname
+      });
+
+      // Make actual API call
       const result = await joinSession(id, items, nicknameData);
 
+      // API SUCCESS: Replace optimistic data with real data
       setSession(result.session);
       setCurrentParticipant(result.participant);
+
+      // Replace optimistic participant with real participant in list
+      setParticipants(prev => {
+        const withoutOptimistic = prev.filter(p => p.id !== optimisticParticipant.id);
+        // Only add real participant if not marked as not coming
+        if (!nicknameData.marked_not_coming) {
+          return [...withoutOptimistic, result.participant];
+        }
+        return withoutOptimistic;
+      });
 
       // Persist session to localStorage
       persistSession(result.session, result.participant);
@@ -209,13 +254,30 @@ export function useSession(sessionId = null) {
       setConnected(true);
 
       // Notify others via WebSocket (must be after room join is confirmed)
-      socketService.emitParticipantJoined(result.participant);
+      if (!nicknameData.marked_not_coming) {
+        socketService.emitParticipantJoined(result.participant);
+      }
 
-      // Reload full session data
+      // Reload full session data to ensure consistency
       await loadSession(id);
+
+      logger.info('Join confirmed - real data received', {
+        participantId: result.participant.id
+      });
 
       return result;
     } catch (err) {
+      // ROLLBACK: Revert optimistic updates on failure
+      logger.error('Join failed - rolling back optimistic updates', {
+        sessionId: id,
+        error: err.message
+      });
+
+      setSession(previousSession);
+      setParticipants(previousParticipants);
+      setCurrentParticipant(previousCurrentParticipant);
+      setConnected(previousConnected);
+
       setError(err.message);
       logger.error('Failed to join session', { sessionId: id, error: err.message });
       throw err;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This migration adds 35+ performance indexes to improve query speed across all tables.
+This migration adds 37+ performance indexes to improve query speed across all tables.
 
 ## Files
 
@@ -58,7 +58,7 @@ WHERE schemaname = 'public'
 ORDER BY tablename, indexname;
 ```
 
-You should see 34+ indexes starting with `idx_`.
+You should see 37+ indexes starting with `idx_`.
 
 ## Impact
 
@@ -101,10 +101,12 @@ You should see 34+ indexes starting with `idx_`.
 - `idx_invites_status` - Active invites
 - `idx_invites_token_status` - Valid token lookup
 
-### Payments (3 indexes)
+### Payments (5 indexes)
 - `idx_payments_session_id` - Payments in session
+- `idx_payments_item_id` - **NEW:** Bill calculations by item (Code Review Finding)
 - `idx_payments_skipped` - Non-skipped items
 - `idx_payments_session_skipped` - Session payment calculations
+- `idx_payments_session_item` - **NEW:** Compound index for bill item calculations (Code Review Finding)
 
 ### Nicknames Pool (4 indexes)
 - `idx_nicknames_pool_is_available` - Available nicknames
@@ -202,8 +204,10 @@ DROP INDEX IF EXISTS idx_invites_status;
 DROP INDEX IF EXISTS idx_invites_token_status;
 
 DROP INDEX IF EXISTS idx_payments_session_id;
+DROP INDEX IF EXISTS idx_payments_item_id;
 DROP INDEX IF EXISTS idx_payments_skipped;
 DROP INDEX IF EXISTS idx_payments_session_skipped;
+DROP INDEX IF EXISTS idx_payments_session_item;
 
 DROP INDEX IF EXISTS idx_nicknames_pool_is_available;
 DROP INDEX IF EXISTS idx_nicknames_pool_gender;

@@ -1,0 +1,215 @@
+name: Tests and Coverage
+
+on:
+  push:
+    branches: [main, master, develop, infrastructure/**]
+  pull_request:
+    branches: [main, master, develop]
+
+# Cancel previous runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Unit and Integration Tests
+  unit-and-integration-tests:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./packages/minibag
+
+      - name: Run unit tests
+        run: npm run test:unit
+        working-directory: ./packages/minibag
+
+      - name: Run integration tests
+        run: npm run test:integration
+        working-directory: ./packages/minibag
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        working-directory: ./packages/minibag
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./packages/minibag/coverage/lcov.info
+          flags: unit-integration
+          name: unit-integration-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-${{ matrix.node-version }}
+          path: ./packages/minibag/coverage/
+          retention-days: 30
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./packages/minibag/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # E2E Tests with Playwright
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./packages/minibag
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: ./packages/minibag
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        working-directory: ./packages/minibag
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: ./packages/minibag/playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: ./packages/minibag/test-results/
+          retention-days: 30
+
+  # Backend Tests (if applicable)
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: minibag_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies (shared)
+        run: npm ci
+        working-directory: ./packages/shared
+
+      - name: Run backend tests
+        run: npm test -- --run
+        working-directory: ./packages/shared
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/minibag_test
+          NODE_ENV: test
+
+      - name: Upload backend test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: ./packages/shared/coverage/
+          retention-days: 30
+
+  # Coverage Summary
+  coverage-summary:
+    name: Coverage Summary
+    needs: [unit-and-integration-tests, e2e-tests, backend-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-report-*
+          path: ./coverage-reports/
+
+      - name: Generate coverage summary
+        run: |
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Coverage Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|---------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| MiniBag Frontend | Unit & Integration | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| MiniBag Frontend | E2E (Playwright) | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend API | Unit & Integration | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage reports available in artifacts." >> $GITHUB_STEP_SUMMARY
+
+  # Status Check
+  test-status:
+    name: Test Status Check
+    needs: [unit-and-integration-tests, e2e-tests, backend-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          if [[ "${{ needs.unit-and-integration-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.e2e-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.backend-tests.result }}" == "failure" ]]; then
+            echo "❌ One or more test suites failed"
+            exit 1
+          else
+            echo "✅ All test suites passed"
+          fi

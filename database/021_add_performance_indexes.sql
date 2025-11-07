@@ -94,6 +94,11 @@ ON payments(session_id);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_participant_id
 ON payments(participant_id);
 
+-- Index on item_id for bill calculations (Code Review Finding - Issue #4)
+-- Without this index, bill calculations do full table scans (10-100x slower)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_item_id
+ON payments(item_id);
+
 -- Index on skip for filtering skipped items
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_skip
 ON payments(skip);
@@ -101,6 +106,11 @@ ON payments(skip);
 -- Compound index for common query pattern: non-skipped payments in a session
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_session_skip
 ON payments(session_id, skip);
+
+-- Compound index for bill item calculations (Code Review Finding - Issue #4)
+-- Optimizes queries that fetch payments for specific items within a session
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_session_item
+ON payments(session_id, item_id);
 
 -- ============================================================================
 -- Nicknames Pool Table Indexes

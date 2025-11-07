@@ -39,7 +39,9 @@
       "Bash(npx supabase db:*)",
       "Bash(psql:*)",
       "Bash(node verify-emoji-migration.js:*)",
-      "Bash(npm run test:run:*)"
+      "Bash(npm run test:run:*)",
+      "Bash(git stash show:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

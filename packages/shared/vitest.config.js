@@ -1,17 +1,10 @@
 import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
   test: {
-    // Test environment (use node for utils, jsdom for components)
-    environment: 'node', // Changed from jsdom to node for simple utility tests
-    environmentMatchGlobs: [
-      // Use jsdom only for component tests
-      ['**/*.component.{test,spec}.{js,jsx}', 'jsdom'],
-      ['**/components/**/*.{test,spec}.{js,jsx}', 'jsdom'],
-    ],
+    // Test environment for Node.js backend
+    environment: 'node',
 
     // Setup files
     setupFiles: ['./src/__tests__/setup.js'],
@@ -30,10 +23,10 @@ export default defineConfig({
         'dist/',
         '**/*.test.{js,jsx}',
         '**/*.spec.{js,jsx}',
+        'server.js', // Main entry point
       ],
-      // Week 2 Target: 30%+ coverage
-      // Week 3 Target: 50%
-      // Week 4 Target: 60%+
+      // Week 2 Target: 30%+ coverage (API endpoints focus)
+      // Will increase to 60%+ by Week 4
       thresholds: {
         lines: 30,
         functions: 30,
@@ -45,21 +38,22 @@ export default defineConfig({
     // Test file patterns
     include: [
       'src/**/*.{test,spec}.{js,jsx}',
+      '__tests__/**/*.{test,spec}.{js,jsx}',
     ],
 
-    // Timeout settings
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    // Timeout settings (longer for integration tests)
+    testTimeout: 15000,
+    hookTimeout: 15000,
 
     // Mock configuration
     clearMocks: true,
     restoreMocks: true,
+    mockReset: true,
   },
 
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@shared': path.resolve(__dirname, '../shared'),
     },
   },
 });

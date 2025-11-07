@@ -307,6 +307,12 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
         const newEndpointData = result.data;
 
+        // Validate data structure
+        if (!newEndpointData || typeof newEndpointData !== 'object') {
+          console.error('❌ [Option 1] Invalid data structure from endpoint:', newEndpointData);
+          return;
+        }
+
         // Calculate aggregated items from current state (old approach)
         const currentStateAggregated = {};
 
@@ -338,9 +344,9 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         console.log('📊 [Option 1] DATA COMPARISON:');
         console.log('-----------------------------------');
         console.log('🆕 New Endpoint Data:', {
-          aggregatedItems: newEndpointData.aggregatedItems,
-          participantCount: newEndpointData.participants?.length,
-          participants: newEndpointData.participants?.map(p => ({
+          aggregatedItems: newEndpointData?.aggregatedItems,
+          participantCount: newEndpointData?.participants?.length,
+          participants: newEndpointData?.participants?.map(p => ({
             nickname: p.nickname,
             itemsCount: p.itemsCount
           }))
@@ -355,7 +361,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         });
 
         // Deep comparison of aggregated items
-        const newItemIds = Object.keys(newEndpointData.aggregatedItems || {}).sort();
+        const newItemIds = Object.keys(newEndpointData?.aggregatedItems || {}).sort();
         const oldItemIds = Object.keys(currentStateAggregated).sort();
 
         let differencesFound = false;
@@ -367,8 +373,14 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         }
 
         newItemIds.forEach(itemId => {
-          const newItem = newEndpointData.aggregatedItems[itemId];
+          const newItem = newEndpointData?.aggregatedItems?.[itemId];
           const oldItem = currentStateAggregated[itemId];
+
+          if (!newItem) {
+            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} missing in new data`);
+            differencesFound = true;
+            return;
+          }
 
           if (!oldItem) {
             console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} exists in new data but not in old`);

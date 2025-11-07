@@ -11,9 +11,15 @@ describe('Testing Infrastructure', () => {
   });
 
   it('should have jest-dom matchers available', () => {
-    const element = document.createElement('div');
-    element.textContent = 'Hello';
-    expect(element).toBeInTheDocument || expect(true).toBe(true); // Fallback if not in jsdom
+    // This test requires jsdom environment, skip in node environment
+    if (typeof document !== 'undefined') {
+      const element = document.createElement('div');
+      element.textContent = 'Hello';
+      document.body.appendChild(element);
+      expect(element).toBeInTheDocument();
+    } else {
+      expect(true).toBe(true); // Fallback if not in jsdom
+    }
   });
 
   it('should support async tests', async () => {

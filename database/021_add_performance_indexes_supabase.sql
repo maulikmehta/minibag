@@ -92,6 +92,11 @@ ON invites(invite_token, status);
 CREATE INDEX IF NOT EXISTS idx_payments_session_id
 ON payments(session_id);
 
+-- Index on item_id for bill calculations (Code Review Finding - Issue #4)
+-- Without this index, bill calculations do full table scans (10-100x slower)
+CREATE INDEX IF NOT EXISTS idx_payments_item_id
+ON payments(item_id);
+
 -- Index on skipped for filtering skipped items
 CREATE INDEX IF NOT EXISTS idx_payments_skipped
 ON payments(skipped);
@@ -99,6 +104,11 @@ ON payments(skipped);
 -- Compound index for common query pattern: non-skipped payments in a session
 CREATE INDEX IF NOT EXISTS idx_payments_session_skipped
 ON payments(session_id, skipped);
+
+-- Compound index for bill item calculations (Code Review Finding - Issue #4)
+-- Optimizes queries that fetch payments for specific items within a session
+CREATE INDEX IF NOT EXISTS idx_payments_session_item
+ON payments(session_id, item_id);
 
 -- ============================================================================
 -- Nicknames Pool Table Indexes
