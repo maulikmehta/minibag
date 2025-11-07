@@ -28,6 +28,12 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
   }
 
   return apiItems.reduce((acc, item) => {
+    // Defensive: Skip malformed items
+    if (!item || typeof item !== 'object') {
+      console.warn('transformParticipantItems: skipping invalid item', item);
+      return acc;
+    }
+
     // Try to get item_id from catalog_item relation (most reliable)
     let itemId = item.catalog_item?.item_id;
     console.log(`  📦 Processing item:`, {
@@ -44,13 +50,23 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
       console.log(`  🔍 Defensive lookup result:`, { found: !!catalogItem, itemId });
     }
 
-    // Last resort: use the UUID (will likely fail downstream, but log warning)
+    // CRITICAL: Only add to map if we have valid itemId
     if (!itemId) {
-      console.warn('⚠️ Could not resolve item_id for participant item:', item);
-      itemId = item.item_id;
+      console.error('transformParticipantItems: Could not resolve item_id', {
+        item_uuid: item.item_id,
+        has_catalog_item: !!item.catalog_item
+      });
+      return acc; // Skip this item
     }
 
-    acc[itemId] = item.quantity;
+    // Validate quantity
+    const quantity = parseFloat(item.quantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      console.warn('transformParticipantItems: invalid quantity', { itemId, quantity: item.quantity });
+      return acc; // Skip this item
+    }
+
+    acc[itemId] = quantity;
     return acc;
   }, {});
 }
@@ -63,14 +79,20 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
  * @returns {Object} Frontend-compatible participant object
  */
 export function transformParticipant(apiParticipant, catalogItems = []) {
+  // Defensive: Validate participant object
+  if (!apiParticipant || typeof apiParticipant !== 'object') {
+    console.warn('transformParticipant: invalid participant', apiParticipant);
+    return null;
+  }
+
   return {
     id: apiParticipant.id,
     name: apiParticipant.nickname || apiParticipant.real_name || 'Participant',
     nickname: apiParticipant.nickname,
     real_name: apiParticipant.real_name,
     avatar_emoji: apiParticipant.avatar_emoji,
-    is_creator: apiParticipant.is_creator,
-    items: transformParticipantItems(apiParticipant.items, catalogItems),
+    is_creator: apiParticipant.is_creator || false,
+    items: transformParticipantItems(apiParticipant.items || [], catalogItems),
     marked_not_coming: apiParticipant.marked_not_coming || false
   };
 }
@@ -89,14 +111,14 @@ export function extractHostItems(apiParticipants, catalogItems = []) {
     return {};
   }
 
-  const hostParticipant = apiParticipants.find(p => p.is_creator);
+  const hostParticipant = apiParticipants.find(p => p && p.is_creator);
   console.log('👑 Host participant found:', {
     found: !!hostParticipant,
     hasItems: !!hostParticipant?.items,
     itemsCount: hostParticipant?.items?.length
   });
 
-  if (!hostParticipant || !hostParticipant.items) {
+  if (!hostParticipant || !hostParticipant.items || !Array.isArray(hostParticipant.items)) {
     return {};
   }
 
@@ -113,22 +135,24 @@ export function extractHostItems(apiParticipants, catalogItems = []) {
 export function extractNonHostParticipants(apiParticipants, catalogItems = []) {
   console.log('👥 extractNonHostParticipants called:', {
     totalParticipants: apiParticipants?.length,
-    nonHostCount: apiParticipants?.filter(p => !p.is_creator && !p.marked_not_coming).length
+    nonHostCount: apiParticipants?.filter(p => p && !p.is_creator && !p.marked_not_coming).length
   });
 
   if (!apiParticipants || !Array.isArray(apiParticipants)) {
     return [];
   }
 
-  const nonHostParticipants = apiParticipants.filter(p => !p.is_creator && !p.marked_not_coming);
+  const nonHostParticipants = apiParticipants.filter(p => p && !p.is_creator && !p.marked_not_coming);
   console.log('👥 Non-host participants:', nonHostParticipants.map(p => ({
-    id: p.id,
-    nickname: p.nickname,
-    hasItems: !!p.items,
-    itemsCount: p.items?.length
+    id: p?.id,
+    nickname: p?.nickname,
+    hasItems: !!p?.items,
+    itemsCount: p?.items?.length
   })));
 
-  return nonHostParticipants.map(p => transformParticipant(p, catalogItems));
+  return nonHostParticipants
+    .map(p => transformParticipant(p, catalogItems))
+    .filter(Boolean); // Remove any null results from invalid participants
 }
 
 /**

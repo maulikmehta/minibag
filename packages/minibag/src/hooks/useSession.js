@@ -83,8 +83,8 @@ export function useSession(sessionId = null) {
         setParticipants(data.participants || []);
         setCurrentParticipant(storedParticipant);
 
-        // Join WebSocket room
-        socketService.joinSessionRoom(storedSession.session_id);
+        // Join WebSocket room and wait for confirmation
+        await socketService.joinSessionRoom(storedSession.session_id);
         setConnected(true);
 
         return true;
@@ -146,8 +146,8 @@ export function useSession(sessionId = null) {
       setSession(data.session);
       setParticipants(data.participants || []);
 
-      // Join WebSocket room
-      socketService.joinSessionRoom(id);
+      // Join WebSocket room and wait for confirmation
+      await socketService.joinSessionRoom(id);
       setConnected(true);
     } catch (err) {
       setError(err.message);
@@ -174,8 +174,8 @@ export function useSession(sessionId = null) {
       // Persist session to localStorage (including host_token for creator)
       persistSession(result.session, result.participant, result.host_token);
 
-      // Join WebSocket room
-      socketService.joinSessionRoom(result.session.session_id);
+      // Join WebSocket room and wait for confirmation
+      await socketService.joinSessionRoom(result.session.session_id);
       setConnected(true);
 
       return result;
@@ -204,11 +204,11 @@ export function useSession(sessionId = null) {
       // Persist session to localStorage
       persistSession(result.session, result.participant);
 
-      // Join WebSocket room first (sets currentSessionId needed for emit)
-      socketService.joinSessionRoom(id);
+      // Join WebSocket room first and wait for confirmation
+      await socketService.joinSessionRoom(id);
       setConnected(true);
 
-      // Notify others via WebSocket (must be after joinSessionRoom)
+      // Notify others via WebSocket (must be after room join is confirmed)
       socketService.emitParticipantJoined(result.participant);
 
       // Reload full session data

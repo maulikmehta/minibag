@@ -14,11 +14,25 @@ export function setupSocketHandlers(socket, io) {
   /**
    * JOIN SESSION ROOM
    * Client joins a session room for real-time updates
+   * Sends confirmation back to client with room metadata
    */
-  socket.on('join-session', (data) => {
+  socket.on('join-session', async (data) => {
     const sessionId = data.sessionId || data;
-    socket.join(sessionId);
-    io.to(sessionId).emit('user-joined', { socketId: socket.id });
+
+    // Join the session room
+    await socket.join(sessionId);
+
+    // Get room size for metadata
+    const roomSize = io.sockets.adapter.rooms.get(sessionId)?.size || 0;
+
+    // Send confirmation to the client that joined
+    socket.emit('joined-session', {
+      sessionId,
+      participantCount: roomSize
+    });
+
+    // Broadcast to others in the room (optional - for awareness)
+    socket.to(sessionId).emit('user-joined', { socketId: socket.id });
   });
 
   /**

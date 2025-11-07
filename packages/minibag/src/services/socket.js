@@ -34,9 +34,11 @@ class SocketService {
     this.socket.on('connect', () => {
       this.connected = true;
 
-      // Rejoin session if we were in one
+      // Rejoin session if we were in one (wait for confirmation)
       if (this.currentSessionId) {
-        this.joinSessionRoom(this.currentSessionId);
+        this.joinSessionRoom(this.currentSessionId).catch(err => {
+          console.error('Failed to rejoin session room on reconnect:', err);
+        });
       }
     });
 
@@ -66,16 +68,37 @@ class SocketService {
 
   /**
    * Join a session room for real-time updates
+   * Returns a Promise that resolves when the server confirms the join
    * @param {string} sessionId - Session ID to join
+   * @returns {Promise<{sessionId: string, participantCount: number}>}
    */
   joinSessionRoom(sessionId) {
     if (!this.socket || !sessionId) {
       console.error('Cannot join room: socket not connected or no sessionId');
-      return;
+      return Promise.reject(new Error('Socket not connected or no sessionId'));
     }
 
     this.currentSessionId = sessionId;
-    this.socket.emit('join-session', { sessionId });
+
+    return new Promise((resolve, reject) => {
+      // Set a timeout in case server doesn't respond
+      const timeout = setTimeout(() => {
+        reject(new Error('Join session timeout - no confirmation received'));
+      }, 5000);
+
+      // Wait for confirmation from server
+      this.socket.once('joined-session', (data) => {
+        clearTimeout(timeout);
+        console.log('✅ Successfully joined session room', {
+          sessionId: data.sessionId,
+          participantCount: data.participantCount
+        });
+        resolve(data);
+      });
+
+      // Emit the join request
+      this.socket.emit('join-session', { sessionId });
+    });
   }
 
   /**
