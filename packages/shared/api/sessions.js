@@ -247,41 +247,88 @@ const FALLBACK_NAMES = [
 const AVATAR_EMOJIS = ['👨', '👩', '🧑', '👨‍🦱', '👩‍🦱', '👨‍🦰', '👩‍🦰', '👨‍🦲', '👩‍🦲'];
 
 /**
+ * Reserve a nickname with 5-minute TTL
+ * @param {UUID} nicknameId - Nickname to reserve
+ * @param {UUID} sessionId - Session reserving the nickname
+ * @returns {Promise<{data, error}>}
+ */
+async function reserveNickname(nicknameId, sessionId) {
+  if (!nicknameId || !sessionId) {
+    return { data: null, error: new Error('nicknameId and sessionId required') };
+  }
+
+  const reservationExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+  const { data, error } = await supabase
+    .from('nicknames_pool')
+    .update({
+      reserved_until: reservationExpiry.toISOString(),
+      reserved_by_session: sessionId
+    })
+    .eq('id', nicknameId)
+    .eq('is_available', true)
+    .or(`reserved_until.is.null,reserved_until.lt.${new Date().toISOString()}`)
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+/**
  * Get 2 available nicknames from pool (1 male, 1 female)
  * Optionally matches first letter of user's name for personalization
  * Used to present options to user during join/create
+ * NOW WITH RESERVATION: Nicknames are reserved for 5 minutes to prevent race conditions
  */
-async function getTwoNicknameOptions(firstLetter = null) {
+async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
   let maleOption = null;
   let femaleOption = null;
+
+  // Generate a temporary session ID if none provided (for reservation tracking)
+  const tempSessionId = sessionId || `temp-${Date.now()}`;
+  const now = new Date().toISOString();
 
   // If firstLetter provided, try to find matching nicknames
   if (firstLetter) {
     const upperLetter = firstLetter.toUpperCase();
 
-    // Try to get male nickname starting with letter
+    // Try to get male nickname starting with letter (not reserved or expired reservation)
     const { data: matchedMale } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'male')
       .ilike('nickname', `${upperLetter}%`)
+      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(1)
       .single();
 
-    // Try to get female nickname starting with letter
+    // Immediately reserve if found
+    if (matchedMale && sessionId) {
+      const { data: reserved } = await reserveNickname(matchedMale.id, tempSessionId);
+      if (reserved) maleOption = reserved;
+    } else if (matchedMale) {
+      maleOption = matchedMale;
+    }
+
+    // Try to get female nickname starting with letter (not reserved or expired reservation)
     const { data: matchedFemale } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
       .ilike('nickname', `${upperLetter}%`)
+      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(1)
       .single();
 
-    // Use matched nicknames if found
-    if (matchedMale) maleOption = matchedMale;
-    if (matchedFemale) femaleOption = matchedFemale;
+    // Immediately reserve if found
+    if (matchedFemale && sessionId) {
+      const { data: reserved } = await reserveNickname(matchedFemale.id, tempSessionId);
+      if (reserved) femaleOption = reserved;
+    } else if (matchedFemale) {
+      femaleOption = matchedFemale;
+    }
   }
 
   // Fallback: If we don't have both genders with matching letter, get any available
@@ -291,10 +338,17 @@ async function getTwoNicknameOptions(firstLetter = null) {
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'male')
+      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(1)
       .single();
 
-    if (anyMale) maleOption = anyMale;
+    // Immediately reserve if found
+    if (anyMale && sessionId) {
+      const { data: reserved } = await reserveNickname(anyMale.id, tempSessionId);
+      if (reserved) maleOption = reserved;
+    } else if (anyMale) {
+      maleOption = anyMale;
+    }
   }
 
   if (!femaleOption) {
@@ -303,10 +357,17 @@ async function getTwoNicknameOptions(firstLetter = null) {
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
+      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(1)
       .single();
 
-    if (anyFemale) femaleOption = anyFemale;
+    // Immediately reserve if found
+    if (anyFemale && sessionId) {
+      const { data: reserved } = await reserveNickname(anyFemale.id, tempSessionId);
+      if (reserved) femaleOption = reserved;
+    } else if (anyFemale) {
+      femaleOption = anyFemale;
+    }
   }
 
   // Build options array
@@ -362,10 +423,10 @@ async function markNicknameAsUsed(nicknameId, sessionId) {
   if (!nicknameId) return { data: null, error: null }; // Return proper structure
 
   try {
-    // Fetch current nickname data to get times_used value
+    // Fetch current nickname data to get times_used value and verify reservation
     const { data: nickname, error: fetchError } = await supabase
       .from('nicknames_pool')
-      .select('times_used')
+      .select('times_used, reserved_by_session, reserved_until')
       .eq('id', nicknameId)
       .single();
 
@@ -373,16 +434,46 @@ async function markNicknameAsUsed(nicknameId, sessionId) {
       return { data: null, error: fetchError };
     }
 
-    // Update with incremented value
+    // CRITICAL: Verify reservation belongs to this session (or is expired/null)
+    // This prevents another session from claiming a reserved nickname
+    const reservedByOtherSession = nickname.reserved_by_session &&
+                                   nickname.reserved_by_session !== sessionId &&
+                                   nickname.reserved_until &&
+                                   new Date(nickname.reserved_until) > new Date();
+
+    if (reservedByOtherSession) {
+      return {
+        data: null,
+        error: new Error('Nickname is reserved by another session')
+      };
+    }
+
+    // Convert reservation to permanent assignment
     const { data, error } = await supabase
       .from('nicknames_pool')
       .update({
         is_available: false,
         currently_used_in: sessionId,
         times_used: (nickname?.times_used || 0) + 1,
-        last_used: new Date().toISOString()
+        last_used: new Date().toISOString(),
+        // Clear reservation fields
+        reserved_until: null,
+        reserved_by_session: null
       })
-      .eq('id', nicknameId);
+      .eq('id', nicknameId)
+      .eq('is_available', true); // Extra safety: only mark if still available
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    // If no rows were updated, nickname was already taken
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return {
+        data: null,
+        error: new Error('Nickname no longer available')
+      };
+    }
 
     return { data, error };
   } catch (err) {
@@ -426,6 +517,29 @@ async function getAvailableNickname(sessionId) {
     nickname: data.nickname,
     avatar_emoji: data.avatar_emoji
   };
+}
+
+/**
+ * Release expired nickname reservations
+ * Runs every 5 minutes to free up reserved nicknames that were never claimed
+ * Reservations expire after 5 minutes
+ */
+export async function releaseExpiredReservations() {
+  try {
+    const { data: released, error } = await supabase
+      .rpc('cleanup_expired_nickname_reservations');
+
+    if (error) {
+      console.error('Error cleaning up expired reservations:', error);
+      return;
+    }
+
+    if (released > 0) {
+      console.log(`✅ Released ${released} expired nickname reservations`);
+    }
+  } catch (error) {
+    console.error('Unexpected error in releaseExpiredReservations:', error);
+  }
 }
 
 /**
@@ -478,22 +592,28 @@ export async function releaseExpiredNicknames() {
 }
 
 /**
- * Start nickname cleanup job
- * Runs every hour and once on startup
+ * Start nickname cleanup jobs
+ * - Reservation cleanup: Runs every 5 minutes (releases expired reservations)
+ * - Session cleanup: Runs every hour (releases nicknames from expired sessions)
  */
 export function startNicknameCleanup() {
-  console.log('🔄 Starting nickname cleanup job...');
+  console.log('🔄 Starting nickname cleanup jobs...');
 
   // Run immediately on startup
+  releaseExpiredReservations();
   releaseExpiredNicknames();
 
-  // Run cleanup every hour (3600000 milliseconds)
-  const cleanupInterval = setInterval(releaseExpiredNicknames, 60 * 60 * 1000);
+  // Run reservation cleanup every 5 minutes (300000 milliseconds)
+  const reservationCleanupInterval = setInterval(releaseExpiredReservations, 5 * 60 * 1000);
+
+  // Run session cleanup every hour (3600000 milliseconds)
+  const sessionCleanupInterval = setInterval(releaseExpiredNicknames, 60 * 60 * 1000);
 
   // Return cleanup function for graceful shutdown
   return () => {
-    console.log('Stopping nickname cleanup job...');
-    clearInterval(cleanupInterval);
+    console.log('Stopping nickname cleanup jobs...');
+    clearInterval(reservationCleanupInterval);
+    clearInterval(sessionCleanupInterval);
   };
 }
 
@@ -553,11 +673,12 @@ export async function createSession(req, res) {
     // Check for duplicate session (same nickname + within 5 minutes)
     if (selected_nickname) {
       // SECURITY: Validate nickname format to prevent SQL injection
-      const NICKNAME_REGEX = /^[a-zA-Z0-9\s]{2,20}$/;
+      // NOTE: NO spaces allowed to maintain data integrity
+      const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
       if (!NICKNAME_REGEX.test(selected_nickname)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only.'
+          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).'
         });
       }
 
@@ -1192,12 +1313,13 @@ export async function joinSession(req, res) {
     } = req.body;
 
     // SECURITY: Validate nickname format to prevent SQL injection
+    // NOTE: NO spaces allowed to maintain data integrity
     if (selected_nickname) {
-      const NICKNAME_REGEX = /^[a-zA-Z0-9\s]{2,20}$/;
+      const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
       if (!NICKNAME_REGEX.test(selected_nickname)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only.'
+          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).'
         });
       }
     }
@@ -1664,8 +1786,11 @@ export async function getSessionInvites(req, res) {
  */
 export async function getNicknameOptions(req, res) {
   try {
-    const { firstLetter } = req.query;
-    const options = await getTwoNicknameOptions(firstLetter);
+    const { firstLetter, sessionId } = req.query;
+
+    // Pass sessionId to enable nickname reservation
+    // If no sessionId provided, nicknames are returned without reservation
+    const options = await getTwoNicknameOptions(firstLetter, sessionId);
 
     res.json({
       success: true,

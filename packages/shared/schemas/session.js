@@ -80,7 +80,7 @@ export const JoinSessionSchema = z.object({
   })).optional().default([]),
   real_name: z.string().min(1).max(100).optional(),
   selected_nickname_id: z.string().uuid().optional(),
-  selected_nickname: z.string().regex(/^[a-zA-Z0-9\s]{2,20}$/, 'Nickname must be 2-20 alphanumeric characters').optional(),
+  selected_nickname: z.string().regex(/^[a-zA-Z0-9]{2,20}$/, 'Nickname must be 2-20 alphanumeric characters (no spaces)').optional(),
   selected_avatar_emoji: z.string().max(10).optional(),
   session_pin: z.string().regex(/^\d{4,6}$/).optional().nullable(),
   marked_not_coming: z.boolean().optional().default(false),
