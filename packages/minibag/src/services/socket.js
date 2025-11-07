@@ -283,13 +283,23 @@ class SocketService {
       return;
     }
 
-    // Store listener reference for cleanup
+    // Wrap callback with logging for better debugging
+    const wrappedCallback = (...args) => {
+      console.log(`📥 [SocketService] Received event: "${event}"`, args);
+      callback(...args);
+    };
+
+    // Store BOTH original and wrapped versions for proper cleanup
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event).push(callback);
+    this.listeners.get(event).push({
+      original: callback,
+      wrapped: wrappedCallback
+    });
 
-    this.socket.on(event, callback);
+    // Register the wrapped version with socket.io
+    this.socket.on(event, wrappedCallback);
   }
 
   /**
@@ -300,15 +310,17 @@ class SocketService {
   off(event, callback) {
     if (!this.socket) return;
 
-    this.socket.off(event, callback);
+    // Find the listener object by comparing original callbacks
+    const eventListeners = this.listeners.get(event) || [];
+    const listener = eventListeners.find(l => l.original === callback);
 
-    // Remove from listeners map
-    if (this.listeners.has(event)) {
-      const callbacks = this.listeners.get(event);
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
+    if (listener) {
+      // Remove the WRAPPED version from socket.io (this is critical!)
+      this.socket.off(event, listener.wrapped);
+
+      // Remove from our listeners map
+      const index = eventListeners.indexOf(listener);
+      eventListeners.splice(index, 1);
     }
   }
 
@@ -336,9 +348,10 @@ class SocketService {
   removeAllListeners() {
     if (!this.socket) return;
 
-    this.listeners.forEach((callbacks, event) => {
-      callbacks.forEach(callback => {
-        this.socket.off(event, callback);
+    this.listeners.forEach((listeners, event) => {
+      listeners.forEach(listener => {
+        // Remove the WRAPPED callback from socket.io
+        this.socket.off(event, listener.wrapped);
       });
     });
 
