@@ -293,6 +293,27 @@ export async function getBillItems(sessionId) {
   return response.data;
 }
 
+/**
+ * Generate a time-limited access token for viewing a bill
+ * @param {string} sessionId - Session ID
+ * @param {string|null} participantId - Optional participant ID (null for host/solo)
+ * @returns {Promise<Object>} Token data with access_token and expires_at
+ */
+export async function generateBillToken(sessionId, participantId = null) {
+  const response = await apiFetch(`/api/sessions/${sessionId}/bill-token`, {
+    method: 'POST',
+    body: JSON.stringify({ participant_id: participantId })
+  });
+
+  logger.debug('generateBillToken API Response', {
+    sessionId,
+    participantId,
+    hasToken: !!response.data?.access_token
+  });
+
+  return response.data;
+}
+
 // ============================================================================
 // PAYMENTS API
 // ============================================================================

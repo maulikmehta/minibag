@@ -10,8 +10,8 @@ import {
   FrontendParticipantSchema,
   ParticipantItemSchema,
   FrontendItemMapSchema
-} from '../../../../shared/schemas/index.js';
-import logger from '../../../../shared/utils/frontendLogger.js';
+} from '@shared/schemas/index.js';
+import logger from '@shared/utils/frontendLogger.js';
 
 /**
  * Custom error class for validation failures

@@ -101,18 +101,67 @@ app.use(helmet({
 // - Development: http://localhost:5173 or http://localhost:5174 (Vite may use either)
 // - Production: Should be set via FRONTEND_URL env variable
 // - minibag.cc: Production domain for field testing
-// Always include localhost for development, plus FRONTEND_URL if set
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'https://minibag.cc',
-  'https://www.minibag.cc'
-];
+// SECURITY: Validates FRONTEND_URL to prevent CORS bypass attacks
+const getAllowedOrigins = () => {
+  const origins = [];
 
-// Add FRONTEND_URL to allowed origins if it's set and not already in the list
-if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+  if (process.env.NODE_ENV === 'production') {
+    origins.push('https://minibag.cc');
+    origins.push('https://www.minibag.cc');
+  } else {
+    origins.push('http://localhost:5173');
+    origins.push('http://localhost:5174');
+  }
+
+  // Validate FRONTEND_URL before adding
+  if (process.env.FRONTEND_URL) {
+    try {
+      const url = new URL(process.env.FRONTEND_URL);
+
+      // SECURITY: Enforce HTTPS in production
+      if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+        logger.error('CORS: FRONTEND_URL must use HTTPS in production', {
+          provided: process.env.FRONTEND_URL,
+          protocol: url.protocol
+        });
+        throw new Error('FRONTEND_URL must use HTTPS in production');
+      }
+
+      // SECURITY: Only allow trusted domains
+      const trustedHosts = [
+        'localhost',
+        '127.0.0.1',
+        'minibag.cc',
+        'www.minibag.cc'
+      ];
+
+      const isValidHost = trustedHosts.some(host =>
+        url.hostname === host || url.hostname.endsWith('.minibag.cc')
+      );
+
+      if (isValidHost) {
+        origins.push(process.env.FRONTEND_URL);
+        logger.info('CORS: Added FRONTEND_URL to allowed origins', {
+          url: process.env.FRONTEND_URL
+        });
+      } else {
+        logger.warn('CORS: FRONTEND_URL rejected - untrusted domain', {
+          provided: process.env.FRONTEND_URL,
+          hostname: url.hostname
+        });
+      }
+    } catch (error) {
+      logger.error('CORS: Invalid FRONTEND_URL format', {
+        provided: process.env.FRONTEND_URL,
+        error: error.message
+      });
+    }
+  }
+
+  return origins;
+};
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(cors({
   origin: allowedOrigins,
