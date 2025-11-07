@@ -24,6 +24,7 @@ import * as paymentsAPI from './api/payments.js';
 import * as analyticsAPI from './api/analytics.js';
 import * as participantsAPI from './api/participants.js';
 import * as billsAPI from './api/bills.js';
+import * as logsAPI from './api/logs.js';
 
 // Validation middleware imports
 import {
@@ -170,6 +171,15 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Only count failed attempts
 });
 
+// Rate limiter for frontend logs (prevent log spam)
+const logsLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: process.env.NODE_ENV === 'production' ? 100 : 200, // 100 logs per minute in production
+  message: 'Too many logs from this IP. Please slow down.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Basic routes
 app.get('/', (req, res) => {
   res.json({
@@ -272,6 +282,10 @@ app.get('/api/analytics/overview', analyticsAPI.getAnalyticsOverview);
 app.get('/api/analytics/sessions/weekly', analyticsAPI.getWeeklySessionTrends);
 app.get('/api/analytics/revenue', analyticsAPI.getRevenueAnalytics);
 app.get('/api/analytics/sessions/recent', analyticsAPI.getRecentSessions);
+
+// Logs API routes (frontend logging with rate limiting)
+app.post('/api/logs', logsLimiter, logsAPI.receiveFrontendLog);
+app.post('/api/logs/batch', logsLimiter, logsAPI.receiveFrontendLogBatch);
 app.get('/api/analytics/sessions/completions', analyticsAPI.getSessionCompletions);
 
 // WebSocket connection handling
