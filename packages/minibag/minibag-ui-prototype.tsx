@@ -13,6 +13,7 @@ import PaymentModal from './src/components/PaymentModal.jsx';
 import ParticipantAvatar from './src/components/session/ParticipantAvatar.jsx';
 import ItemList from './src/components/items/ItemList.jsx';
 import ItemRow from './src/components/items/ItemRow.jsx';
+import { SessionErrorBoundary } from './src/components/ErrorBoundary.jsx';
 import HomeScreen from './src/screens/HomeScreen.jsx';
 import ParticipantBillScreen from './src/screens/ParticipantBillScreen.jsx';
 import ShoppingScreen from './src/screens/ShoppingScreen.jsx';
@@ -727,22 +728,24 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   // SCREEN: JOIN SESSION
   if (currentScreen === 'join') {
     return (
-      <JoinSessionScreen
-        session={session}
-        sessionLoading={sessionLoading}
-        sessionError={sessionError}
-        joinSessionId={joinSessionId}
-        participants={participants}
-        items={VEGETABLES}
-        getItemName={getItemName}
-        hostItems={hostItems}
-        joinSession={joinSession}
-        onJoinSuccess={() => setCurrentScreen('session-active')}
-        onNavigateToHome={() => setCurrentScreen('home')}
-        onNavigateToCreate={() => setCurrentScreen('host-create')}
-        i18n={i18n}
-        handleLanguageChange={handleLanguageChange}
-      />
+      <SessionErrorBoundary sessionId={joinSessionId}>
+        <JoinSessionScreen
+          session={session}
+          sessionLoading={sessionLoading}
+          sessionError={sessionError}
+          joinSessionId={joinSessionId}
+          participants={participants}
+          items={VEGETABLES}
+          getItemName={getItemName}
+          hostItems={hostItems}
+          joinSession={joinSession}
+          onJoinSuccess={() => setCurrentScreen('session-active')}
+          onNavigateToHome={() => setCurrentScreen('home')}
+          onNavigateToCreate={() => setCurrentScreen('host-create')}
+          i18n={i18n}
+          handleLanguageChange={handleLanguageChange}
+        />
+      </SessionErrorBoundary>
     );
   }
 
@@ -764,9 +767,10 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   // SCREEN 1: CREATE SESSION
   if (currentScreen === 'host-create') {
     return (
-      <SessionCreateScreen
-        categories={CATEGORIES}
-        items={items}
+      <SessionErrorBoundary sessionId={session?.session_id}>
+        <SessionCreateScreen
+          categories={CATEGORIES}
+          items={items}
         vegCategoryIds={vegCategoryIds}
         session={session}
         currentParticipant={currentParticipant}
@@ -796,6 +800,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onHelpClick={handleHelpClick}
         onLogoClick={handleLogoClick}
       />
+      </SessionErrorBoundary>
     );
   }
 
@@ -855,9 +860,10 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   // SCREEN 2: SESSION ACTIVE (with avatar circles)
   if (currentScreen === 'session-active') {
     return (
-      <SessionActiveScreen
-        session={session}
-        currentParticipant={currentParticipant}
+      <SessionErrorBoundary sessionId={session?.session_id}>
+        <SessionActiveScreen
+          session={session}
+          currentParticipant={currentParticipant}
         hostItems={hostItems}
         participants={participants}
         selectedParticipant={selectedParticipant}
@@ -958,6 +964,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onHelpClick={handleHelpClick}
         onLogoClick={handleLogoClick}
       />
+      </SessionErrorBoundary>
     );
   }
 

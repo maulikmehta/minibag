@@ -371,6 +371,75 @@ async function getAvailableNickname(sessionId) {
 }
 
 /**
+ * Release nicknames from expired sessions
+ * Runs periodically to prevent nickname pool depletion
+ * Sessions older than 4 hours are considered expired
+ */
+export async function releaseExpiredNicknames() {
+  try {
+    const FOUR_HOURS_AGO = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+
+    // Find sessions that are still open/active but created more than 4 hours ago
+    const { data: expiredSessions, error: fetchError } = await supabase
+      .from('sessions')
+      .select('id, session_id, created_at')
+      .lt('created_at', FOUR_HOURS_AGO)
+      .in('status', ['open', 'active']);
+
+    if (fetchError) {
+      console.error('Error fetching expired sessions:', fetchError);
+      return;
+    }
+
+    if (!expiredSessions || expiredSessions.length === 0) {
+      console.log('No expired sessions found for nickname cleanup');
+      return;
+    }
+
+    const sessionIds = expiredSessions.map(s => s.id);
+
+    // Release nicknames from these expired sessions
+    const { data: releasedNicknames, error: updateError } = await supabase
+      .from('nicknames_pool')
+      .update({
+        is_available: true,
+        currently_used_in: null
+      })
+      .in('currently_used_in', sessionIds)
+      .select();
+
+    if (updateError) {
+      console.error('Error releasing nicknames:', updateError);
+      return;
+    }
+
+    console.log(`✅ Nickname cleanup complete: Released ${releasedNicknames?.length || 0} nicknames from ${sessionIds.length} expired sessions`);
+  } catch (error) {
+    console.error('Unexpected error in releaseExpiredNicknames:', error);
+  }
+}
+
+/**
+ * Start nickname cleanup job
+ * Runs every hour and once on startup
+ */
+export function startNicknameCleanup() {
+  console.log('🔄 Starting nickname cleanup job...');
+
+  // Run immediately on startup
+  releaseExpiredNicknames();
+
+  // Run cleanup every hour (3600000 milliseconds)
+  const cleanupInterval = setInterval(releaseExpiredNicknames, 60 * 60 * 1000);
+
+  // Return cleanup function for graceful shutdown
+  return () => {
+    console.log('Stopping nickname cleanup job...');
+    clearInterval(cleanupInterval);
+  };
+}
+
+/**
  * POST /api/sessions/create
  * Create a new shopping session
  */

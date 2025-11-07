@@ -335,6 +335,19 @@ server.listen(PORT, () => {
   logger.info('  ✓ Rate limiting');
   logger.info('  ✓ Security headers (Helmet)');
   logger.info('  ✓ Request ID tracking');
+  logger.info('  ✓ Nickname cleanup job (runs hourly)');
+
+  // Start nickname cleanup job (runs every hour to prevent pool depletion)
+  const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
+
+  // Graceful shutdown handler
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    stopNicknameCleanup();
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+  });
 });
 
 export { app, io };
