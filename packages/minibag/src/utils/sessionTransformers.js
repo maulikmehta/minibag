@@ -5,6 +5,39 @@
  * This centralizes data transformation logic to avoid duplication and maintain consistency.
  */
 
+import {
+  ParticipantSchema,
+  FrontendParticipantSchema,
+  ParticipantItemSchema,
+  FrontendItemMapSchema
+} from '../../../../shared/schemas/index.js';
+import logger from '../../../../shared/utils/frontendLogger.js';
+
+/**
+ * Custom error class for validation failures
+ */
+export class ValidationError extends Error {
+  constructor(message, zodError = null) {
+    super(message);
+    this.name = 'ValidationError';
+    this.zodError = zodError;
+    this.details = zodError?.issues || [];
+  }
+
+  /**
+   * Get formatted error message with details
+   */
+  getFormattedMessage() {
+    if (this.details.length === 0) {
+      return this.message;
+    }
+    const detailsStr = this.details
+      .map(issue => `  - ${issue.path.join('.')}: ${issue.message}`)
+      .join('\n');
+    return `${this.message}\n${detailsStr}`;
+  }
+}
+
 /**
  * Transform participant items from API format to frontend format
  *
@@ -13,30 +46,30 @@
  *
  * @param {Array} apiItems - Array of participant items from API
  * @param {Array} catalogItems - Catalog items for defensive lookup (optional)
- * @returns {Object} Map of item_id to quantity
+ * @returns {Object} Map of item_id to quantity (validated)
  */
 export function transformParticipantItems(apiItems, catalogItems = []) {
-  console.log('🔄 transformParticipantItems called:', {
+  logger.debug('transformParticipantItems called', {
     apiItemsCount: apiItems?.length,
     catalogItemsCount: catalogItems?.length,
     apiItems: apiItems
   });
 
   if (!apiItems || !Array.isArray(apiItems)) {
-    console.log('⚠️ transformParticipantItems: apiItems is invalid', apiItems);
+    logger.warn('transformParticipantItems: apiItems is invalid', { apiItems });
     return {};
   }
 
-  return apiItems.reduce((acc, item) => {
+  const itemsMap = apiItems.reduce((acc, item) => {
     // Defensive: Skip malformed items
     if (!item || typeof item !== 'object') {
-      console.warn('transformParticipantItems: skipping invalid item', item);
+      logger.warn('transformParticipantItems: skipping invalid item', { item });
       return acc;
     }
 
     // Try to get item_id from catalog_item relation (most reliable)
     let itemId = item.catalog_item?.item_id;
-    console.log(`  📦 Processing item:`, {
+    logger.debug('Processing item', {
       item_id_uuid: item.item_id,
       catalog_item: item.catalog_item,
       resolved_itemId: itemId,
@@ -47,12 +80,12 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
     if (!itemId && item.item_id && catalogItems.length > 0) {
       const catalogItem = catalogItems.find(ci => ci.id === item.item_id);
       itemId = catalogItem?.item_id;
-      console.log(`  🔍 Defensive lookup result:`, { found: !!catalogItem, itemId });
+      logger.debug('Defensive lookup result', { found: !!catalogItem, itemId });
     }
 
     // CRITICAL: Only add to map if we have valid itemId
     if (!itemId) {
-      console.error('transformParticipantItems: Could not resolve item_id', {
+      logger.error('transformParticipantItems: Could not resolve item_id', {
         item_uuid: item.item_id,
         has_catalog_item: !!item.catalog_item
       });
@@ -62,13 +95,28 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
     // Validate quantity
     const quantity = parseFloat(item.quantity);
     if (isNaN(quantity) || quantity <= 0) {
-      console.warn('transformParticipantItems: invalid quantity', { itemId, quantity: item.quantity });
+      logger.warn('transformParticipantItems: invalid quantity', { itemId, quantity: item.quantity });
       return acc; // Skip this item
     }
 
     acc[itemId] = quantity;
     return acc;
   }, {});
+
+  // Validate output format with Zod
+  try {
+    return FrontendItemMapSchema.parse(itemsMap);
+  } catch (error) {
+    if (error.name === 'ZodError') {
+      logger.error('transformParticipantItems: Output validation failed', {
+        itemsMap,
+        errors: error.issues
+      });
+      // Return empty object on validation failure (defensive)
+      return {};
+    }
+    throw error;
+  }
 }
 
 /**
@@ -77,24 +125,45 @@ export function transformParticipantItems(apiItems, catalogItems = []) {
  * @param {Object} apiParticipant - Participant object from API
  * @param {Array} catalogItems - Catalog items for defensive lookup (optional)
  * @returns {Object} Frontend-compatible participant object
+ * @throws {ValidationError} If participant data is invalid
  */
 export function transformParticipant(apiParticipant, catalogItems = []) {
   // Defensive: Validate participant object
   if (!apiParticipant || typeof apiParticipant !== 'object') {
-    console.warn('transformParticipant: invalid participant', apiParticipant);
+    logger.warn('transformParticipant: invalid participant', { apiParticipant });
     return null;
   }
 
-  return {
-    id: apiParticipant.id,
-    name: apiParticipant.nickname || apiParticipant.real_name || 'Participant',
-    nickname: apiParticipant.nickname,
-    real_name: apiParticipant.real_name,
-    avatar_emoji: apiParticipant.avatar_emoji,
-    is_creator: apiParticipant.is_creator || false,
-    items: transformParticipantItems(apiParticipant.items || [], catalogItems),
-    marked_not_coming: apiParticipant.marked_not_coming || false
-  };
+  // Validate input with Zod schema
+  try {
+    const validatedInput = ParticipantSchema.parse(apiParticipant);
+
+    // Transform to frontend format
+    const frontendParticipant = {
+      id: validatedInput.id,
+      name: validatedInput.nickname || validatedInput.real_name || 'Participant',
+      nickname: validatedInput.nickname,
+      real_name: validatedInput.real_name,
+      avatar_emoji: validatedInput.avatar_emoji,
+      is_creator: validatedInput.is_creator || false,
+      items: transformParticipantItems(validatedInput.items || [], catalogItems),
+      marked_not_coming: validatedInput.marked_not_coming || false
+    };
+
+    // Validate output format
+    const validatedOutput = FrontendParticipantSchema.parse(frontendParticipant);
+    return validatedOutput;
+
+  } catch (error) {
+    if (error.name === 'ZodError') {
+      logger.error('transformParticipant: Validation failed', {
+        participant: apiParticipant,
+        errors: error.issues
+      });
+      throw new ValidationError('Invalid participant data structure', error);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -105,14 +174,14 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
  * @returns {Object} Map of host's item_id to quantity
  */
 export function extractHostItems(apiParticipants, catalogItems = []) {
-  console.log('👑 extractHostItems called:', { participantsCount: apiParticipants?.length });
+  logger.debug('extractHostItems called', { participantsCount: apiParticipants?.length });
 
   if (!apiParticipants || !Array.isArray(apiParticipants)) {
     return {};
   }
 
   const hostParticipant = apiParticipants.find(p => p && p.is_creator);
-  console.log('👑 Host participant found:', {
+  logger.debug('Host participant found', {
     found: !!hostParticipant,
     hasItems: !!hostParticipant?.items,
     itemsCount: hostParticipant?.items?.length
@@ -133,7 +202,7 @@ export function extractHostItems(apiParticipants, catalogItems = []) {
  * @returns {Array} Array of transformed non-host participants
  */
 export function extractNonHostParticipants(apiParticipants, catalogItems = []) {
-  console.log('👥 extractNonHostParticipants called:', {
+  logger.debug('extractNonHostParticipants called', {
     totalParticipants: apiParticipants?.length,
     nonHostCount: apiParticipants?.filter(p => p && !p.is_creator && !p.marked_not_coming).length
   });
@@ -143,12 +212,14 @@ export function extractNonHostParticipants(apiParticipants, catalogItems = []) {
   }
 
   const nonHostParticipants = apiParticipants.filter(p => p && !p.is_creator && !p.marked_not_coming);
-  console.log('👥 Non-host participants:', nonHostParticipants.map(p => ({
-    id: p?.id,
-    nickname: p?.nickname,
-    hasItems: !!p?.items,
-    itemsCount: p?.items?.length
-  })));
+  logger.debug('Non-host participants', {
+    participants: nonHostParticipants.map(p => ({
+      id: p?.id,
+      nickname: p?.nickname,
+      hasItems: !!p?.items,
+      itemsCount: p?.items?.length
+    }))
+  });
 
   return nonHostParticipants
     .map(p => transformParticipant(p, catalogItems))

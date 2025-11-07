@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createSession, getSession, joinSession, updateSessionStatus } from '../services/api.js';
 import socketService from '../services/socket.js';
+import logger from '../../../shared/utils/frontendLogger.js';
 
 const SESSION_STORAGE_KEY = 'minibag_active_session';
 
@@ -40,7 +41,7 @@ export function useSession(sessionId = null) {
       // Host token management removed - now using httpOnly cookies for security
       // The server sets the cookie automatically, no client-side storage needed
     } catch (err) {
-      console.error('Failed to persist session:', err);
+      logger.error('Failed to persist session', { error: err.message });
     }
   }, []);
 
@@ -54,7 +55,7 @@ export function useSession(sessionId = null) {
       // Host token cookie is httpOnly and managed by server
       // It will expire automatically or can be cleared via /api/logout endpoint
     } catch (err) {
-      console.error('Failed to clear persisted session:', err);
+      logger.error('Failed to clear persisted session', { error: err.message });
     }
   }, []);
 
@@ -94,7 +95,7 @@ export function useSession(sessionId = null) {
         return false;
       }
     } catch (err) {
-      console.error('Failed to restore session:', err);
+      logger.error('Failed to restore session', { error: err.message });
       clearPersistedSession();
       return false;
     }
@@ -126,12 +127,12 @@ export function useSession(sessionId = null) {
    */
   const loadSession = useCallback(async (id) => {
     try {
-      console.log('🔄 loadSession called for session:', id);
+      logger.debug('loadSession called for session', { sessionId: id });
       setLoading(true);
       setError(null);
 
       const data = await getSession(id);
-      console.log('📡 getSession API response:', {
+      logger.info('getSession API response', {
         sessionId: data.session?.session_id,
         sessionStatus: data.session?.status,
         participantsCount: data.participants?.length,
@@ -139,8 +140,7 @@ export function useSession(sessionId = null) {
           id: p.id,
           nickname: p.nickname,
           is_creator: p.is_creator,
-          items_count: p.items?.length,
-          items_array: p.items
+          items_count: p.items?.length
         }))
       });
       setSession(data.session);
@@ -151,7 +151,7 @@ export function useSession(sessionId = null) {
       setConnected(true);
     } catch (err) {
       setError(err.message);
-      console.error('Failed to load session:', err);
+      logger.error('Failed to load session', { sessionId: id, error: err.message });
     } finally {
       setLoading(false);
     }
@@ -181,7 +181,7 @@ export function useSession(sessionId = null) {
       return result;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to create session:', err);
+      logger.error('Failed to create session', { error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -217,7 +217,7 @@ export function useSession(sessionId = null) {
       return result;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to join session:', err);
+      logger.error('Failed to join session', { sessionId: id, error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -240,7 +240,7 @@ export function useSession(sessionId = null) {
       return result;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to update session status:', err);
+      logger.error('Failed to update session status', { sessionId: session?.session_id, newStatus, error: err.message });
       throw err;
     }
   };
@@ -261,42 +261,49 @@ export function useSession(sessionId = null) {
   useEffect(() => {
     if (!session) return;
 
-    // Listen for participant joins
-    socketService.onParticipantJoined((participant) => {
-      console.log('🔔 useSession: participant-joined WebSocket event', {
+    // Store listener references locally for proper cleanup
+    const handleParticipantJoined = (participant) => {
+      logger.info('participant-joined WebSocket event', {
         participantId: participant.id,
-        participantData: participant
+        sessionId: session?.session_id
       });
       setParticipants(prev => {
         // Avoid duplicates
         if (prev.some(p => p.id === participant.id)) {
-          console.log('⚠️ Duplicate participant, skipping');
+          logger.warn('Duplicate participant, skipping', { participantId: participant.id });
           return prev;
         }
-        console.log('➕ Adding new participant to state');
+        logger.debug('Adding new participant to state', { participantId: participant.id });
         return [...prev, participant];
       });
-    });
-
-    // Listen for participant leaving
-    socketService.onParticipantLeft((participantId) => {
-      setParticipants(prev => prev.filter(p => p.id !== participantId));
-    });
-
-    // Listen for session updates
-    socketService.onSessionUpdated((updatedSession) => {
-      setSession(prev => ({ ...prev, ...updatedSession }));
-    });
-
-    // Listen for status changes
-    socketService.onSessionStatusUpdated((data) => {
-      setSession(prev => ({ ...prev, status: data.status }));
-    });
-
-    return () => {
-      socketService.removeAllListeners();
     };
-  }, [session]);
+
+    const handleParticipantLeft = (participantId) => {
+      setParticipants(prev => prev.filter(p => p && p.id !== participantId));
+    };
+
+    const handleSessionUpdated = (updatedSession) => {
+      setSession(prev => ({ ...prev, ...updatedSession }));
+    };
+
+    const handleSessionStatusUpdated = (data) => {
+      setSession(prev => ({ ...prev, status: data.status }));
+    };
+
+    // Register listeners
+    socketService.onParticipantJoined(handleParticipantJoined);
+    socketService.onParticipantLeft(handleParticipantLeft);
+    socketService.onSessionUpdated(handleSessionUpdated);
+    socketService.onSessionStatusUpdated(handleSessionStatusUpdated);
+
+    // Cleanup: remove ONLY these specific listeners
+    return () => {
+      socketService.off('participant-joined', handleParticipantJoined);
+      socketService.off('participant-left', handleParticipantLeft);
+      socketService.off('session-updated', handleSessionUpdated);
+      socketService.off('session-status-updated', handleSessionStatusUpdated);
+    };
+  }, [session?.session_id]); // Use stable dependency
 
   // Load session if sessionId is provided
   useEffect(() => {
@@ -353,7 +360,7 @@ export function useParticipantItems(participantId) {
       return newItem;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to add item:', err);
+      logger.error('Failed to add item', { error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -380,7 +387,7 @@ export function useParticipantItems(participantId) {
       socketService.emitItemUpdated({ id: itemId, ...updates });
     } catch (err) {
       setError(err.message);
-      console.error('Failed to update item:', err);
+      logger.error('Failed to update item', { itemId, error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -402,7 +409,7 @@ export function useParticipantItems(participantId) {
       socketService.emitItemRemoved(itemId);
     } catch (err) {
       setError(err.message);
-      console.error('Failed to remove item:', err);
+      logger.error('Failed to remove item', { itemId, error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -411,26 +418,35 @@ export function useParticipantItems(participantId) {
 
   // Listen for real-time item updates
   useEffect(() => {
-    socketService.onItemAdded((item) => {
+    // Store listener references locally for proper cleanup
+    const handleItemAdded = (item) => {
       if (item.participant_id !== participantId) {
         setItems(prev => [...prev, item]);
       }
-    });
+    };
 
-    socketService.onItemUpdated((updatedItem) => {
+    const handleItemUpdated = (updatedItem) => {
       setItems(prev =>
         prev.map(item =>
           item.id === updatedItem.id ? { ...item, ...updatedItem } : item
         )
       );
-    });
+    };
 
-    socketService.onItemRemoved((itemId) => {
+    const handleItemRemoved = (itemId) => {
       setItems(prev => prev.filter(item => item.id !== itemId));
-    });
+    };
 
+    // Register listeners
+    socketService.onItemAdded(handleItemAdded);
+    socketService.onItemUpdated(handleItemUpdated);
+    socketService.onItemRemoved(handleItemRemoved);
+
+    // Cleanup: remove ONLY these specific listeners
     return () => {
-      socketService.removeAllListeners();
+      socketService.off('item-added', handleItemAdded);
+      socketService.off('item-updated', handleItemUpdated);
+      socketService.off('item-removed', handleItemRemoved);
     };
   }, [participantId]);
 

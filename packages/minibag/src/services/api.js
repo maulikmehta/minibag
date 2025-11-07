@@ -3,6 +3,8 @@
  * Handles all communication with the backend API
  */
 
+import logger from '../../../shared/utils/frontendLogger.js';
+
 // Use empty string to leverage Vite proxy (relative URLs)
 // In production, set VITE_API_URL to the actual API URL
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -84,7 +86,7 @@ async function apiFetch(endpoint, options = {}) {
     try {
       data = isJson ? await response.json() : await response.text();
     } catch (parseError) {
-      console.error('Failed to parse response:', parseError);
+      logger.error('Failed to parse response', { endpoint, error: parseError.message });
       throw new APIError(
         'Invalid response from server',
         response.status,
@@ -94,11 +96,11 @@ async function apiFetch(endpoint, options = {}) {
 
     if (!response.ok) {
       // Log full error details for debugging
-      console.error(`API Error (${endpoint}):`, {
+      logger.error('API Error', {
+        endpoint,
         status: response.status,
         error: data.error || data,
-        details: data.details,
-        data
+        details: data.details
       });
 
       const errorMessage = data.error || data.message || `HTTP error! status: ${response.status}`;
@@ -111,13 +113,13 @@ async function apiFetch(endpoint, options = {}) {
   } catch (error) {
     // Handle network errors
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      console.error(`Network Error (${endpoint}):`, error);
+      logger.error('Network Error', { endpoint, error: error.message });
       throw new APIError('Network error', 0, ERROR_MESSAGES.NETWORK_ERROR);
     }
 
     // Handle timeout errors
     if (error.name === 'AbortError') {
-      console.error(`Timeout Error (${endpoint}):`, error);
+      logger.error('Timeout Error', { endpoint, error: error.message });
       throw new APIError('Request timeout', 0, ERROR_MESSAGES.TIMEOUT);
     }
 
@@ -127,7 +129,7 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     // Handle other errors
-    console.error(`API Error (${endpoint}):`, error);
+    logger.error('API Error', { endpoint, error: error.message });
     throw new APIError(
       error.message || 'Unknown error',
       0,
@@ -214,17 +216,10 @@ export async function getSession(sessionId) {
   const response = await apiFetch(`/api/sessions/${sessionId}`);
 
   // DEBUG: Log what we received from API
-  console.log('📡 [getSession] API Response:', {
+  logger.debug('getSession API Response', {
     sessionId,
     sessionStatus: response.data?.session?.status,
-    participantsCount: response.data?.participants?.length,
-    participantsDetail: response.data?.participants?.map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      is_creator: p.is_creator,
-      items_count: p.items?.length,
-      items_keys: p.items ? (Array.isArray(p.items) ? `array[${p.items.length}]` : Object.keys(p.items).slice(0, 3)) : 'no items'
-    }))
+    participantsCount: response.data?.participants?.length
   });
 
   return response.data;
@@ -271,7 +266,7 @@ export async function updateSessionStatus(sessionId, status) {
 export async function getShoppingItems(sessionId) {
   const response = await apiFetch(`/api/sessions/${sessionId}/shopping-items`);
 
-  console.log('🛒 [getShoppingItems] API Response:', {
+  logger.debug('getShoppingItems API Response', {
     sessionId,
     itemsCount: Object.keys(response.data?.aggregatedItems || {}).length,
     participantsCount: response.data?.participants?.length
@@ -289,7 +284,7 @@ export async function getShoppingItems(sessionId) {
 export async function getBillItems(sessionId) {
   const response = await apiFetch(`/api/sessions/${sessionId}/bill-items`);
 
-  console.log('💰 [getBillItems] API Response:', {
+  logger.debug('getBillItems API Response', {
     sessionId,
     participantsCount: response.data?.participants?.length,
     totalCost: response.data?.totalCost
