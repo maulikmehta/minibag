@@ -425,6 +425,15 @@ export async function createSession(req, res) {
 
     // Check for duplicate session (same nickname + within 5 minutes)
     if (selected_nickname) {
+      // SECURITY: Validate nickname format to prevent SQL injection
+      const NICKNAME_REGEX = /^[a-zA-Z0-9\s]{2,20}$/;
+      if (!NICKNAME_REGEX.test(selected_nickname)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only.'
+        });
+      }
+
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: recentSessions } = await supabase
         .from('sessions')
@@ -1054,6 +1063,17 @@ export async function joinSession(req, res) {
       // Invite tracking
       invite_token = null // Token from invite link URL parameter
     } = req.body;
+
+    // SECURITY: Validate nickname format to prevent SQL injection
+    if (selected_nickname) {
+      const NICKNAME_REGEX = /^[a-zA-Z0-9\s]{2,20}$/;
+      if (!NICKNAME_REGEX.test(selected_nickname)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only.'
+        });
+      }
+    }
 
     // Get session
     const { data: session, error: sessionError } = await supabase
