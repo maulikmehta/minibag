@@ -28,7 +28,8 @@ export default function JoinSessionScreen({
   const [selectedNickname, setSelectedNickname] = useState(null);
   const [loadingNicknames, setLoadingNicknames] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
-  const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
+  const [showJoinModal, setShowJoinModal] = useState(false); // Modal for collecting user info
+  const [modalStep, setModalStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
   const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
 
   // PIN authentication state (for protected sessions)
@@ -80,8 +81,21 @@ export default function JoinSessionScreen({
     }
   }, [nicknameOptions.length, loadingNicknames, participantName]);
 
-  // Handle joining a session
-  const handleJoinSession = async () => {
+  // Handle joining a session - now shows modal first
+  const handleJoinClick = () => {
+    // Check if session is full (max 4 people: 1 host + 3 participants)
+    if (participants.length >= 3) {
+      notify.error('This list is full! Maximum 4 people can shop together.');
+      return;
+    }
+
+    // Show modal to collect user info
+    setShowJoinModal(true);
+    setModalStep(1);
+  };
+
+  // Handle actual join after modal completion
+  const handleConfirmJoin = async () => {
     if (!participantName.trim()) {
       notify.warning('Please enter your name');
       return;
@@ -89,12 +103,6 @@ export default function JoinSessionScreen({
 
     if (!selectedNickname) {
       notify.warning('Please select a nickname');
-      return;
-    }
-
-    // Check if session is full (max 4 people: 1 host + 3 participants)
-    if (participants.length >= 3) {
-      notify.error('This list is full! Maximum 4 people can shop together.');
       return;
     }
 
@@ -259,264 +267,75 @@ export default function JoinSessionScreen({
           </p>
         </div>
 
-        {/* Dot Navigation */}
-        <div className="flex gap-2 justify-center mb-6">
-          {[1, 2, 3].map((step) => (
-            <div
-              key={step}
-              className={`w-2 h-2 rounded-full transition-all ${
-                step <= onboardingStep ? 'bg-green-600' : 'bg-gray-300'
-              }`}
-            />
-          ))}
-        </div>
+        {/* Items Preview Section - Now shown first! */}
+        {hostSelectedItems.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-900 mb-3">
+              Items in this list ({hostSelectedItems.length})
+            </p>
+            <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
+              {hostSelectedItems.map(item => (
+                <div key={item.id} className="flex items-center gap-3 py-3 px-3">
+                  {/* Emoji */}
+                  <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
+                    {item.emoji || '🥬'}
+                  </div>
 
-        {/* Step 1: Name Input */}
-        {onboardingStep === 1 && (
+                  {/* Name */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">{getItemName(item)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PIN Input (if session requires it) - shown directly below items */}
+        {session?.requires_pin && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              What's your name?
+              Session PIN
             </label>
             <input
               type="text"
-              value={participantName}
+              inputMode="numeric"
+              value={sessionPin}
               onChange={(e) => {
-                // Allow only letters and spaces
-                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                setParticipantName(value);
+                // Allow only 4-6 digits
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setSessionPin(value);
               }}
-              placeholder="Enter your name"
+              placeholder="Enter 4-digit PIN"
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-              maxLength={50}
-              autoFocus
-              required
+              maxLength={6}
+              autoComplete="off"
             />
-            <p className="mt-2 text-xs text-gray-500">
-              We'll use this for payment splits & receipts
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the PIN from your invite message
             </p>
           </div>
         )}
 
-        {/* Step 2: Language Preference */}
-        {onboardingStep === 2 && i18n && handleLanguageChange && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-900 mb-3">
-              Choose your language
-            </label>
-            <div className="flex gap-3 justify-center">
-              <button
-                type="button"
-                onClick={() => handleLanguageChange('en')}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                  i18n.language === 'en'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                English
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLanguageChange('hi')}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                  i18n.language === 'hi'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                हिंदी
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLanguageChange('gu')}
-                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
-                  i18n.language === 'gu'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                ગુજરાતી
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Nickname Selection + Items */}
-        {onboardingStep === 3 && (
-          <>
-            {/* Nickname Selection */}
-            <div className="mb-6" data-tour="participant-nickname-selection">
-              <label className="block text-sm font-medium text-gray-900 mb-3">
-                Pick your bag tag
-              </label>
-              {loadingNicknames ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-green-600" />
-                </div>
-              ) : (
-                <div className="flex justify-center gap-8">
-                  {nicknameOptions.map((option, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => {
-                        setSelectedNickname(option);
-                        // Trigger big checkmark animation
-                        setShowBigCheck(option.nickname);
-                        setTimeout(() => setShowBigCheck(null), 600);
-                      }}
-                      className="flex flex-col items-center"
-                    >
-                      <div className="relative">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
-                          selectedNickname?.nickname === option.nickname
-                            ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
-                            : 'border-2 border-gray-300 hover:border-gray-400'
-                        }`}>
-                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                            <span className="text-2xl">{option.avatar_emoji}</span>
-                          </div>
-                        </div>
-
-                        {/* Big checkmark overlay - tap feedback (inside circle) */}
-                        {showBigCheck === option.nickname && (
-                          <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-float-up pointer-events-none">
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        )}
-
-                        {/* Small persistent badge (outside circle, top-right) */}
-                        {selectedNickname?.nickname === option.nickname && (
-                          <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white animate-pop">
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <p className="mt-3 text-xs text-gray-500 text-center">
-                How you'll appear to other shoppers
-              </p>
-            </div>
-
-            {/* PIN Input (required for all sessions) */}
-            {selectedNickname && (
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Session PIN
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={sessionPin}
-                  onChange={(e) => {
-                    // Allow only 4-6 digits
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setSessionPin(value);
-                  }}
-                  placeholder="Enter 4-digit PIN"
-                  className="input"
-                  maxLength={6}
-                  autoComplete="off"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter the PIN from your invite message
-                </p>
-              </div>
-            )}
-
-            {/* Items Preview Section */}
-            {hostSelectedItems.length > 0 && (
-              <div className="mb-6">
-                <p className="text-sm font-medium text-gray-900 mb-3">
-                  Items in this list ({hostSelectedItems.length})
-                </p>
-                <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
-                  {hostSelectedItems.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 py-3 px-3">
-                      {/* Emoji */}
-                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
-                        {item.emoji || '🥬'}
-                      </div>
-
-                      {/* Name */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">{getItemName(item)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Navigation Buttons */}
-        {onboardingStep < 3 ? (
-          <div className="flex gap-3">
-            {onboardingStep > 1 && (
-              <button
-                onClick={() => setOnboardingStep(onboardingStep - 1)}
-                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
-                title="Back"
-              >
-                <ChevronLeft size={20} strokeWidth={2} />
-              </button>
-            )}
-            <button
-              onClick={() => {
-                // Validate current step before proceeding
-                if (onboardingStep === 1 && !participantName.trim()) {
-                  notify.warning('Please enter your name');
-                  return;
-                }
-                setOnboardingStep(onboardingStep + 1);
-              }}
-              disabled={onboardingStep === 1 && !participantName.trim()}
-              className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-base font-semibold disabled:bg-gray-400 disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
-            >
-              Next
-              <ChevronRight size={18} strokeWidth={2.5} />
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Back and Join Buttons - Side by Side */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setOnboardingStep(2)}
-                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
-                title="Back"
-              >
-                <ChevronLeft size={20} strokeWidth={2} />
-              </button>
-              <button
-                onClick={handleJoinSession}
-                disabled={joiningSession || !selectedNickname}
-                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
-              >
-                {joiningSession ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Joining...
-                  </>
-                ) : (
-                  <>
-                    <Check size={18} strokeWidth={2.5} />
-                    Join list
-                  </>
-                )}
-              </button>
-            </div>
-          </>
-        )}
+        {/* Join / Decline Buttons */}
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={handleDeclineSession}
+            disabled={joiningSession}
+            className="flex-1 py-3 border-2 border-gray-300 hover:border-red-500 text-gray-900 hover:text-red-600 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <X size={18} strokeWidth={2.5} />
+            No Thanks
+          </button>
+          <button
+            onClick={handleJoinClick}
+            disabled={joiningSession}
+            className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <Check size={18} strokeWidth={2.5} />
+            Join List
+          </button>
+        </div>
 
         {/* Error Display */}
         {sessionError && (
@@ -525,6 +344,222 @@ export default function JoinSessionScreen({
           </div>
         )}
       </div>
+
+      {/* Join Modal - Collect Name, Language, Nickname */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-modal max-w-sm w-full p-4 relative animate-modal-enter shadow-2xl">
+            {/* Close button */}
+            <button
+              onClick={() => setShowJoinModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
+            >
+              <X size={24} />
+            </button>
+
+            {/* Modal Header */}
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Join the list</h2>
+
+            {/* Dot Navigation */}
+            <div className="flex gap-2 justify-center mb-4">
+              {[1, 2, 3].map((step) => (
+                <div
+                  key={step}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    step <= modalStep ? 'bg-green-600' : 'bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Step 1: Name Input */}
+            {modalStep === 1 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  What's your name?
+                </label>
+                <input
+                  type="text"
+                  value={participantName}
+                  onChange={(e) => {
+                    // Allow only letters and spaces
+                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                    setParticipantName(value);
+                  }}
+                  placeholder="Enter your name"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
+                  maxLength={50}
+                  autoFocus
+                  required
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  We'll use this for payment splits & receipts
+                </p>
+              </div>
+            )}
+
+            {/* Step 2: Language Preference */}
+            {modalStep === 2 && i18n && handleLanguageChange && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  Choose your language
+                </label>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange('en')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'en'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange('hi')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'hi'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    हिंदी
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange('gu')}
+                    className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
+                      i18n.language === 'gu'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ગુજરાતી
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Nickname Selection */}
+            {modalStep === 3 && (
+              <div className="mb-4" data-tour="participant-nickname-selection">
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  Pick your bag tag
+                </label>
+                {loadingNicknames ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={24} className="animate-spin text-green-600" />
+                  </div>
+                ) : (
+                  <div className="flex justify-center gap-8">
+                    {nicknameOptions.map((option, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          setSelectedNickname(option);
+                          // Trigger big checkmark animation
+                          setShowBigCheck(option.nickname);
+                          setTimeout(() => setShowBigCheck(null), 600);
+                        }}
+                        className="flex flex-col items-center"
+                      >
+                        <div className="relative">
+                          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
+                            selectedNickname?.nickname === option.nickname
+                              ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                              : 'border-2 border-gray-300 hover:border-gray-400'
+                          }`}>
+                            <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                              <span className="text-2xl">{option.avatar_emoji}</span>
+                            </div>
+                          </div>
+
+                          {/* Big checkmark overlay - tap feedback (inside circle) */}
+                          {showBigCheck === option.nickname && (
+                            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-ripple pointer-events-none">
+                              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Small persistent badge (outside circle, top-right) */}
+                          {selectedNickname?.nickname === option.nickname && (
+                            <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-green-600 rounded-full flex items-center justify-center border-2 border-white animate-pop">
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">{option.nickname}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-3 text-xs text-gray-500 text-center">
+                  How you'll appear to other shoppers
+                </p>
+              </div>
+            )}
+
+            {/* Modal Navigation Buttons */}
+            {modalStep < 3 ? (
+              <div className="flex justify-end gap-3 mt-4">
+                {modalStep > 1 && (
+                  <button
+                    onClick={() => setModalStep(modalStep - 1)}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-400 hover:bg-gray-500 rounded-full text-white transition-all duration-150 active:scale-90"
+                    title="Back"
+                  >
+                    <ChevronLeft size={20} strokeWidth={2} />
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    // Validate current step before proceeding
+                    if (modalStep === 1 && !participantName.trim()) {
+                      notify.warning('Please enter your name');
+                      return;
+                    }
+                    setModalStep(modalStep + 1);
+                  }}
+                  disabled={modalStep === 1 && !participantName.trim()}
+                  className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+                  title="Next"
+                >
+                  <ChevronRight size={20} strokeWidth={2} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setModalStep(2)}
+                  className="w-10 h-10 flex items-center justify-center bg-gray-400 hover:bg-gray-500 rounded-full text-white transition-all duration-150 active:scale-90"
+                  title="Back"
+                >
+                  <ChevronLeft size={20} strokeWidth={2} />
+                </button>
+                <button
+                  onClick={handleConfirmJoin}
+                  disabled={joiningSession || !selectedNickname}
+                  className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+                  title={joiningSession ? "Joining..." : "Confirm & Join"}
+                >
+                  {joiningSession ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <Check size={20} strokeWidth={2} />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
