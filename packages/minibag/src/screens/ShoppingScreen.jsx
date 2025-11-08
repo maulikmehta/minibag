@@ -263,8 +263,8 @@ function ShoppingScreen({
             setShowPaymentModal(false);
             setSelectedItemForPayment(null);
           }}
-          onConfirm={(method, amount) => {
-            onRecordPayment(selectedItemForPayment, method, amount);
+          onConfirm={(method, amount, paymentId) => {
+            onRecordPayment(selectedItemForPayment, method, amount, paymentId);
             setShowPaymentModal(false);
             setSelectedItemForPayment(null);
           }}

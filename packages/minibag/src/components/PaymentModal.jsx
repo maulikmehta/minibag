@@ -12,7 +12,7 @@ import ModalWrapper from './shared/ModalWrapper.jsx';
  * @param {Array} items - Array of all items
  * @param {Object} existingPayment - Existing payment data for editing (optional)
  * @param {function} onClose - Callback when modal is closed
- * @param {function} onConfirm - Callback when payment is confirmed (method, amount)
+ * @param {function} onConfirm - Callback when payment is confirmed (method, amount, paymentId)
  */
 function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfirm }) {
   const [method, setMethod] = useState(existingPayment?.method || 'upi');
@@ -68,7 +68,7 @@ function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfir
 
       <div className="flex justify-end">
         <button
-          onClick={() => amount && onConfirm(method, amount)}
+          onClick={() => amount && onConfirm(method, amount, existingPayment?.id)}
           disabled={!amount}
           className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
           title="Confirm payment"

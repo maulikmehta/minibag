@@ -310,10 +310,10 @@ export async function generateBillToken(sessionId, participantId = null) {
   logger.debug('generateBillToken API Response', {
     sessionId,
     participantId,
-    hasToken: !!response.data?.access_token
+    hasToken: !!response.token
   });
 
-  return response.data;
+  return response;
 }
 
 // ============================================================================

@@ -3,7 +3,7 @@ import { Plus, Minus, Check, MapPin, X, Share2, Users, Calendar, Clock, IndianRu
 import { useTranslation } from 'react-i18next';
 import useCatalog from './src/hooks/useCatalog.js';
 import useSession from './src/hooks/useSession.js';
-import { recordPayment, getSessionPayments, updateParticipantItems, updateParticipantStatus, updateSessionStatus, deletePayment } from './src/services/api.js';
+import { recordPayment, updatePayment, getSessionPayments, updateParticipantItems, updateParticipantStatus, updateSessionStatus, deletePayment } from './src/services/api.js';
 import socketService from './src/services/socket.js';
 import VoiceSearch from './src/components/VoiceSearch.jsx';
 import CategoryButton from './src/components/performance/CategoryButton.jsx';
@@ -1015,15 +1015,26 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         selectedItemForPayment={selectedItemForPayment}
         setSelectedItemForPayment={setSelectedItemForPayment}
         onSkipToggle={handleSkipToggle}
-        onRecordPayment={async (itemId, method, amount) => {
+        onRecordPayment={async (itemId, method, amount, paymentId) => {
           try {
-            // Record payment to backend
-            const payment = await recordPayment(session.session_id, {
-              item_id: itemId,
-              amount: parseFloat(amount),
-              method: method,
-              recorded_by: currentParticipant?.id || null
-            });
+            let payment;
+
+            // Check if we're editing an existing payment or creating a new one
+            if (paymentId) {
+              // Update existing payment
+              payment = await updatePayment(paymentId, {
+                amount: parseFloat(amount),
+                method: method
+              });
+            } else {
+              // Create new payment
+              payment = await recordPayment(session.session_id, {
+                item_id: itemId,
+                amount: parseFloat(amount),
+                method: method,
+                recorded_by: currentParticipant?.id || null
+              });
+            }
 
             // Update local state
             setItemPayments({

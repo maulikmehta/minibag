@@ -168,7 +168,6 @@ export async function updatePayment(req, res) {
     if (amount !== undefined) updates.amount = parseFloat(amount);
     if (method !== undefined) updates.method = method;
     if (vendor_name !== undefined) updates.vendor_name = vendor_name;
-    updates.updated_at = new Date().toISOString();
 
     // Validate method if provided
     if (method && !['upi', 'cash', 'skip'].includes(method)) {
