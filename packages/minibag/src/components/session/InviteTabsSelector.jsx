@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users } from 'lucide-react';
+import { Users, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../../hooks/useNotification.js';
 import InviteCard from './InviteCard.jsx';
@@ -198,19 +198,14 @@ export default function InviteTabsSelector({
 
       {/* OK Button for Modal Mode */}
       {showConfirmButton && (
-        <div className="px-2 pt-4 border-t border-gray-200">
+        <div className="px-2 pt-4 border-t border-gray-200 flex justify-end">
           <button
             onClick={handleConfirm}
             disabled={activeTab === null || locked || loadingInvites}
-            className={`
-              w-full py-3 px-4 rounded-lg font-medium transition-all
-              ${activeTab === null || locked || loadingInvites
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800'
-              }
-            `}
+            className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+            title={activeTab === null ? 'Select a mode to continue' : loadingInvites ? 'Loading invites...' : 'OK'}
           >
-            {activeTab === null ? 'Select a mode to continue' : loadingInvites ? 'Loading invites...' : 'OK'}
+            <Check size={20} strokeWidth={2} />
           </button>
         </div>
       )}

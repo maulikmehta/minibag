@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Check } from 'lucide-react';
 
 export default function ConfirmationModal({
   isOpen,
@@ -117,26 +117,28 @@ export default function ConfirmationModal({
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col-reverse sm:flex-row gap-3">
-            {/* Cancel button (primary action for safety) */}
+          <div className="flex justify-end gap-3">
+            {/* Cancel button */}
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-4 text-base font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-all min-h-[56px]"
+              className="w-10 h-10 flex items-center justify-center bg-gray-400 hover:bg-gray-500 text-white rounded-full transition-all duration-150 active:scale-90 focus:outline-none focus:ring-2 focus:ring-gray-300"
               aria-label={`${cancelText} this action`}
+              title={cancelText}
             >
-              {cancelText}
+              <X size={20} strokeWidth={2} />
             </button>
 
-            {/* Confirm button (destructive action) */}
+            {/* Confirm button */}
             <button
               type="button"
               ref={confirmButtonRef}
               onClick={onConfirm}
-              className={`flex-1 px-6 py-4 text-base font-medium text-white rounded-xl focus:outline-none focus:ring-4 transition-all min-h-[56px] ${styles.button}`}
+              className={`w-10 h-10 flex items-center justify-center text-white rounded-full transition-all duration-150 active:scale-90 focus:outline-none focus:ring-2 ${styles.button}`}
               aria-label={`${confirmText} - this action cannot be undone`}
+              title={confirmText}
             >
-              {confirmText}
+              <Check size={20} strokeWidth={2} />
             </button>
           </div>
 

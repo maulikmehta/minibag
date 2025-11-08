@@ -611,8 +611,8 @@ export default function SessionCreateScreen({
 
                 {/* Optional PIN Protection (shown after nickname selected) */}
                 {selectedHostNickname && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+                    <label className="flex items-center justify-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={enablePin}
@@ -620,14 +620,14 @@ export default function SessionCreateScreen({
                           setEnablePin(e.target.checked);
                           if (!e.target.checked) setSessionPin(''); // Clear PIN if disabled
                         }}
-                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        className="w-4 h-4 accent-green-600 border-gray-300 rounded focus:ring-green-500"
                       />
                       <span className="text-sm font-medium text-gray-900">Protect with PIN</span>
                     </label>
-                    <p className="text-xs text-gray-500 mt-1 ml-6">Only people with the PIN can join</p>
+                    <p className="text-xs text-gray-500 mt-1">Only people with the PIN can join</p>
 
                     {enablePin && (
-                      <div className="mt-3 ml-6">
+                      <div className="mt-3">
                         <input
                           type="text"
                           value={sessionPin}
@@ -651,11 +651,11 @@ export default function SessionCreateScreen({
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex gap-3 mt-4">
+            <div className="flex justify-end gap-3 mt-4">
               {onboardingStep > 1 && (
                 <button
                   onClick={() => setOnboardingStep(onboardingStep - 1)}
-                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-button text-gray-900 hover:bg-gray-50 transition-all duration-150 active:scale-90"
+                  className="w-10 h-10 flex items-center justify-center bg-gray-400 hover:bg-gray-500 rounded-full text-white transition-all duration-150 active:scale-90"
                   title="Back"
                 >
                   <ChevronLeft size={20} strokeWidth={2} />
@@ -673,27 +673,22 @@ export default function SessionCreateScreen({
                     setOnboardingStep(onboardingStep + 1);
                   }}
                   disabled={onboardingStep === 1 && !hostName.trim()}
-                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
+                  className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+                  title={`Next (${onboardingStep}/3)`}
                 >
-                  <span>Next ({onboardingStep}/3)</span>
-                  <ChevronRight size={18} strokeWidth={2.5} />
+                  <ChevronRight size={20} strokeWidth={2} />
                 </button>
               ) : (
                 <button
                   onClick={handleCreateSession}
                   disabled={creatingSession || !selectedHostNickname}
-                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-button text-base font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 flex items-center justify-center gap-2 transition-all duration-150 active:scale-95 disabled:active:scale-100"
+                  className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
+                  title={creatingSession ? "Creating..." : "Start List"}
                 >
                   {creatingSession ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Creating...
-                    </>
+                    <Loader2 size={20} className="animate-spin" />
                   ) : (
-                    <>
-                      <Check size={18} strokeWidth={2.5} />
-                      Start List
-                    </>
+                    <Check size={20} strokeWidth={2} />
                   )}
                 </button>
               )}
