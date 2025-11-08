@@ -174,10 +174,10 @@ export async function getBillByToken(req, res) {
       })
       .eq('id', tokenData.id);
 
-    // Fetch session data
+    // Fetch session data with host information
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('id, session_id, session_type, created_at')
+      .select('id, session_id, session_type, created_at, creator_nickname, title, completed_at')
       .eq('id', tokenData.session_id)
       .single();
 
@@ -187,6 +187,22 @@ export async function getBillByToken(req, res) {
         error: 'Session not found'
       });
     }
+
+    // Fetch host (creator) real name
+    const { data: hostParticipant } = await supabase
+      .from('participants')
+      .select('real_name, nickname')
+      .eq('session_id', tokenData.session_id)
+      .eq('is_creator', true)
+      .single();
+
+    const hostRealName = hostParticipant?.real_name || session.creator_nickname || 'Your MiniBag Host';
+
+    // Fetch participant count for the session
+    const { count: participantCount } = await supabase
+      .from('participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', tokenData.session_id);
 
     // Fetch payments first to get the item_ids
     const { data: payments, error: paymentsError } = await supabase
@@ -209,9 +225,9 @@ export async function getBillByToken(req, res) {
     if (itemIds.length === 0) {
       // Return empty bill
       if (tokenData.participant_id) {
-        return await getParticipantBill(res, tokenData, session, [], payments);
+        return await getParticipantBill(res, tokenData, session, [], payments, hostRealName, participantCount);
       } else {
-        return await getHostBill(res, tokenData, session, [], payments);
+        return await getHostBill(res, tokenData, session, [], payments, hostRealName, participantCount);
       }
     }
 
@@ -232,11 +248,11 @@ export async function getBillByToken(req, res) {
     // If participant_id is set, fetch participant-specific bill
     if (tokenData.participant_id) {
       console.log('📄 [getBillByToken] Calling getParticipantBill for participant:', tokenData.participant_id);
-      return await getParticipantBill(res, tokenData, session, catalogItems, payments);
+      return await getParticipantBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount);
     } else {
       console.log('📄 [getBillByToken] Calling getHostBill (no participant_id)');
       // Return host/solo bill (full session)
-      return await getHostBill(res, tokenData, session, catalogItems, payments);
+      return await getHostBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount);
     }
   } catch (error) {
     logger.error({ err: error, token: req.params.token }, 'Error fetching bill');
@@ -250,7 +266,7 @@ export async function getBillByToken(req, res) {
 /**
  * Helper: Get participant-specific bill
  */
-async function getParticipantBill(res, tokenData, session, catalogItems, payments) {
+async function getParticipantBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount) {
   // Fetch participant data
   const { data: participant, error: participantError } = await supabase
     .from('participants')
@@ -367,6 +383,8 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
 
       billItems.push({
         item_name: catalog.name,
+        item_name_hi: catalog.name_hi,
+        item_name_gu: catalog.name_gu,
         emoji: catalog.emoji,
         quantity: item.quantity,
         unit: catalog.unit,
@@ -391,7 +409,12 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     session: {
       session_id: session.session_id,
       created_at: session.created_at,
-      session_type: session.session_type
+      completed_at: session.completed_at,
+      session_type: session.session_type,
+      title: session.title
+    },
+    host: {
+      real_name: hostRealName
     },
     participant: {
       nickname: participant.nickname,
@@ -399,6 +422,7 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     },
     items: billItems,
     total_amount: Math.round(totalAmount * 100) / 100,
+    participant_count: participantCount || 0,
     expires_at: tokenData.expires_at
   });
 }
@@ -406,7 +430,7 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
 /**
  * Helper: Get host/solo bill (full session)
  */
-async function getHostBill(res, tokenData, session, catalogItems, payments) {
+async function getHostBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount) {
 
   // Build catalog map
   const catalogMap = {};
@@ -428,6 +452,8 @@ async function getHostBill(res, tokenData, session, catalogItems, payments) {
         totalItemsSkipped++;
         billItems.push({
           item_name: catalog.name,
+          item_name_hi: catalog.name_hi,
+          item_name_gu: catalog.name_gu,
           emoji: catalog.emoji,
           quantity: 0,
           unit: catalog.unit,
@@ -442,6 +468,8 @@ async function getHostBill(res, tokenData, session, catalogItems, payments) {
 
         billItems.push({
           item_name: catalog.name,
+          item_name_hi: catalog.name_hi,
+          item_name_gu: catalog.name_gu,
           emoji: catalog.emoji,
           quantity: null, // Host bill doesn't show quantity breakdown
           unit: catalog.unit,
@@ -461,12 +489,18 @@ async function getHostBill(res, tokenData, session, catalogItems, payments) {
     session: {
       session_id: session.session_id,
       created_at: session.created_at,
-      session_type: session.session_type
+      completed_at: session.completed_at,
+      session_type: session.session_type,
+      title: session.title
+    },
+    host: {
+      real_name: hostRealName
     },
     items: billItems,
     total_amount: Math.round(totalAmount * 100) / 100,
     total_items_paid: totalItemsPaid,
     total_items_skipped: totalItemsSkipped,
+    participant_count: participantCount || 0,
     expires_at: tokenData.expires_at
   });
 }

@@ -22,5 +22,33 @@
   "whatsapp": {
     "invitation": "🛒 हेय! मैं जल्दी शॉपिंग करने जा रहा हूं.\n\nलिस्ट में कुछ जोड़ना है? मैं आपके लिए ले आऊंगा 😊\n\n{{url}}",
     "thankYouMessage": "शॉपिंग के लिए धन्यवाद! 😊 कब ले सकता हूं और पेमेंट करूं?"
+  },
+  "bill": {
+    "title": "MiniBag रसीद",
+    "loading": "बिल लोड हो रहा है...",
+    "downloading": "डाउनलोड हो रहा है...",
+    "downloadError": "बिल डाउनलोड विफल। पुनः प्रयास करें।",
+    "expired": "यह बिल लिंक समाप्त हो गया है",
+    "invalid": "अमान्य बिल लिंक",
+    "failed": "बिल लोड विफल",
+    "connectionError": "कनेक्शन त्रुटि। अपना इंटरनेट जांचें।",
+    "notAvailable": "बिल उपलब्ध नहीं है",
+    "saveReceipt": "रसीद सहेजें",
+    "closeReceipt": "रसीद बंद करें",
+    "sessionId": "सत्र ID",
+    "for": "के लिए",
+    "date": "तारीख",
+    "completed": "पूर्ण",
+    "receipt": "रसीद",
+    "skipped": "छोड़ दिया",
+    "subTotal": "उप योग",
+    "total": "कुल",
+    "itemsInOrder": "इस ऑर्डर में आइटम: {{count}}",
+    "itemsPurchased": "खरीदे गए आइटम",
+    "totalParticipants": "कुल प्रतिभागी",
+    "shoppingCompleted": "शॉपिंग पूर्ण",
+    "thankYou": "स्थानीय पड़ोस का समर्थन करने के लिए\nधन्यवाद!",
+    "from": "की ओर से",
+    "expiryNotice": "यह बिल लिंक {{date}} को समाप्त होगा"
   }
 }

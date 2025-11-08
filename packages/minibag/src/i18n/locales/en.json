@@ -93,5 +93,33 @@
       "title": "Invite friends",
       "description": "Share this session link via WhatsApp to invite neighbors"
     }
+  },
+  "bill": {
+    "title": "MiniBag Receipt",
+    "loading": "Loading bill...",
+    "downloading": "Downloading...",
+    "downloadError": "Failed to download bill. Please try again.",
+    "expired": "This bill link has expired",
+    "invalid": "Invalid bill link",
+    "failed": "Failed to load bill",
+    "connectionError": "Connection error. Please check your internet connection.",
+    "notAvailable": "Bill data not available",
+    "saveReceipt": "Save Receipt",
+    "closeReceipt": "Close Receipt",
+    "sessionId": "Session ID",
+    "for": "For",
+    "date": "Date",
+    "completed": "Completed",
+    "receipt": "Receipt",
+    "skipped": "Skipped",
+    "subTotal": "Sub Total",
+    "total": "TOTAL",
+    "itemsInOrder": "Items in this order: {{count}}",
+    "itemsPurchased": "Items purchased",
+    "totalParticipants": "Total participants",
+    "shoppingCompleted": "Shopping completed",
+    "thankYou": "Thank You For Supporting\nLocal Neighborhoods!",
+    "from": "From",
+    "expiryNotice": "This bill link expires on {{date}}"
   }
 }

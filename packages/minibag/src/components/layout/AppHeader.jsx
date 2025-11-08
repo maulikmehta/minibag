@@ -10,6 +10,7 @@ import MinibagIcon from '../MinibagIcon.jsx';
  * Shows Minibag logo, language switcher, help icon, and optional end session menu.
  *
  * @param {boolean} showLogo - Whether to show the logo icon (default: true)
+ * @param {string} title - Header title text (default: "Minibag")
  * @param {Object} i18n - i18n instance for language management
  * @param {function} onLanguageChange - Language change handler
  * @param {function} onLogoClick - Logo/brand click handler (navigate home with warning)
@@ -17,11 +18,13 @@ import MinibagIcon from '../MinibagIcon.jsx';
  * @param {boolean} endSessionMenuOpen - Whether end session menu is open
  * @param {function} onEndSessionMenuToggle - Toggle end session menu
  * @param {function} onEndSession - End session handler
+ * @param {string} menuLabel - Label for menu action (default: "End Session")
  * @param {function} onHelpClick - Help icon click handler (for on-demand tooltips)
  * @param {React.ReactNode} rightContent - Optional additional right content
  */
 function AppHeader({
   showLogo = true,
+  title = "Minibag",
   i18n = null,
   onLanguageChange = null,
   onLogoClick = null,
@@ -29,6 +32,7 @@ function AppHeader({
   endSessionMenuOpen = false,
   onEndSessionMenuToggle = null,
   onEndSession = null,
+  menuLabel = "End Session",
   onHelpClick = null,
   rightContent = null
 }) {
@@ -39,7 +43,7 @@ function AppHeader({
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         {showLogo && <MinibagIcon size={32} />}
-        <h1 className="text-lg font-bold text-gray-900">Minibag</h1>
+        <h1 className="text-lg font-bold text-gray-900">{title}</h1>
       </button>
 
       <div className="flex items-center gap-3">
@@ -62,6 +66,9 @@ function AppHeader({
             <HelpCircle size={18} className="text-gray-600" />
           </button>
         )}
+
+        {/* Additional right content */}
+        {rightContent}
 
         {/* End Session Menu (Host only) */}
         {showEndSessionMenu && onEndSessionMenuToggle && onEndSession && (
@@ -91,16 +98,13 @@ function AppHeader({
                     className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600 hover:text-red-700"
                   >
                     <X size={16} />
-                    <span className="font-medium">End Session</span>
+                    <span className="font-medium">{menuLabel}</span>
                   </button>
                 </div>
               </>
             )}
           </div>
         )}
-
-        {/* Additional right content */}
-        {rightContent}
       </div>
     </div>
   );

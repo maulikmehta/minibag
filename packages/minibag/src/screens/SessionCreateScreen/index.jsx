@@ -217,7 +217,7 @@ export default function SessionCreateScreen({
         location_text: 'My location', // TODO: Get from user input
         neighborhood: 'Local area',   // TODO: Get from user input
         scheduled_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
-        title: 'Shopping Run',
+        title: 'Minibag',
         description: 'Group shopping session',
         items: formattedItems,
         expected_participants: null, // Host must choose on SessionActiveScreen: null (not set) -> 0 (solo) or 1-3 (wait)
