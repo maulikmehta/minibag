@@ -98,7 +98,7 @@ export const getItemEmoji = (itemName = '', category = '', itemEmoji = null) => 
   }
 
   // Second priority: match by item name
-  const normalizedName = itemName.toLowerCase().trim();
+  const normalizedName = (itemName || '').toLowerCase().trim();
   for (const [key, emoji] of Object.entries(ITEM_NAME_EMOJI_MAP)) {
     if (normalizedName.includes(key)) {
       return emoji;
@@ -106,7 +106,7 @@ export const getItemEmoji = (itemName = '', category = '', itemEmoji = null) => 
   }
 
   // Third priority: use category emoji
-  const normalizedCategory = category.toLowerCase().trim();
+  const normalizedCategory = (category || '').toLowerCase().trim();
   if (CATEGORY_EMOJI_MAP[normalizedCategory]) {
     return CATEGORY_EMOJI_MAP[normalizedCategory];
   }
@@ -121,6 +121,6 @@ export const getItemEmoji = (itemName = '', category = '', itemEmoji = null) => 
  * @returns {string} Emoji character
  */
 export const getCategoryEmoji = (category = '') => {
-  const normalized = category.toLowerCase().trim();
+  const normalized = (category || '').toLowerCase().trim();
   return CATEGORY_EMOJI_MAP[normalized] || CATEGORY_EMOJI_MAP.default;
 };

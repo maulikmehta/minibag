@@ -5,6 +5,7 @@
 
 import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 /**
  * POST /api/sessions/:session_id/bill-token
@@ -93,7 +94,7 @@ export async function generateBillToken(req, res) {
         .single();
 
       if (tokenError) {
-        console.error('Failed to create bill token:', tokenError);
+        logger.error({ err: tokenError, sessionId: session.id, participantId: participant_id }, 'Failed to create bill token');
         return res.status(500).json({
           success: false,
           error: 'Failed to generate bill token'
@@ -115,7 +116,7 @@ export async function generateBillToken(req, res) {
       bill_url: billUrl
     });
   } catch (error) {
-    console.error('Error generating bill token:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error generating bill token');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -194,7 +195,7 @@ export async function getBillByToken(req, res) {
       .eq('session_id', session.session_id);
 
     if (paymentsError) {
-      console.error('Failed to fetch payments:', paymentsError);
+      logger.error({ err: paymentsError, sessionId: session.session_id }, 'Failed to fetch payments');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch payments'
@@ -221,7 +222,7 @@ export async function getBillByToken(req, res) {
       .in('item_id', itemIds);
 
     if (catalogError) {
-      console.error('Failed to fetch catalog items:', catalogError);
+      logger.error({ err: catalogError, itemIds }, 'Failed to fetch catalog items');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch catalog items'
@@ -238,7 +239,7 @@ export async function getBillByToken(req, res) {
       return await getHostBill(res, tokenData, session, catalogItems, payments);
     }
   } catch (error) {
-    console.error('Error fetching bill:', error);
+    logger.error({ err: error, token: req.params.token }, 'Error fetching bill');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -271,7 +272,7 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     .eq('participant_id', tokenData.participant_id);
 
   if (itemsError) {
-    console.error('Failed to fetch participant items:', itemsError);
+    logger.error({ err: itemsError, participantId: tokenData.participant_id }, 'Failed to fetch participant items');
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch items'
@@ -305,7 +306,7 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     .in('item_id', participantItems.map(i => i.item_id));
 
   if (allItemsError) {
-    console.error('Failed to fetch all participant items:', allItemsError);
+    logger.error({ err: allItemsError, participantId: tokenData.participant_id }, 'Failed to fetch all participant items');
     return res.status(500).json({
       success: false,
       error: 'Failed to calculate bill'

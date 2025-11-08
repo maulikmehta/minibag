@@ -46,6 +46,10 @@ export default function SessionCreateScreen({
   const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
   const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
 
+  // PIN protection state
+  const [enablePin, setEnablePin] = useState(false);
+  const [sessionPin, setSessionPin] = useState('');
+
   // Reset onboarding step when modal opens
   useEffect(() => {
     if (showHostNicknameModal) {
@@ -212,7 +216,7 @@ export default function SessionCreateScreen({
         unit: 'kg'
       }));
 
-      // Create session via API with nickname selection
+      // Create session via API with nickname selection and optional PIN
       const result = await createSession({
         location_text: 'My location', // TODO: Get from user input
         neighborhood: 'Local area',   // TODO: Get from user input
@@ -225,7 +229,10 @@ export default function SessionCreateScreen({
         real_name: hostName,
         selected_nickname_id: selectedHostNickname.id,
         selected_nickname: selectedHostNickname.nickname,
-        selected_avatar_emoji: selectedHostNickname.avatar_emoji
+        selected_avatar_emoji: selectedHostNickname.avatar_emoji,
+        // PIN protection (optional)
+        generate_pin: enablePin && !sessionPin.trim(), // Auto-generate if enabled but no custom PIN
+        session_pin: enablePin && sessionPin.trim() ? sessionPin : null // Use custom PIN if provided
       });
 
       // Navigate to session-active screen and pass hostItems
@@ -601,6 +608,45 @@ export default function SessionCreateScreen({
                   </div>
                 )}
                 <p className="text-xs text-gray-500 mt-3 text-center">How you'll appear to other shoppers</p>
+
+                {/* Optional PIN Protection (shown after nickname selected) */}
+                {selectedHostNickname && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={enablePin}
+                        onChange={(e) => {
+                          setEnablePin(e.target.checked);
+                          if (!e.target.checked) setSessionPin(''); // Clear PIN if disabled
+                        }}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">Protect with PIN</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1 ml-6">Only people with the PIN can join</p>
+
+                    {enablePin && (
+                      <div className="mt-3 ml-6">
+                        <input
+                          type="text"
+                          value={sessionPin}
+                          onChange={(e) => {
+                            // Allow only 4-6 digits
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                            setSessionPin(value);
+                          }}
+                          placeholder="Enter 4-6 digit PIN (optional)"
+                          className="input text-sm"
+                          maxLength={6}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {sessionPin.trim() ? 'Custom PIN will be used' : 'Leave empty for auto-generated PIN'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

@@ -31,6 +31,9 @@ export default function JoinSessionScreen({
   const [onboardingStep, setOnboardingStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
   const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
 
+  // PIN authentication state (for protected sessions)
+  const [sessionPin, setSessionPin] = useState('');
+
   // Extract invite token from URL query parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -98,13 +101,14 @@ export default function JoinSessionScreen({
     try {
       setJoiningSession(true);
 
-      // Join session via API with nickname selection
+      // Join session via API with nickname selection and PIN (if required)
       const result = await joinSession(joinSessionId, [], {
         real_name: participantName,
         selected_nickname_id: selectedNickname.id,
         selected_nickname: selectedNickname.nickname,
         selected_avatar_emoji: selectedNickname.avatar_emoji,
-        invite_token: inviteToken // Include invite token if present
+        invite_token: inviteToken, // Include invite token if present
+        session_pin: sessionPin.trim() || null // Include PIN if provided
       });
 
       console.log('✅ Joined session:', result);
@@ -401,6 +405,32 @@ export default function JoinSessionScreen({
                 How you'll appear to other shoppers
               </p>
             </div>
+
+            {/* PIN Input (if session requires PIN) */}
+            {session?.requires_pin && selectedNickname && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Session PIN Required
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={sessionPin}
+                  onChange={(e) => {
+                    // Allow only 4-6 digits
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setSessionPin(value);
+                  }}
+                  placeholder="Enter 4-6 digit PIN"
+                  className="input"
+                  maxLength={6}
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ask the host for the PIN to join this session
+                </p>
+              </div>
+            )}
 
             {/* Items Preview Section */}
             {hostSelectedItems.length > 0 && (

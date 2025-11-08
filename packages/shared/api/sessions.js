@@ -6,6 +6,7 @@
 import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
 import { setHostTokenCookie, getHostToken } from '../utils/cookies.js';
+import logger from '../utils/logger.js';
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)
@@ -133,7 +134,7 @@ async function checkFinancialSettlement(sessionId) {
       .eq('session_id', sessionId);
 
     if (itemsError) {
-      console.error('Error fetching participant items:', itemsError);
+      logger.error({ err: itemsError, sessionId }, 'Error fetching participant items');
       return false;
     }
 
@@ -149,7 +150,7 @@ async function checkFinancialSettlement(sessionId) {
       .eq('session_id', sessionId);
 
     if (paymentsError) {
-      console.error('Error fetching payments:', paymentsError);
+      logger.error({ err: paymentsError, sessionId }, 'Error fetching payments');
       return false;
     }
 
@@ -159,7 +160,7 @@ async function checkFinancialSettlement(sessionId) {
     // Check if all participant items have payment records (paid or skipped)
     return participantItems.every(item => paidItemIds.has(item.item_id));
   } catch (error) {
-    console.error('Error checking financial settlement:', error);
+    logger.error({ err: error, sessionId }, 'Error checking financial settlement');
     return false;
   }
 }
@@ -181,7 +182,7 @@ async function performSessionCleanup(session, status) {
           .eq('id', session.id);
 
         if (settlementError) {
-          console.error('Error updating financially_settled_at:', settlementError);
+          logger.error({ err: settlementError, sessionId: session.id }, 'Error updating financially_settled_at');
         }
       }
     }
@@ -193,7 +194,7 @@ async function performSessionCleanup(session, status) {
       .eq('session_id', session.id);
 
     if (participantsError) {
-      console.error('Error fetching participants for cleanup:', participantsError);
+      logger.error({ err: participantsError, sessionId: session.id }, 'Error fetching participants for cleanup');
       return;
     }
 
@@ -205,7 +206,7 @@ async function performSessionCleanup(session, status) {
         .eq('currently_used_in', session.id);
 
       if (nicknamesError) {
-        console.error('Error fetching nicknames for cleanup:', nicknamesError);
+        logger.error({ err: nicknamesError, sessionId: session.id }, 'Error fetching nicknames for cleanup');
         return;
       }
 
@@ -219,12 +220,12 @@ async function performSessionCleanup(session, status) {
           .eq('currently_used_in', session.id);
 
         if (releaseError) {
-          console.error('Error releasing nicknames:', releaseError);
+          logger.error({ err: releaseError, sessionId: session.id }, 'Error releasing nicknames');
         }
       }
     }
   } catch (error) {
-    console.error('Error in performSessionCleanup:', error);
+    logger.error({ err: error, sessionId: session?.id }, 'Error in performSessionCleanup');
   }
 }
 
@@ -530,7 +531,7 @@ export async function releaseExpiredReservations() {
       .rpc('cleanup_expired_nickname_reservations');
 
     if (error) {
-      console.error('Error cleaning up expired reservations:', error);
+      logger.error({ err: error }, 'Error cleaning up expired reservations');
       return;
     }
 
@@ -538,7 +539,7 @@ export async function releaseExpiredReservations() {
       console.log(`✅ Released ${released} expired nickname reservations`);
     }
   } catch (error) {
-    console.error('Unexpected error in releaseExpiredReservations:', error);
+    logger.error({ err: error }, 'Unexpected error in releaseExpiredReservations');
   }
 }
 
@@ -559,7 +560,7 @@ export async function releaseExpiredNicknames() {
       .in('status', ['open', 'active']);
 
     if (fetchError) {
-      console.error('Error fetching expired sessions:', fetchError);
+      logger.error({ err: fetchError }, 'Error fetching expired sessions');
       return;
     }
 
@@ -581,13 +582,13 @@ export async function releaseExpiredNicknames() {
       .select();
 
     if (updateError) {
-      console.error('Error releasing nicknames:', updateError);
+      logger.error({ err: updateError }, 'Error releasing nicknames');
       return;
     }
 
     console.log(`✅ Nickname cleanup complete: Released ${releasedNicknames?.length || 0} nicknames from ${sessionIds.length} expired sessions`);
   } catch (error) {
-    console.error('Unexpected error in releaseExpiredNicknames:', error);
+    logger.error({ err: error }, 'Unexpected error in releaseExpiredNicknames');
   }
 }
 
@@ -749,7 +750,7 @@ export async function createSession(req, res) {
       .single();
 
     if (sessionError) {
-      console.error('Session creation failed:', sessionError);
+      logger.error({ err: sessionError, session_id }, 'Session creation failed');
       throw sessionError;
     }
 
@@ -835,7 +836,7 @@ export async function createSession(req, res) {
       .single();
 
     if (refetchError) {
-      console.error('Error refetching participant with items:', refetchError);
+      logger.error({ err: refetchError, participantId: participant.id }, 'Error refetching participant with items');
       // Fall back to participant without items if refetch fails
     }
 
@@ -854,7 +855,7 @@ export async function createSession(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error creating session:', error);
+    logger.error({ err: error }, 'Error creating session');
     res.status(500).json({
       success: false,
       error: error.message
@@ -946,7 +947,7 @@ export async function getSession(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching session:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error fetching session');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1081,7 +1082,7 @@ export async function getShoppingItems(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching shopping items:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error fetching shopping items');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1282,7 +1283,7 @@ export async function getBillItems(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching bill items:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error fetching bill items');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1530,7 +1531,7 @@ export async function joinSession(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error joining session:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error joining session');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1612,7 +1613,7 @@ export async function updateSessionStatus(req, res) {
     // Run cleanup tasks asynchronously (non-blocking)
     if (status === 'completed' || status === 'cancelled') {
       performSessionCleanup(session, status).catch(err => {
-        console.error('Error performing session cleanup:', err);
+        logger.error({ err, sessionId: session_id }, 'Error performing session cleanup');
       });
     }
 
@@ -1622,7 +1623,7 @@ export async function updateSessionStatus(req, res) {
       data: updatedSession
     });
   } catch (error) {
-    console.error('Error updating session status:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error updating session status');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1716,7 +1717,7 @@ export async function updateExpectedParticipants(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error updating expected participants:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error updating expected participants');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1771,7 +1772,7 @@ export async function getSessionInvites(req, res) {
       data: invites || []
     });
   } catch (error) {
-    console.error('Error fetching invites:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error fetching invites');
     res.status(500).json({
       success: false,
       error: error.message
@@ -1797,7 +1798,7 @@ export async function getNicknameOptions(req, res) {
       data: options
     });
   } catch (error) {
-    console.error('Error fetching nickname options:', error);
+    logger.error({ err: error, firstLetter: req.query.firstLetter }, 'Error fetching nickname options');
     res.status(500).json({
       success: false,
       error: error.message

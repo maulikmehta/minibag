@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../db/supabase.js';
+import logger from '../utils/logger.js';
 
 /**
  * POST /api/sessions/:session_id/payments
@@ -98,7 +99,7 @@ export async function recordPayment(req, res) {
       .single();
 
     if (error) {
-      console.error('Failed to record payment:', error);
+      logger.error({ err: error, sessionId: session_id }, 'Failed to record payment');
       return res.status(500).json({
         success: false,
         error: 'Failed to record payment'
@@ -110,7 +111,7 @@ export async function recordPayment(req, res) {
       payment
     });
   } catch (error) {
-    console.error('Error recording payment:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error recording payment');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -133,7 +134,7 @@ export async function getSessionPayments(req, res) {
       .order('recorded_at', { ascending: true });
 
     if (error) {
-      console.error('Failed to fetch payments:', error);
+      logger.error({ err: error, sessionId: session_id }, 'Failed to fetch payments');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch payments'
@@ -145,7 +146,7 @@ export async function getSessionPayments(req, res) {
       payments: payments || []
     });
   } catch (error) {
-    console.error('Error fetching payments:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error fetching payments');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -185,7 +186,7 @@ export async function updatePayment(req, res) {
       .single();
 
     if (error) {
-      console.error('Failed to update payment:', error);
+      logger.error({ err: error, paymentId: payment_id }, 'Failed to update payment');
       return res.status(500).json({
         success: false,
         error: 'Failed to update payment'
@@ -197,7 +198,7 @@ export async function updatePayment(req, res) {
       payment
     });
   } catch (error) {
-    console.error('Error updating payment:', error);
+    logger.error({ err: error, paymentId: req.params.payment_id }, 'Error updating payment');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -219,7 +220,7 @@ export async function deletePayment(req, res) {
       .eq('id', payment_id);
 
     if (error) {
-      console.error('Failed to delete payment:', error);
+      logger.error({ err: error, paymentId: payment_id }, 'Failed to delete payment');
       return res.status(500).json({
         success: false,
         error: 'Failed to delete payment'
@@ -231,7 +232,7 @@ export async function deletePayment(req, res) {
       message: 'Payment deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting payment:', error);
+    logger.error({ err: error, paymentId: req.params.payment_id }, 'Error deleting payment');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -254,7 +255,7 @@ export async function getPaymentSummary(req, res) {
       .eq('session_id', session_id);
 
     if (error) {
-      console.error('Failed to fetch payments:', error);
+      logger.error({ err: error, sessionId: session_id }, 'Failed to fetch payments for summary');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch payments'
@@ -303,7 +304,7 @@ export async function getPaymentSummary(req, res) {
       summary
     });
   } catch (error) {
-    console.error('Error calculating payment summary:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error calculating payment summary');
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -338,7 +339,7 @@ export async function getPaymentSplit(req, res) {
       .single();
 
     if (sessionError) {
-      console.error('Failed to fetch session:', sessionError);
+      logger.error({ err: sessionError, sessionId: session_id }, 'Failed to fetch session');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch session data'
@@ -352,7 +353,7 @@ export async function getPaymentSplit(req, res) {
       .eq('session_id', session_id);
 
     if (paymentsError) {
-      console.error('Failed to fetch payments:', paymentsError);
+      logger.error({ err: paymentsError, sessionId: session_id }, 'Failed to fetch payments for split');
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch payments'
@@ -425,7 +426,7 @@ export async function getPaymentSplit(req, res) {
       }))
     });
   } catch (error) {
-    console.error('Error calculating payment split:', error);
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error calculating payment split');
     res.status(500).json({
       success: false,
       error: 'Internal server error'

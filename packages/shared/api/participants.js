@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../db/supabase.js';
+import logger from '../utils/logger.js';
 
 /**
  * PUT /api/participants/:participant_id/items
@@ -71,7 +72,7 @@ export async function updateParticipantItems(req, res) {
         });
 
       if (upsertError) {
-        console.error('Error upserting items:', upsertError);
+        logger.error({ err: upsertError, participantId: participant_id }, 'Error upserting items');
         throw upsertError;
       }
     }
@@ -127,7 +128,7 @@ export async function updateParticipantItems(req, res) {
       data: updatedParticipant
     });
   } catch (error) {
-    console.error('Error updating participant items:', error);
+    logger.error({ err: error, participantId: req.params.participant_id }, 'Error updating participant items');
     res.status(500).json({
       success: false,
       error: error.message
@@ -190,7 +191,7 @@ export async function updateParticipantStatus(req, res) {
       data: participant
     });
   } catch (error) {
-    console.error('Error updating participant status:', error);
+    logger.error({ err: error, participantId: req.params.participant_id }, 'Error updating participant status');
     res.status(500).json({
       success: false,
       error: error.message

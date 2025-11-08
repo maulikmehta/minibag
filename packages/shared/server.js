@@ -34,6 +34,9 @@ import {
   validateSessionStatus
 } from './middleware/validation.js';
 
+// Admin authentication middleware
+import { adminAuth } from './middleware/adminAuth.js';
+
 // WebSocket handlers
 import { setupSocketHandlers } from './websocket/handlers.js';
 
@@ -335,16 +338,16 @@ app.delete('/api/payments/:payment_id', paymentsAPI.deletePayment);
 app.post('/api/sessions/:session_id/bill-token', billsAPI.generateBillToken);
 app.get('/api/bill/:token', billsAPI.getBillByToken);
 
-// Analytics API routes
-app.get('/api/analytics/overview', analyticsAPI.getAnalyticsOverview);
-app.get('/api/analytics/sessions/weekly', analyticsAPI.getWeeklySessionTrends);
-app.get('/api/analytics/revenue', analyticsAPI.getRevenueAnalytics);
-app.get('/api/analytics/sessions/recent', analyticsAPI.getRecentSessions);
+// Analytics API routes (protected with admin authentication)
+app.get('/api/analytics/overview', adminAuth, analyticsAPI.getAnalyticsOverview);
+app.get('/api/analytics/sessions/weekly', adminAuth, analyticsAPI.getWeeklySessionTrends);
+app.get('/api/analytics/revenue', adminAuth, analyticsAPI.getRevenueAnalytics);
+app.get('/api/analytics/sessions/recent', adminAuth, analyticsAPI.getRecentSessions);
 
 // Logs API routes (frontend logging with rate limiting)
 app.post('/api/logs', logsLimiter, logsAPI.receiveFrontendLog);
 app.post('/api/logs/batch', logsLimiter, logsAPI.receiveFrontendLogBatch);
-app.get('/api/analytics/sessions/completions', analyticsAPI.getSessionCompletions);
+app.get('/api/analytics/sessions/completions', adminAuth, analyticsAPI.getSessionCompletions);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {

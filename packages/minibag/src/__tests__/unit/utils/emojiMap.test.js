@@ -127,9 +127,7 @@ describe('emojiMap', () => {
         expect(result).toBe('🛒');
       });
 
-      it.skip('should handle null values', () => {
-        // TODO: Fix bug in emojiMap.js - currently throws TypeError on null
-        // The function should handle null values gracefully
+      it('should handle null values', () => {
         const result = getItemEmoji(null, null);
         expect(result).toBe('🛒');
       });
@@ -201,9 +199,7 @@ describe('emojiMap', () => {
       expect(getCategoryEmoji('')).toBe('🛒');
     });
 
-    it.skip('should handle null and undefined', () => {
-      // TODO: Fix bug in emojiMap.js - currently throws TypeError on null
-      // The function should handle null values gracefully
+    it('should handle null and undefined', () => {
       expect(getCategoryEmoji(null)).toBe('🛒');
       expect(getCategoryEmoji(undefined)).toBe('🛒');
     });
