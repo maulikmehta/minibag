@@ -11,6 +11,7 @@ import { buildInviteUrl, copyInviteToClipboard, shareInvite } from '../../utils/
  *
  * @param {Object} props
  * @param {string} props.sessionId - The session ID
+ * @param {string|null} props.sessionPin - The session PIN for sharing
  * @param {number|null} props.expectedCount - Current expected count
  * @param {Array} props.invites - Array of invite objects from API
  * @param {boolean} props.locked - Whether tabs are locked (someone responded)
@@ -21,6 +22,7 @@ import { buildInviteUrl, copyInviteToClipboard, shareInvite } from '../../utils/
  */
 export default function InviteTabsSelector({
   sessionId,
+  sessionPin = null,
   expectedCount,
   invites = [],
   locked = false,
@@ -116,7 +118,7 @@ export default function InviteTabsSelector({
   // Handle copy with timeout for UI feedback
   const handleCopy = async (invite, index) => {
     const inviteUrl = buildInviteUrl(sessionId, invite.invite_token);
-    const success = await copyInviteToClipboard(inviteUrl, t, notify);
+    const success = await copyInviteToClipboard(inviteUrl, sessionPin, t, notify);
     if (success) {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
@@ -126,7 +128,7 @@ export default function InviteTabsSelector({
   // Handle share with fallback to copy
   const handleShare = async (invite, inviteNumber) => {
     const inviteUrl = buildInviteUrl(sessionId, invite.invite_token);
-    await shareInvite(inviteUrl, t, notify, () => handleCopy(invite, inviteNumber - 1));
+    await shareInvite(inviteUrl, sessionPin, t, notify, () => handleCopy(invite, inviteNumber - 1));
   };
 
   return (

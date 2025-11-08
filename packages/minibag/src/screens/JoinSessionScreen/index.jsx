@@ -406,11 +406,11 @@ export default function JoinSessionScreen({
               </p>
             </div>
 
-            {/* PIN Input (if session requires PIN) */}
-            {session?.requires_pin && selectedNickname && (
+            {/* PIN Input (required for all sessions) */}
+            {selectedNickname && (
               <div className="mb-6 pb-6 border-b border-gray-200">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Session PIN Required
+                  Session PIN
                 </label>
                 <input
                   type="text"
@@ -421,13 +421,13 @@ export default function JoinSessionScreen({
                     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
                     setSessionPin(value);
                   }}
-                  placeholder="Enter 4-6 digit PIN"
+                  placeholder="Enter 4-digit PIN"
                   className="input"
                   maxLength={6}
                   autoComplete="off"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Ask the host for the PIN to join this session
+                  Enter the PIN from your invite message
                 </p>
               </div>
             )}

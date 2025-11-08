@@ -495,6 +495,7 @@ export default function SessionActiveScreen({
           >
             <InviteTabsSelector
               sessionId={session?.session_id}
+              sessionPin={session?.session_pin}
               expectedCount={expectedCount}
               invites={invites}
               locked={session?.invites_locked || false}

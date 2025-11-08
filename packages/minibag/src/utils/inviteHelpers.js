@@ -17,28 +17,30 @@ export function buildInviteUrl(sessionId, inviteToken = null) {
 }
 
 /**
- * Build a localized invite message with the URL
+ * Build a localized invite message with the URL and PIN
  * @param {string} inviteUrl - The invite URL to include in the message
+ * @param {string|null} pin - The session PIN (required for joining)
  * @param {Function} t - The i18n translation function
  * @returns {string} Localized invite message
  */
-export function buildInviteMessage(inviteUrl, t) {
-  return t('whatsapp.invitation', {
-    url: inviteUrl,
-    defaultValue: `Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you.\n\nJoin here: ${inviteUrl}`
-  });
+export function buildInviteMessage(inviteUrl, pin, t) {
+  return `Join my shopping list!
+Link: ${inviteUrl}
+PIN: ${pin || 'N/A'}
+We will split bills later`;
 }
 
 /**
  * Copy invite message to clipboard
  * @param {string} inviteUrl - The invite URL
+ * @param {string|null} pin - The session PIN
  * @param {Function} t - The i18n translation function
  * @param {Object} notify - The notification object (optional, for error only)
  * @returns {Promise<boolean>} True if copy succeeded, false otherwise
  */
-export async function copyInviteToClipboard(inviteUrl, t, notify = null) {
+export async function copyInviteToClipboard(inviteUrl, pin, t, notify = null) {
   try {
-    const shareText = buildInviteMessage(inviteUrl, t);
+    const shareText = buildInviteMessage(inviteUrl, pin, t);
     await navigator.clipboard.writeText(shareText);
     // No success notification - UI will show inline feedback
     return true;
@@ -54,13 +56,14 @@ export async function copyInviteToClipboard(inviteUrl, t, notify = null) {
 /**
  * Share invite via native share API or fallback to copy
  * @param {string} inviteUrl - The invite URL
+ * @param {string|null} pin - The session PIN
  * @param {Function} t - The i18n translation function
  * @param {Object} notify - The notification object
  * @param {Function} fallbackCopy - Optional fallback copy function
  * @returns {Promise<boolean>} True if share succeeded or was cancelled, false if failed
  */
-export async function shareInvite(inviteUrl, t, notify, fallbackCopy = null) {
-  const shareText = buildInviteMessage(inviteUrl, t);
+export async function shareInvite(inviteUrl, pin, t, notify, fallbackCopy = null) {
+  const shareText = buildInviteMessage(inviteUrl, pin, t);
 
   if (navigator.share) {
     try {
@@ -81,13 +84,13 @@ export async function shareInvite(inviteUrl, t, notify, fallbackCopy = null) {
       if (fallbackCopy) {
         return await fallbackCopy();
       }
-      return await copyInviteToClipboard(inviteUrl, t, notify);
+      return await copyInviteToClipboard(inviteUrl, pin, t, notify);
     }
   } else {
     // Share API not supported, use fallback or copy
     if (fallbackCopy) {
       return await fallbackCopy();
     }
-    return await copyInviteToClipboard(inviteUrl, t, notify);
+    return await copyInviteToClipboard(inviteUrl, pin, t, notify);
   }
 }

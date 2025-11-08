@@ -27,7 +27,7 @@ export default function SessionInviteControls({
     if (!session || disabled) return;
 
     const inviteUrl = buildInviteUrl(session.session_id);
-    await copyInviteToClipboard(inviteUrl, t, notify);
+    await copyInviteToClipboard(inviteUrl, session.session_pin, t, notify);
   };
 
   return (
