@@ -581,7 +581,7 @@ export default function SessionCreateScreen({
 
                           {/* Big checkmark overlay - tap feedback (inside circle) */}
                           {showBigCheck === option.nickname && (
-                            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-float-up pointer-events-none">
+                            <div className="absolute inset-0 w-16 h-16 rounded-full bg-green-600/90 flex items-center justify-center animate-pop animate-ripple pointer-events-none">
                               <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                               </svg>

@@ -243,6 +243,18 @@ body {
   }
 }
 
+/* Ripple - for tap feedback with center expansion */
+@keyframes ripple {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
 /* Utility classes for animations */
 .animate-pop {
   animation: popScale 300ms ease-in-out;
@@ -250,6 +262,10 @@ body {
 
 .animate-float-up {
   animation: float-up 600ms ease-out forwards;
+}
+
+.animate-ripple {
+  animation: ripple 600ms ease-out forwards;
 }
 
 /* Bounce in - for participants joining */

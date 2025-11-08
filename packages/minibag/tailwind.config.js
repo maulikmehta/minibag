@@ -35,6 +35,7 @@ export default {
         'stagger': 'staggerFadeIn 0.3s ease-out forwards',
         'flash-green': 'flashGreen 0.3s ease-out',
         'float-up': 'floatUp 0.6s ease-out forwards',
+        'ripple': 'ripple 0.6s ease-out forwards',
         'bounce-in': 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'shake': 'shake 0.4s ease-in-out',
         'gradient-pulse': 'gradientPulse 2s ease-in-out infinite',
