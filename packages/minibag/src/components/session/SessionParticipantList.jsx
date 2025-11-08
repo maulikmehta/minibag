@@ -34,10 +34,10 @@ export default function SessionParticipantList({
 
   return (
     <div className="mb-6">
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 relative z-0">
         {`${participantCount} of 4 people`}
       </p>
-      <div className="flex gap-4 overflow-x-auto pb-4 px-2 -mx-2">
+      <div className="flex gap-4 overflow-x-auto pb-16 px-2 -mx-2">
         {/* Host slot */}
         <ParticipantAvatar
           displayText={hostNickname.toUpperCase()}
