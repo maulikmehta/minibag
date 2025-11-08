@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingBag, CheckCircle, Users, Share2, ArrowRight, Lock, Zap, ChevronDown, List, Heart } from 'lucide-react';
 import { Logo } from '@localloops/ui-components';
 import { getProduct, PLATFORM } from '@localloops/ui-components/config';
+import MinibagIcon from './components/MinibagIcon.jsx';
 
 export default function LandingPage({ onGetStarted }) {
   const minibag = getProduct('minibag');
@@ -15,12 +16,10 @@ export default function LandingPage({ onGetStarted }) {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="max-w-6xl mx-auto px-6 py-4">
-        <Logo
-          icon={ShoppingBag}
-          name={minibag.name}
-          variant="compact"
-          iconColor="bg-green-600"
-        />
+        <div className="flex items-center gap-2">
+          <MinibagIcon size={32} />
+          <span className="text-xl font-semibold text-gray-900">{minibag.name}</span>
+        </div>
       </header>
 
       {/* Hero Section - Above the Fold */}
@@ -42,9 +41,8 @@ export default function LandingPage({ onGetStarted }) {
               {/* CTA */}
               <button
                 onClick={onGetStarted}
-                className="inline-flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
               >
-                <ShoppingBag size={24} strokeWidth={2.5} />
                 Start Shopping
                 <ArrowRight size={20} strokeWidth={2.5} />
               </button>
@@ -81,9 +79,7 @@ export default function LandingPage({ onGetStarted }) {
                       {/* Header */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
-                            <ShoppingBag size={20} className="text-white" strokeWidth={2.5} />
-                          </div>
+                          <MinibagIcon size={24} />
                           <span className="font-bold text-gray-900">Minibag</span>
                         </div>
                       </div>
@@ -138,7 +134,6 @@ export default function LandingPage({ onGetStarted }) {
 
                       {/* CTA Button */}
                       <button className="w-full bg-green-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                        <ShoppingBag size={20} strokeWidth={2.5} />
                         Start Shopping
                       </button>
                     </div>
@@ -388,7 +383,7 @@ export default function LandingPage({ onGetStarted }) {
             </div>
             <div className="flex items-center gap-6">
               <a href="#" className="hover:text-gray-900 transition-colors">Privacy</a>
-              <a href="/home" className="hover:text-gray-900 transition-colors">← {PLATFORM.name}</a>
+              <a href="/localloops-landing.html" className="hover:text-gray-900 transition-colors">← {PLATFORM.name}</a>
             </div>
           </div>
           <div className="mt-4 text-center text-sm text-gray-500">

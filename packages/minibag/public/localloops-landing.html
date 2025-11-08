@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalLoops - Neighborhood Coordination Made Simple</title>
+  <meta name="description" content="Digitally enable the ways people already help each other. Simple tools for neighborhood coordination in India.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .product-card {
+      transition: all 0.3s ease;
+    }
+    .product-card:hover {
+      transform: translateY(-8px);
+    }
+    .feature-icon {
+      transition: transform 0.3s ease;
+    }
+    .feature-card:hover .feature-icon {
+      transform: scale(1.1);
+    }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .faq-answer.active {
+      max-height: 500px;
+      transition: max-height 0.5s ease-in;
+    }
+    .faq-icon {
+      transition: transform 0.3s ease;
+    }
+    .faq-icon.active {
+      transform: rotate(180deg);
+    }
+    @keyframes fade-in-up {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fade-in-up {
+      animation: fade-in-up 0.6s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+  <div class="max-w-7xl mx-auto px-6 py-4">
+    <div class="flex items-center justify-between">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <img src="/localloops-logo.png" alt="LocalLoops" class="w-10 h-10" style="width: 40px; height: 40px; object-fit: contain;">
+        <span class="text-xl font-bold text-gray-900">LocalLoops</span>
+      </a>
+
+      <!-- Navigation -->
+      <nav class="hidden md:flex items-center gap-8">
+        <a href="#products" class="text-gray-600 hover:text-gray-900 transition-colors font-medium">Products</a>
+        <a href="#how-it-works" class="text-gray-600 hover:text-gray-900 transition-colors font-medium">How It Works</a>
+        <a href="#faq" class="text-gray-600 hover:text-gray-900 transition-colors font-medium">FAQ</a>
+        <a href="localloops-admin-dashboard.html" class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+          </svg>
+          Admin
+        </a>
+      </nav>
+
+      <!-- Mobile Menu Button -->
+      <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden pt-4 pb-2 space-y-3">
+      <a href="#products" class="block text-gray-600 hover:text-gray-900 transition-colors font-medium">Products</a>
+      <a href="#how-it-works" class="block text-gray-600 hover:text-gray-900 transition-colors font-medium">How It Works</a>
+      <a href="#faq" class="block text-gray-600 hover:text-gray-900 transition-colors font-medium">FAQ</a>
+      <a href="localloops-admin-dashboard.html" class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors font-medium">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+        </svg>
+        Admin Dashboard
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-white to-gray-100 py-20 md:py-32">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="max-w-4xl mx-auto text-center animate-fade-in-up">
+      <!-- Main Headline -->
+      <h1 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+        Digitally enable the ways people<br/>already <span class="gradient-text">help each other</span>
+      </h1>
+
+      <!-- Subheadline -->
+      <p class="text-xl md:text-2xl text-gray-600 mb-8 leading-relaxed">
+        Simple tools for neighborhood coordination
+      </p>
+
+      <!-- Trust Signals -->
+      <div class="flex flex-wrap items-center justify-center gap-6 mb-10 text-sm md:text-base">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span class="text-gray-700 font-medium">Free Forever</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span class="text-gray-700 font-medium">Privacy First</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span class="text-gray-700 font-medium">No Signup</span>
+        </div>
+      </div>
+
+      <!-- Primary CTA -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="/minibag" class="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          Start with Minibag
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </a>
+        <a href="#products" class="inline-flex items-center gap-2 px-8 py-4 bg-white hover:bg-gray-50 text-gray-900 text-lg font-semibold rounded-xl border-2 border-gray-300 transition-all">
+          Explore All Products
+        </a>
+      </div>
+
+      <!-- Visual Accent -->
+      <div class="mt-16 flex items-center justify-center gap-8">
+        <div class="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center transform rotate-6">
+          <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+        </div>
+        <div class="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center transform -rotate-6">
+          <svg class="w-10 h-10 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+          </svg>
+        </div>
+        <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center transform rotate-6">
+          <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Products Showcase -->
+<section id="products" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Choose Your Coordination Tool</h2>
+      <p class="text-xl text-gray-600 max-w-2xl mx-auto">Simple, focused apps for different neighborhood activities</p>
+    </div>
+
+    <!-- Product Cards Grid -->
+    <div class="grid md:grid-cols-3 gap-8">
+      <!-- Minibag Card -->
+      <div class="product-card bg-white rounded-2xl border-2 border-green-200 p-8 shadow-lg hover:shadow-2xl">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-16 h-16 bg-white rounded-xl flex items-center justify-center p-2">
+            <img src="/minibag-logo.png" alt="Minibag" style="width: 100%; height: 100%; object-fit: contain;">
+          </div>
+          <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">LIVE</span>
+        </div>
+
+        <h3 class="text-2xl font-bold text-gray-900 mb-3">Minibag</h3>
+        <p class="text-gray-600 mb-6">Track shopping, split with neighbors</p>
+
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-700">Shopping lists for vegetables</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-700">Works alone or together</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-700">No app, no signup</span>
+          </li>
+        </ul>
+
+        <a href="/minibag" class="block w-full text-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-md">
+          Try Now
+        </a>
+      </div>
+
+      <!-- Product Alpha Card -->
+      <div class="product-card bg-white rounded-2xl border-2 border-gray-200 p-8 shadow-lg hover:shadow-2xl opacity-75">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-16 h-16 bg-pink-100 rounded-xl flex items-center justify-center">
+            <svg class="w-10 h-10 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>
+          </div>
+          <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-bold rounded-full">COMING SOON</span>
+        </div>
+
+        <h3 class="text-2xl font-bold text-gray-900 mb-3">Product Alpha</h3>
+        <p class="text-gray-600 mb-6">Lorem ipsum dolor sit amet</p>
+
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Consectetur adipiscing elit</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Sed do eiusmod tempor</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Ut labore et dolore magna</span>
+          </li>
+        </ul>
+
+        <button disabled class="block w-full text-center px-6 py-3 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed">
+          Coming Soon
+        </button>
+      </div>
+
+      <!-- Product Beta Card -->
+      <div class="product-card bg-white rounded-2xl border-2 border-gray-200 p-8 shadow-lg hover:shadow-2xl opacity-75">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center">
+            <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </div>
+          <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-bold rounded-full">COMING SOON</span>
+        </div>
+
+        <h3 class="text-2xl font-bold text-gray-900 mb-3">Product Beta</h3>
+        <p class="text-gray-600 mb-6">Aliqua ut enim ad minim veniam</p>
+
+        <ul class="space-y-3 mb-8">
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Quis nostrud exercitation</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Ullamco laboris nisi ut</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-gray-500">Duis aute irure dolor in</span>
+          </li>
+        </ul>
+
+        <button disabled class="block w-full text-center px-6 py-3 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed">
+          Coming Soon
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section id="how-it-works" class="py-20 bg-gray-50">
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+      <p class="text-xl text-gray-600 max-w-2xl mx-auto">Start coordinating in three simple steps</p>
+    </div>
+
+    <!-- Steps Grid -->
+    <div class="grid md:grid-cols-3 gap-12 md:gap-8">
+      <!-- Step 1 -->
+      <div class="text-center">
+        <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span class="text-3xl font-bold text-blue-600">1</span>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-3">Choose Your Tool</h3>
+        <p class="text-gray-600 leading-relaxed">
+          Pick the product that fits your neighborhood coordination need
+        </p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="text-center">
+        <div class="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span class="text-3xl font-bold text-purple-600">2</span>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-3">Create a Session</h3>
+        <p class="text-gray-600 leading-relaxed">
+          Start in 10 seconds. No signup, no app download. Just open and create
+        </p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="text-center">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span class="text-3xl font-bold text-green-600">3</span>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-3">Share & Coordinate</h3>
+        <p class="text-gray-600 leading-relaxed">
+          Share via WhatsApp with neighbors. Coordinate in real-time with live updates
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Grid -->
+<section class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-6">
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why LocalLoops?</h2>
+      <p class="text-xl text-gray-600 max-w-2xl mx-auto">Built with Indian neighborhoods in mind</p>
+    </div>
+
+    <!-- Features Grid -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <!-- Feature 1 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Privacy First</h3>
+        <p class="text-gray-600">No phone numbers shared. Your privacy is protected by default</p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">No Signup Required</h3>
+        <p class="text-gray-600">Start using in 10 seconds. No forms, no accounts, no hassle</p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Works Offline</h3>
+        <p class="text-gray-600">Create your list offline. Sync when you're back online</p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">WhatsApp Integration</h3>
+        <p class="text-gray-600">Share sessions instantly with your neighborhood group</p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Free Forever</h3>
+        <p class="text-gray-600">No subscriptions, no hidden costs. Completely free to use</p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="feature-card p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div class="feature-icon w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Built for India</h3>
+        <p class="text-gray-600">Made for Indian neighborhoods with local coordination in mind</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Mission Statement -->
+<section class="py-20 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+  <div class="max-w-5xl mx-auto px-6 text-center">
+    <div class="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8">
+      <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    </div>
+
+    <h2 class="text-3xl md:text-4xl font-bold mb-6">Built for Indian Neighborhoods</h2>
+    <p class="text-xl text-gray-300 leading-relaxed mb-8">
+      LocalLoops is designed for the way Indian neighborhoods already function—helping each other with daily tasks. We simply make it easier to coordinate digitally, without complicated features or overwhelming apps.
+    </p>
+    <p class="text-lg text-gray-400 leading-relaxed">
+      No complex features. No overwhelming apps. Just simple tools that work the way you already do things.
+    </p>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section id="faq" class="py-20 bg-white">
+  <div class="max-w-3xl mx-auto px-6">
+    <!-- Section Header -->
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
+      <p class="text-xl text-gray-600">Everything you need to know about LocalLoops</p>
+    </div>
+
+    <!-- FAQ Accordion -->
+    <div class="space-y-4">
+      <!-- Question 1 -->
+      <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+        <button onclick="toggleFAQ(1)" class="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+          <span class="text-lg font-semibold text-gray-900">What is LocalLoops?</span>
+          <svg id="faq-icon-1" class="faq-icon w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div id="faq-answer-1" class="faq-answer px-6 pb-5">
+          <p class="text-gray-600 leading-relaxed">
+            LocalLoops is a platform that provides simple digital tools for neighborhood coordination in India. We offer focused products like Minibag (shopping coordination) and other apps coming soon to help people coordinate activities they already do together.
+          </p>
+        </div>
+      </div>
+
+      <!-- Question 2 -->
+      <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+        <button onclick="toggleFAQ(2)" class="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+          <span class="text-lg font-semibold text-gray-900">Is LocalLoops free to use?</span>
+          <svg id="faq-icon-2" class="faq-icon w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div id="faq-answer-2" class="faq-answer px-6 pb-5">
+          <p class="text-gray-600 leading-relaxed">
+            Yes! LocalLoops is completely free to use, forever. There are no subscriptions, no hidden costs, and no premium tiers. We believe neighborhood coordination should be accessible to everyone.
+          </p>
+        </div>
+      </div>
+
+      <!-- Question 3 -->
+      <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+        <button onclick="toggleFAQ(3)" class="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+          <span class="text-lg font-semibold text-gray-900">How is my data used?</span>
+          <svg id="faq-icon-3" class="faq-icon w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div id="faq-answer-3" class="faq-answer px-6 pb-5">
+          <p class="text-gray-600 leading-relaxed">
+            Your privacy is our priority. We don't require phone numbers or personal information to use our products. Session data is only visible to participants, and we never share your information with third parties. You can learn more in our <a href="#" class="text-blue-600 hover:underline">privacy policy</a>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Question 4 -->
+      <div class="border-2 border-gray-200 rounded-xl overflow-hidden">
+        <button onclick="toggleFAQ(4)" class="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+          <span class="text-lg font-semibold text-gray-900">Which product should I start with?</span>
+          <svg id="faq-icon-4" class="faq-icon w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div id="faq-answer-4" class="faq-answer px-6 pb-5">
+          <p class="text-gray-600 leading-relaxed">
+            Start with <strong>Minibag</strong> if you want to coordinate vegetable shopping with neighbors. It's our live product that works for solo shopping or group coordination. More products are coming soon for other neighborhood coordination needs!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="py-20 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+  <div class="max-w-4xl mx-auto px-6 text-center">
+    <h2 class="text-3xl md:text-5xl font-bold mb-6">Ready to Coordinate?</h2>
+    <p class="text-xl md:text-2xl text-blue-100 mb-10 leading-relaxed">
+      Start with Minibag and experience neighborhood coordination made simple
+    </p>
+    <a href="/minibag" class="inline-flex items-center gap-3 px-10 py-5 bg-white hover:bg-gray-100 text-blue-600 text-xl font-bold rounded-xl shadow-2xl transition-all transform hover:scale-105">
+      <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+      </svg>
+      Start with Minibag
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-gray-900 text-gray-300 py-16">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="grid md:grid-cols-4 gap-12 mb-12">
+      <!-- Platform Info -->
+      <div>
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <span class="text-xl font-bold text-white">LocalLoops</span>
+        </div>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          Simple tools for neighborhood coordination in India
+        </p>
+      </div>
+
+      <!-- Products -->
+      <div>
+        <h3 class="text-white font-bold mb-4">Products</h3>
+        <ul class="space-y-3 text-sm">
+          <li>
+            <a href="/minibag" class="hover:text-white transition-colors flex items-center gap-2">
+              Minibag
+              <span class="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded">Live</span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="hover:text-white transition-colors flex items-center gap-2">
+              Product Alpha
+              <span class="px-2 py-0.5 bg-gray-600 text-gray-300 text-xs rounded">Soon</span>
+            </a>
+          </li>
+          <li>
+            <a href="#" class="hover:text-white transition-colors flex items-center gap-2">
+              Product Beta
+              <span class="px-2 py-0.5 bg-gray-600 text-gray-300 text-xs rounded">Soon</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Company -->
+      <div>
+        <h3 class="text-white font-bold mb-4">Company</h3>
+        <ul class="space-y-3 text-sm">
+          <li><a href="#" class="hover:text-white transition-colors">About Us</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Privacy Policy</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Terms of Service</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Contact</a></li>
+        </ul>
+      </div>
+
+      <!-- Admin & Support -->
+      <div>
+        <h3 class="text-white font-bold mb-4">For Businesses</h3>
+        <ul class="space-y-3 text-sm">
+          <li>
+            <a href="localloops-admin-dashboard.html" class="hover:text-white transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+              </svg>
+              Admin Dashboard
+            </a>
+          </li>
+          <li><a href="#" class="hover:text-white transition-colors">Data Platform</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Partner with Us</a></li>
+          <li><a href="#" class="hover:text-white transition-colors">Help Center</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="pt-8 border-t border-gray-800 text-center text-sm text-gray-500">
+      <p>© 2025 LocalLoops. Built for Indian neighborhoods.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- JavaScript -->
+<script>
+  // Toggle mobile menu
+  function toggleMobileMenu() {
+    const menu = document.getElementById('mobile-menu');
+    menu.classList.toggle('hidden');
+  }
+
+  // Toggle FAQ
+  function toggleFAQ(number) {
+    const answer = document.getElementById(`faq-answer-${number}`);
+    const icon = document.getElementById(`faq-icon-${number}`);
+
+    answer.classList.toggle('active');
+    icon.classList.toggle('active');
+  }
+
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      const href = this.getAttribute('href');
+      if (href !== '#') {
+        e.preventDefault();
+        const target = document.querySelector(href);
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+          // Close mobile menu if open
+          document.getElementById('mobile-menu').classList.add('hidden');
+        }
+      }
+    });
+  });
+
+  // Add fade-in animation on scroll
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, observerOptions);
+
+  // Observe elements for animation
+  document.querySelectorAll('.product-card, .feature-card').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>

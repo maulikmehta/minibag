@@ -18,10 +18,8 @@ function LoadingFallback({ message = 'Loading...' }) {
 
 // Lazy load all routes to reduce main bundle size
 // Each screen becomes a separate chunk, loaded only when accessed
-const LocalLoopsLanding = lazy(() => import('./LocalLoopsLanding'));
 const LandingPage = lazy(() => import('./LandingPage'));
 const MinibagPrototype = lazy(() => import('../minibag-ui-prototype'));
-const AdminDashboard = lazy(() => import('./AdminDashboard'));
 const BillScreen = lazy(() => import('./screens/BillScreen'));
 
 // Wrapper component to navigate to app on button click
@@ -52,12 +50,10 @@ function App() {
             <Routes>
               {/* Landing page as home - Get Started navigates to /app */}
               <Route path="/" element={<MinibagLandingWrapper />} />
-              <Route path="/home" element={<LocalLoopsLanding />} />
               <Route path="/minibag" element={<MinibagLandingWrapper />} />
               <Route path="/app" element={<MinibagPrototype />} />
               <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
               <Route path="/bill/:token" element={<BillScreen />} />
-              <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
           </Suspense>
         </BrowserRouter>

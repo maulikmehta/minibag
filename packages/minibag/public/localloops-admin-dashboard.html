@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalLoops Data Monetization Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    body {
+      background: #fafafa;
+      color: #1a1a1a;
+      min-width: 1280px;
+    }
+
+    /* Enhanced readability - larger base fonts */
+    .text-xs {
+      font-size: 0.8125rem; /* 13px instead of 12px */
+      line-height: 1.4;
+    }
+
+    .metric-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      transition: border-color 0.2s ease;
+    }
+    .metric-card:hover {
+      border-color: #d1d5db;
+    }
+    /* Micro indicator dots */
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-dot.mvp { background: #10b981; }
+    .status-dot.auth { background: #f59e0b; }
+    .status-dot.future { background: #ef4444; }
+
+    /* Tooltip for dots */
+    .status-indicator {
+      position: relative;
+      cursor: help;
+    }
+    .status-indicator:hover .tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    .tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      background: #374151;
+      color: white;
+      font-size: 13px;
+      font-weight: normal;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: #374151;
+    }
+
+    /* Tab navigation */
+    .tab-button {
+      padding: 10px 20px;
+      border-bottom: 2px solid transparent;
+      font-weight: 500;
+      font-size: 14px;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-button:hover {
+      color: #111827;
+      background: #f9fafb;
+    }
+    .tab-button.active {
+      color: #111827;
+      border-bottom-color: #111827;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Thin progress bars */
+    .thin-bar {
+      height: 3px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .thin-bar-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body class="font-sans">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200">
+  <div class="max-w-[1600px] mx-auto px-12 py-5">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <img src="/localloops-logo.png" alt="LocalLoops" style="width: 48px; height: 48px; object-fit: contain;">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">LocalLoops Data Monetization</h1>
+          <p class="text-sm text-gray-500 mt-1">Federated Model: Minibag • Streethawk • Product Alpha • Product Beta</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-6">
+        <div class="text-right">
+          <p class="text-xs text-gray-500">Last updated</p>
+          <p class="text-sm text-gray-700 font-medium">Nov 3, 2025 • 14:32</p>
+        </div>
+        <a href="localloops-landing.html" class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-300 transition-colors cursor-pointer" title="Back to LocalLoops">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Status Legend -->
+    <div class="mt-5 pt-5 border-t border-gray-100 flex items-center gap-5 text-xs text-gray-600">
+      <span class="font-medium text-gray-500 uppercase tracking-wide">Status:</span>
+      <span class="flex items-center gap-1.5">
+        <span class="status-dot mvp"></span>
+        MVP Ready
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="status-dot auth"></span>
+        Needs Auth
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="status-dot future"></span>
+        Future
+      </span>
+    </div>
+  </div>
+</header>
+
+<!-- Revenue Summary -->
+<div class="bg-white border-b border-gray-200">
+  <div class="max-w-[1600px] mx-auto px-12 py-6">
+    <div class="grid grid-cols-4 gap-6">
+      <div>
+        <p class="text-xs text-gray-500 mb-1.5">Total Monthly Revenue</p>
+        <p class="text-3xl font-semibold text-gray-900">₹3,56,200</p>
+        <p class="text-xs text-gray-500 mt-1.5">+15% MoM</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 mb-1.5">Pro Subscriptions</p>
+        <p class="text-2xl font-semibold text-gray-900">₹77,000</p>
+        <p class="text-xs text-gray-500 mt-1.5">22% of revenue</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 mb-1.5">Market Intelligence</p>
+        <p class="text-2xl font-semibold text-gray-900">₹1,20,000</p>
+        <p class="text-xs text-gray-500 mt-1.5">34% of revenue</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 mb-1.5">Partner Licensing</p>
+        <p class="text-2xl font-semibold text-gray-900">₹1,59,200</p>
+        <p class="text-xs text-gray-500 mt-1.5">45% of revenue</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="max-w-[1600px] mx-auto px-12 py-8">
+
+  <!-- Tab Navigation -->
+  <div class="bg-white border border-gray-200 rounded-t-lg border-b-0 flex gap-1 mb-0">
+    <button class="tab-button active" onclick="switchTab('operational')">
+      Operational
+    </button>
+    <button class="tab-button" onclick="switchTab('market')">
+      Market Intelligence
+    </button>
+    <button class="tab-button" onclick="switchTab('infrastructure')">
+      Infrastructure
+    </button>
+    <button class="tab-button" onclick="switchTab('advanced')">
+      Advanced Metrics
+    </button>
+    <button class="tab-button" onclick="switchTab('geographic')">
+      Geographic
+    </button>
+    <button class="tab-button" onclick="switchTab('vendors')">
+      Vendors
+    </button>
+  </div>
+
+  <!-- Tab Content Container -->
+  <div class="metric-card rounded-b-lg rounded-tr-lg p-8">
+
+    <!-- OPERATIONAL INSIGHTS TAB -->
+    <div id="tab-operational" class="tab-content active">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Operational Insights</h2>
+        <p class="text-sm text-gray-500">Analytics for Minibag, Streethawk, and LocalLoops Core teams</p>
+      </div>
+
+      <!-- Minibag Core Metrics -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Minibag Core Metrics</h3>
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Total Sessions</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">156</p>
+          <p class="text-xs text-gray-500">All-time across apps</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Active Sessions</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">12</p>
+          <p class="text-xs text-gray-500">Currently in progress</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Weekly Sessions</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">89</p>
+          <p class="text-xs text-gray-600">↑ 8% vs last week</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Completion Rate</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">68%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 68%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sessions by Type -->
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Sessions by Type</h4>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs text-gray-600">Minibag</span>
+                <span class="text-sm font-medium text-gray-900">98</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-700" style="width: 63%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs text-gray-600">Product Alpha</span>
+                <span class="text-sm font-medium text-gray-900">42</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-500" style="width: 27%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs text-gray-600">Product Beta</span>
+                <span class="text-sm font-medium text-gray-900">16</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-400" style="width: 10%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Weekly Trends</h4>
+          </div>
+          <div style="height: 180px; position: relative;">
+            <canvas id="weeklyTrendsChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Volume -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Payment Volume Tracking</h3>
+      <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded mb-6">
+        <p class="text-xs font-medium text-amber-900 mb-1">Important Note</p>
+        <p class="text-xs text-amber-800">This tracks user-to-user payment flow, NOT LocalLoops revenue. Actual revenue comes from Pro subscriptions and data monetization.</p>
+      </div>
+
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Total Payment Volume</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">₹87,650</p>
+          <p class="text-xs text-gray-500">User-to-user payments</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Avg Transaction</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">₹562</p>
+          <p class="text-xs text-gray-500">Per session average</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">UPI Payments</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">85%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 85%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Cash Payments</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">15%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-600" style="width: 15%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Engagement -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">User Engagement</h3>
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication<br/>Timeline: 2-3 weeks</span>
+            </span>
+            <p class="text-xs text-gray-500">Total Users</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">1,247</p>
+          <p class="text-xs text-gray-500">Requires user accounts</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication<br/>Timeline: 2-3 weeks</span>
+            </span>
+            <p class="text-xs text-gray-500">Repeat Users</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">423</p>
+          <p class="text-xs text-gray-500">34% (>3 sessions)</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication<br/>Timeline: 2-3 weeks</span>
+            </span>
+            <p class="text-xs text-gray-500">30-Day Retention</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">71.5%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 71.5%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication<br/>Timeline: 2-3 weeks</span>
+            </span>
+            <p class="text-xs text-gray-500">Avg Sessions/User</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">2.8</p>
+          <p class="text-xs text-gray-500">Cross-session tracking</p>
+        </div>
+      </div>
+
+      <!-- Item Intelligence -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Item Intelligence</h3>
+      <div class="grid grid-cols-2 gap-6">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Most Popular Items</h4>
+          </div>
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Tomatoes</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 100%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">89</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Onions</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 92%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">82</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Milk</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 85%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">76</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Potatoes</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-500" style="width: 80%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">71</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Rice</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-400" style="width: 72%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">64</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current Minibag MVP</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Category Distribution</h4>
+          </div>
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Vegetables</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-32">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 100%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">342</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Dairy</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-32">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 46%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">156</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Grains</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-32">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 29%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">98</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Fruits</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-32">
+                  <div class="thin-bar-fill bg-gray-500" style="width: 25%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">87</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Spices</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-32">
+                  <div class="thin-bar-fill bg-gray-400" style="width: 13%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">45</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKET INTELLIGENCE TAB -->
+    <div id="tab-market" class="tab-content">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Market Intelligence</h2>
+        <p class="text-sm text-gray-500">Sellable data products for FMCG, NGOs, and civic partners</p>
+      </div>
+
+      <!-- Local Category Pulse -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Local Category Pulse (₹25k/month)</h3>
+      <div class="grid grid-cols-3 gap-6 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires geographic layer</span>
+            </span>
+            <p class="text-xs text-gray-500">Top Category Velocity</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">Vegetables</p>
+          <p class="text-xs text-gray-500">1,247 items/week • ↑12.5%</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user tracking</span>
+            </span>
+            <p class="text-xs text-gray-500">Price Sensitivity</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">Medium</p>
+          <p class="text-xs text-gray-500">±18% price variance</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current MVP</span>
+            </span>
+            <p class="text-xs text-gray-500">Bundle Affinity</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">87%</p>
+          <p class="text-xs text-gray-500">Tomatoes + Onions</p>
+        </div>
+      </div>
+
+      <!-- Vendor Network Intelligence -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Vendor Network Intelligence (₹50k/month)</h3>
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Top Vendors by Reliability</h4>
+          </div>
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">FreshVeg Suppliers</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 94%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">94</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Daily Dairy Co</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 91%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">91</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Quick Grocery Hub</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 87%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-8 text-right">87</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Demand Metrics</h4>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Avg Response Time</p>
+              <p class="text-2xl font-semibold text-gray-900">15.3<span class="text-sm text-gray-500">min</span></p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Fulfillment Rate</p>
+              <p class="text-2xl font-semibold text-gray-900">76.4<span class="text-sm text-gray-500">%</span></p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Peak Hour</p>
+              <p class="text-lg font-semibold text-gray-900">8-9 AM</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Coverage Areas</p>
+              <p class="text-lg font-semibold text-gray-900">12 zones</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Micro-Economy Health Score -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Micro-Economy Health (₹30k/month)</h3>
+      <div class="grid grid-cols-4 gap-4">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication</span>
+            </span>
+            <p class="text-xs text-gray-500">Top Neighborhood</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">Navrangpura</p>
+          <p class="text-xs text-gray-500">Health Score: 81/100</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication</span>
+            </span>
+            <p class="text-xs text-gray-500">Economic Activity</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">87/100</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 87%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot auth"></span>
+              <span class="tooltip">Requires user authentication</span>
+            </span>
+            <p class="text-xs text-gray-500">Diversity Index</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">72/100</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-700" style="width: 72%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires trust layer</span>
+            </span>
+            <p class="text-xs text-gray-500">Trust Network</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">3.2</p>
+          <p class="text-xs text-gray-500">Avg connections/user</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- INFRASTRUCTURE TAB -->
+    <div id="tab-infrastructure" class="tab-content">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Data Infrastructure</h2>
+        <p class="text-sm text-gray-500">Partner licensing and API access metrics</p>
+      </div>
+
+      <!-- API Usage Metrics -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">API Usage (30 days)</h3>
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires API gateway infrastructure</span>
+            </span>
+            <p class="text-xs text-gray-500">Total API Calls</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">47,820</p>
+          <p class="text-xs text-gray-500">↑ 23% vs last month</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires partner accounts system</span>
+            </span>
+            <p class="text-xs text-gray-500">Partners Connected</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">3</p>
+          <p class="text-xs text-gray-500">Active integrations</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires API gateway infrastructure</span>
+            </span>
+            <p class="text-xs text-gray-500">Catalog API</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">28,940</p>
+          <p class="text-xs text-gray-500">60% of total calls</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires API gateway infrastructure</span>
+            </span>
+            <p class="text-xs text-gray-500">Trust API</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">12,330</p>
+          <p class="text-xs text-gray-500">26% of total calls</p>
+        </div>
+      </div>
+
+      <!-- Shared Catalog Access -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Shared Catalog</h3>
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available in current MVP</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Catalog Overview</h4>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Total Items</p>
+              <p class="text-3xl font-semibold text-gray-900">284</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Categories</p>
+              <p class="text-3xl font-semibold text-gray-900">18</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Added This Month</p>
+              <p class="text-2xl font-semibold text-gray-900">23</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-1">Growth Rate</p>
+              <p class="text-2xl font-semibold text-gray-900">8.8%</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires API analytics</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Most Accessed Items (API)</h4>
+          </div>
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Tomatoes</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 100%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">1,247</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Onions</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 87%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">1,089</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-700">Milk</span>
+              <div class="flex items-center gap-2">
+                <div class="thin-bar w-24">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 78%"></div>
+                </div>
+                <span class="text-sm font-medium text-gray-900 w-12 text-right">976</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revenue from Licensing -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Partner Revenue</h3>
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires partner billing system</span>
+            </span>
+            <p class="text-xs text-gray-500">Monthly Licensing</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">₹1,25,000</p>
+          <p class="text-xs text-gray-500">Fixed fees from partners</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires partner billing system</span>
+            </span>
+            <p class="text-xs text-gray-500">Revenue Share</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">₹34,200</p>
+          <p class="text-xs text-gray-500">% of partner transactions</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires partner billing system</span>
+            </span>
+            <p class="text-xs text-gray-500">Avg per Partner</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">₹41,733</p>
+          <p class="text-xs text-gray-500">Monthly average</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires partner billing system</span>
+            </span>
+            <p class="text-xs text-gray-500">Growth Rate</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">15.7%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 15.7%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Partners List -->
+      <div class="metric-card p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="status-indicator">
+            <span class="status-dot future"></span>
+            <span class="tooltip">Requires partner management system</span>
+          </span>
+          <h4 class="text-sm font-medium text-gray-700">Active Partner Accounts</h4>
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center py-2 border-b border-gray-100">
+            <div>
+              <p class="text-sm font-medium text-gray-900">CivicApp Alpha</p>
+              <p class="text-xs text-gray-500">Joined: Jan 2025</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-medium text-gray-900">₹50,000/mo</p>
+              <p class="text-xs text-gray-500">+ ₹12,000 revenue share</p>
+            </div>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-gray-100">
+            <div>
+              <p class="text-sm font-medium text-gray-900">FoodbagPartner</p>
+              <p class="text-xs text-gray-500">Joined: Feb 2025</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-medium text-gray-900">₹40,000/mo</p>
+              <p class="text-xs text-gray-500">+ ₹15,000 revenue share</p>
+            </div>
+          </div>
+          <div class="flex justify-between items-center py-2">
+            <div>
+              <p class="text-sm font-medium text-gray-900">GreenTechPartner</p>
+              <p class="text-xs text-gray-500">Joined: Mar 2025</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-medium text-gray-900">₹35,000/mo</p>
+              <p class="text-xs text-gray-500">+ ₹7,200 revenue share</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED METRICS TAB -->
+    <div id="tab-advanced" class="tab-content">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Advanced Metrics</h2>
+        <p class="text-sm text-gray-500">Proprietary analytical indicators for market intelligence</p>
+      </div>
+
+      <!-- Category Recurrence Index -->
+      <div class="metric-card p-6 mb-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="status-indicator">
+            <span class="status-dot auth"></span>
+            <span class="tooltip">Requires user authentication</span>
+          </span>
+          <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wide">Category Recurrence Index (CRI)</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">Measures category purchase frequency by repeat users in specific localities</p>
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">Top CRI Scores</p>
+            <div class="space-y-3">
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-sm text-gray-700">Dairy • Navrangpura</span>
+                  <span class="text-sm font-medium text-gray-900">87.3</span>
+                </div>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-900" style="width: 87.3%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-sm text-gray-700">Vegetables • Vastrapur</span>
+                  <span class="text-sm font-medium text-gray-900">82.1</span>
+                </div>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 82.1%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-sm text-gray-700">Grains • Bodakdev</span>
+                  <span class="text-sm font-medium text-gray-900">76.8</span>
+                </div>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 76.8%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">CRI Components (Dairy • Navrangpura)</p>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Purchase Freq</p>
+                <p class="text-xl font-semibold text-gray-900">4.2</p>
+                <p class="text-xs text-gray-500">per week</p>
+              </div>
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Locality %</p>
+                <p class="text-xl font-semibold text-gray-900">68</p>
+                <p class="text-xs text-gray-500">concentration</p>
+              </div>
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Repeat Users</p>
+                <p class="text-xl font-semibold text-gray-900">78%</p>
+                <p class="text-xs text-gray-500">ratio</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trust Propagation Index & Neighborhood Density Score -->
+      <div class="grid grid-cols-2 gap-6 mb-6">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires trust events + Streethawk</span>
+            </span>
+            <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wide">Trust Propagation Index (TPI)</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">Average trust score across user networks in a locality</p>
+          <div class="mb-4">
+            <p class="text-xs text-gray-500 mb-1">Citywide Average</p>
+            <p class="text-4xl font-semibold text-gray-900">72.4</p>
+            <p class="text-xs text-gray-600 mt-1">↑ 5.8% MoM</p>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">Navrangpura</span>
+              <span class="font-medium text-gray-900">81.2</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">Vastrapur</span>
+              <span class="font-medium text-gray-900">78.9</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">Bodakdev</span>
+              <span class="font-medium text-gray-900">76.3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires GPS + geographic layer</span>
+            </span>
+            <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wide">Neighborhood Density Score (NDS)</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">Active households per 100-meter radius</p>
+          <div class="mb-4">
+            <p class="text-xs text-gray-500 mb-1">City Average Penetration</p>
+            <p class="text-4xl font-semibold text-gray-900">18.4%</p>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">Near Law Garden</span>
+              <span class="font-medium text-gray-900">42.3%</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">Near Vastrapur Lake</span>
+              <span class="font-medium text-gray-900">38.7%</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-gray-600">SG Highway</span>
+              <span class="font-medium text-gray-900">31.2%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demand Synchrony Metric -->
+      <div class="metric-card p-6 mb-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="status-indicator">
+            <span class="status-dot auth"></span>
+            <span class="tooltip">Requires user identity + session history</span>
+          </span>
+          <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wide">Demand Synchrony Metric (DSM)</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">Temporal overlap of recurring shopping sessions in a locality</p>
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">Top Synchrony Windows</p>
+            <div class="space-y-3">
+              <div class="metric-card p-4">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Saturday • 8:00-10:00 AM</p>
+                    <p class="text-xs text-gray-500">Navrangpura</p>
+                  </div>
+                  <p class="text-lg font-semibold text-gray-900">76.3</p>
+                </div>
+                <div class="flex gap-4 text-xs text-gray-600">
+                  <span>23 avg sessions</span>
+                  <span>•</span>
+                  <span>67 participants</span>
+                </div>
+              </div>
+              <div class="metric-card p-4">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Sunday • 6:00-8:00 PM</p>
+                    <p class="text-xs text-gray-500">Vastrapur</p>
+                  </div>
+                  <p class="text-lg font-semibold text-gray-900">71.8</p>
+                </div>
+                <div class="flex gap-4 text-xs text-gray-600">
+                  <span>19 avg sessions</span>
+                  <span>•</span>
+                  <span>54 participants</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">Weekday vs Weekend Synchrony</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Weekday DSM</p>
+                <p class="text-3xl font-semibold text-gray-900 mb-2">34.2</p>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 34.2%"></div>
+                </div>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Weekend DSM</p>
+                <p class="text-3xl font-semibold text-gray-900 mb-2">68.7</p>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-900" style="width: 68.7%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cross-App Identity Overlap -->
+      <div class="metric-card p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="status-indicator">
+            <span class="status-dot auth"></span>
+            <span class="tooltip">Requires shared user identity layer</span>
+          </span>
+          <h3 class="text-sm font-medium text-gray-700 uppercase tracking-wide">Cross-App Identity Overlap</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">Percentage of users active across multiple LocalLoops apps</p>
+        <div class="grid grid-cols-3 gap-6">
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">Current Distribution</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Minibag Only</p>
+                <p class="text-2xl font-semibold text-gray-900">856</p>
+              </div>
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Streethawk Only</p>
+                <p class="text-2xl font-semibold text-gray-900">243</p>
+              </div>
+              <div class="metric-card p-3 col-span-2">
+                <p class="text-xs text-gray-500 mb-1">Both Apps</p>
+                <p class="text-3xl font-semibold text-gray-900">148</p>
+                <p class="text-xs text-gray-600 mt-1">11.9% overlap</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">User Journey Patterns</p>
+            <div class="space-y-2">
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Minibag → Streethawk</p>
+                <p class="text-xl font-semibold text-gray-900">94 users</p>
+                <p class="text-xs text-gray-600">Avg 12 days to switch</p>
+              </div>
+              <div class="metric-card p-3">
+                <p class="text-xs text-gray-500 mb-1">Streethawk → Minibag</p>
+                <p class="text-xl font-semibold text-gray-900">54 users</p>
+                <p class="text-xs text-gray-600">Avg 8 days to switch</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 mb-3 font-medium">Growth Projection</p>
+            <div class="space-y-3">
+              <div>
+                <p class="text-xs text-gray-500 mb-1">6 Months</p>
+                <p class="text-2xl font-semibold text-gray-900">28.4%</p>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 28.4%"></div>
+                </div>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-1">12 Months</p>
+                <p class="text-2xl font-semibold text-gray-900">42.1%</p>
+                <div class="thin-bar">
+                  <div class="thin-bar-fill bg-gray-900" style="width: 42.1%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GEOGRAPHIC TAB -->
+    <div id="tab-geographic" class="tab-content">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Geographic Intelligence</h2>
+        <p class="text-sm text-gray-500">City-level demand patterns and neighborhood analytics</p>
+      </div>
+
+      <!-- City Overview -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Ahmedabad Demand Overview</h3>
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires GPS + GIS layer</span>
+            </span>
+            <p class="text-xs text-gray-500">West Ahmedabad</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">87</p>
+          <p class="text-xs text-gray-500">Demand score • 523 sessions</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 87%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires GPS + GIS layer</span>
+            </span>
+            <p class="text-xs text-gray-500">Central Ahmedabad</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">79</p>
+          <p class="text-xs text-gray-500">Demand score • 412 sessions</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-800" style="width: 79%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires GPS + GIS layer</span>
+            </span>
+            <p class="text-xs text-gray-500">East Ahmedabad</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">65</p>
+          <p class="text-xs text-gray-500">Demand score • 287 sessions</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-600" style="width: 65%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires GPS + GIS layer</span>
+            </span>
+            <p class="text-xs text-gray-500">North Ahmedabad</p>
+          </div>
+          <p class="text-2xl font-semibold text-gray-900 mb-1">52</p>
+          <p class="text-xs text-gray-500">Demand score • 189 sessions</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-500" style="width: 52%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Neighborhoods -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Top Performing Neighborhoods</h3>
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available from session data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">By Session Volume</h4>
+          </div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Navrangpura</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">127</p>
+                <p class="text-xs text-gray-500">sessions</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Vastrapur</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">94</p>
+                <p class="text-xs text-gray-500">sessions</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Bodakdev</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">82</p>
+                <p class="text-xs text-gray-500">sessions</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Satellite</p>
+                <p class="text-xs text-gray-500">Central Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">76</p>
+                <p class="text-xs text-gray-500">sessions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available from payment data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">By Payment Volume</h4>
+          </div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Navrangpura</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">₹28,340</p>
+                <p class="text-xs text-gray-500">volume</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Bodakdev</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">₹21,780</p>
+                <p class="text-xs text-gray-500">volume</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Vastrapur</p>
+                <p class="text-xs text-gray-500">West Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">₹18,950</p>
+                <p class="text-xs text-gray-500">volume</p>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Satellite</p>
+                <p class="text-xs text-gray-500">Central Zone</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-semibold text-gray-900">₹15,230</p>
+                <p class="text-xs text-gray-500">volume</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Neighborhood Insights -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Neighborhood Deep Dive</h3>
+      <div class="grid grid-cols-3 gap-6">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires geographic clustering</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Density Clusters</h4>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Near Law Garden</span>
+              <span class="font-medium text-gray-900">42.3%</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Near Vastrapur Lake</span>
+              <span class="font-medium text-gray-900">38.7%</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">SG Highway</span>
+              <span class="font-medium text-gray-900">31.2%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="status-indicator">
+              <span class="status-dot mvp"></span>
+              <span class="tooltip">Available from catalog data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Popular Categories</h4>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Vegetables</span>
+              <span class="font-medium text-gray-900">342 items</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Dairy</span>
+              <span class="font-medium text-gray-900">156 items</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Grains</span>
+              <span class="font-medium text-gray-900">98 items</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires time series analysis</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Peak Activity Times</h4>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Morning (8-10 AM)</span>
+              <span class="font-medium text-gray-900">34%</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Evening (6-8 PM)</span>
+              <span class="font-medium text-gray-900">42%</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Weekend</span>
+              <span class="font-medium text-gray-900">68%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Future Expansion Opportunities -->
+      <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded mt-10">
+        <p class="text-xs font-medium text-blue-900 mb-1">Geographic Expansion Ready</p>
+        <p class="text-xs text-blue-800">When GPS coordinates are enabled, this dashboard will display interactive heatmaps, delivery route optimization zones, and real-time demand clustering visualizations.</p>
+      </div>
+    </div>
+
+    <!-- VENDORS TAB -->
+    <div id="tab-vendors" class="tab-content">
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-1">Vendor Performance</h2>
+        <p class="text-sm text-gray-500">Vendor reliability metrics and network intelligence (Streethawk integration)</p>
+      </div>
+
+      <!-- Notice about Streethawk requirement -->
+      <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded mb-8">
+        <p class="text-xs font-medium text-amber-900 mb-1">Streethawk Integration Required</p>
+        <p class="text-xs text-amber-800">All vendor metrics require Streethawk vendor coordination app to be operational. Data shown below represents future capabilities.</p>
+      </div>
+
+      <!-- Top Vendors by Reliability -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Top Vendors by Reliability Score</h3>
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk vendor data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Reliability Leaderboard</h4>
+          </div>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+              <div>
+                <p class="text-sm font-medium text-gray-900">FreshVeg Suppliers</p>
+                <p class="text-xs text-gray-500">12 neighborhoods served</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-semibold text-gray-900">94</p>
+                <div class="thin-bar w-16 mt-1">
+                  <div class="thin-bar-fill bg-gray-900" style="width: 94%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Daily Dairy Co</p>
+                <p class="text-xs text-gray-500">8 neighborhoods served</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-semibold text-gray-900">91</p>
+                <div class="thin-bar w-16 mt-1">
+                  <div class="thin-bar-fill bg-gray-800" style="width: 91%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Quick Grocery Hub</p>
+                <p class="text-xs text-gray-500">6 neighborhoods served</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-semibold text-gray-900">87</p>
+                <div class="thin-bar w-16 mt-1">
+                  <div class="thin-bar-fill bg-gray-700" style="width: 87%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Green Harvest Market</p>
+                <p class="text-xs text-gray-500">5 neighborhoods served</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-semibold text-gray-900">84</p>
+                <div class="thin-bar w-16 mt-1">
+                  <div class="thin-bar-fill bg-gray-600" style="width: 84%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk vendor data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Reliability Score Components</h4>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">Score calculated from multiple factors:</p>
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-gray-600">Response Time</span>
+                <span class="text-sm font-medium text-gray-900">35%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-800" style="width: 35%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-gray-600">Acceptance Rate</span>
+                <span class="text-sm font-medium text-gray-900">30%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-700" style="width: 30%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-gray-600">Completion Rating</span>
+                <span class="text-sm font-medium text-gray-900">25%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-600" style="width: 25%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-gray-600">Customer Feedback</span>
+                <span class="text-sm font-medium text-gray-900">10%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-500" style="width: 10%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vendor Performance Metrics -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Network Performance Metrics</h3>
+      <div class="grid grid-cols-4 gap-4 mb-10">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <p class="text-xs text-gray-500">Avg Response Time</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">15.3</p>
+          <p class="text-xs text-gray-500">minutes to accept</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <p class="text-xs text-gray-500">Demand Fulfillment</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">76.4%</p>
+          <div class="thin-bar mt-2">
+            <div class="thin-bar-fill bg-gray-900" style="width: 76.4%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <p class="text-xs text-gray-500">Active Vendors</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">24</p>
+          <p class="text-xs text-gray-500">Currently registered</p>
+        </div>
+
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk integration</span>
+            </span>
+            <p class="text-xs text-gray-500">Coverage Areas</p>
+          </div>
+          <p class="text-3xl font-semibold text-gray-900 mb-1">18</p>
+          <p class="text-xs text-gray-500">Neighborhoods covered</p>
+        </div>
+      </div>
+
+      <!-- Response Time Distribution & Peak Demand Windows -->
+      <div class="grid grid-cols-2 gap-6 mb-10">
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk vendor responses</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Response Time Distribution</h4>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-sm text-gray-700">Under 5 minutes</span>
+                <span class="text-sm font-medium text-gray-900">32%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-900" style="width: 32%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-sm text-gray-700">5-15 minutes</span>
+                <span class="text-sm font-medium text-gray-900">45%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-800" style="width: 45%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-sm text-gray-700">15-30 minutes</span>
+                <span class="text-sm font-medium text-gray-900">18%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-600" style="width: 18%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-sm text-gray-700">Over 30 minutes</span>
+                <span class="text-sm font-medium text-gray-900">5%</span>
+              </div>
+              <div class="thin-bar">
+                <div class="thin-bar-fill bg-gray-400" style="width: 5%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="status-indicator">
+              <span class="status-dot future"></span>
+              <span class="tooltip">Requires Streethawk intent data</span>
+            </span>
+            <h4 class="text-sm font-medium text-gray-700">Peak Demand Windows</h4>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="metric-card p-4">
+              <p class="text-xs text-gray-500 mb-1">Morning Peak</p>
+              <p class="text-2xl font-semibold text-gray-900">8-9 AM</p>
+              <p class="text-xs text-gray-600 mt-1">34% of daily demand</p>
+            </div>
+            <div class="metric-card p-4">
+              <p class="text-xs text-gray-500 mb-1">Evening Peak</p>
+              <p class="text-2xl font-semibold text-gray-900">6-7 PM</p>
+              <p class="text-xs text-gray-600 mt-1">42% of daily demand</p>
+            </div>
+            <div class="metric-card p-4">
+              <p class="text-xs text-gray-500 mb-1">Weekend Surge</p>
+              <p class="text-2xl font-semibold text-gray-900">+68%</p>
+              <p class="text-xs text-gray-600 mt-1">vs weekdays</p>
+            </div>
+            <div class="metric-card p-4">
+              <p class="text-xs text-gray-500 mb-1">Holiday Spike</p>
+              <p class="text-2xl font-semibold text-gray-900">+145%</p>
+              <p class="text-xs text-gray-600 mt-1">festival weeks</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Coverage Map (Placeholder) -->
+      <h3 class="text-sm font-medium text-gray-700 mb-4 uppercase tracking-wide">Vendor Service Coverage</h3>
+      <div class="metric-card p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="status-indicator">
+            <span class="status-dot future"></span>
+            <span class="tooltip">Requires Streethawk vendor profiles</span>
+          </span>
+          <h4 class="text-sm font-medium text-gray-700">Neighborhood Coverage Matrix</h4>
+        </div>
+        <div class="grid grid-cols-4 gap-3">
+          <div class="text-xs text-gray-600 font-medium col-span-4 mb-2">Vendors per Neighborhood</div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Navrangpura</p>
+            <p class="text-xl font-semibold text-gray-900">8</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Vastrapur</p>
+            <p class="text-xl font-semibold text-gray-900">7</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Bodakdev</p>
+            <p class="text-xl font-semibold text-gray-900">6</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Satellite</p>
+            <p class="text-xl font-semibold text-gray-900">5</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Maninagar</p>
+            <p class="text-xl font-semibold text-gray-900">4</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">CG Road</p>
+            <p class="text-xl font-semibold text-gray-900">6</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">SG Highway</p>
+            <p class="text-xl font-semibold text-gray-900">5</p>
+          </div>
+          <div class="metric-card p-3">
+            <p class="text-xs text-gray-500 mb-1">Others</p>
+            <p class="text-xl font-semibold text-gray-900">3-4</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- JavaScript -->
+<script>
+// Tab Switching
+function switchTab(tabName) {
+  // Hide all tabs
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.classList.remove('active');
+  });
+
+  // Remove active class from all buttons
+  document.querySelectorAll('.tab-button').forEach(button => {
+    button.classList.remove('active');
+  });
+
+  // Show selected tab
+  document.getElementById('tab-' + tabName).classList.add('active');
+
+  // Add active class to clicked button
+  event.target.classList.add('active');
+}
+
+// Wait for DOM and Chart.js to be ready
+document.addEventListener('DOMContentLoaded', function() {
+  // Verify Chart.js is loaded
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js failed to load');
+    return;
+  }
+
+  // Weekly Trends - Minimal Line Chart with thin lines
+  const weeklyTrendsCtx = document.getElementById('weeklyTrendsChart');
+  if (!weeklyTrendsCtx) {
+    console.error('Canvas element not found');
+    return;
+  }
+
+  new Chart(weeklyTrendsCtx, {
+    type: 'line',
+    data: {
+      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+      datasets: [
+        {
+          label: 'Minibag',
+          data: [72, 78, 85, 89],
+          borderColor: '#374151',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#374151',
+          pointBorderWidth: 0,
+          pointHoverRadius: 4
+        },
+        {
+          label: 'Product Alpha',
+          data: [32, 35, 38, 42],
+          borderColor: '#6b7280',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#6b7280',
+          pointBorderWidth: 0,
+          pointHoverRadius: 4
+        },
+        {
+          label: 'Product Beta',
+          data: [12, 14, 15, 16],
+          borderColor: '#9ca3af',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#9ca3af',
+          pointBorderWidth: 0,
+          pointHoverRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'start',
+          labels: {
+            color: '#6b7280',
+            font: { size: 13, weight: '500' },
+            usePointStyle: true,
+            pointStyle: 'circle',
+            padding: 12,
+            boxWidth: 7,
+            boxHeight: 7
+          }
+        },
+        tooltip: {
+          enabled: true,
+          backgroundColor: '#374151',
+          padding: 10,
+          titleFont: { size: 13 },
+          bodyFont: { size: 13 },
+          cornerRadius: 4,
+          displayColors: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          grid: {
+            color: '#f3f4f6',
+            drawBorder: false,
+            lineWidth: 1
+          },
+          ticks: {
+            color: '#9ca3af',
+            font: { size: 12 },
+            padding: 8,
+            stepSize: 20
+          },
+          border: {
+            display: false
+          }
+        },
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: '#9ca3af',
+            font: { size: 12 },
+            padding: 8
+          },
+          border: {
+            display: false
+          }
+        }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      }
+    }
+  });
+});
+</script>
+
+</body>
+</html>

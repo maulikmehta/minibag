@@ -1,6 +1,7 @@
 import React from 'react';
-import { ShoppingBag, MoreVertical, X, HelpCircle } from 'lucide-react';
+import { MoreVertical, X, HelpCircle } from 'lucide-react';
 import LanguageSwitcher from '../LanguageSwitcher.jsx';
+import MinibagIcon from '../MinibagIcon.jsx';
 
 /**
  * AppHeader Component
@@ -37,11 +38,7 @@ function AppHeader({
         onClick={onLogoClick}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        {showLogo && (
-          <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
-            <ShoppingBag size={18} className="text-white" strokeWidth={2.5} />
-          </div>
-        )}
+        {showLogo && <MinibagIcon size={32} />}
         <h1 className="text-lg font-bold text-gray-900">Minibag</h1>
       </button>
 

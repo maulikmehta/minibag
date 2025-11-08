@@ -1,5 +1,6 @@
 import React from 'react';
-import { ShoppingBag, Plus, Users, X } from 'lucide-react';
+import { Plus, Users, X } from 'lucide-react';
+import MinibagIcon from '../components/MinibagIcon.jsx';
 
 /**
  * HomeScreen Component
@@ -29,9 +30,7 @@ function HomeScreen({
 
       <div className="flex-1 flex flex-col items-center justify-center px-12 py-16">
         {/* Minibag Logo */}
-        <div className="w-28 h-28 mb-6 rounded-3xl bg-green-600 flex items-center justify-center shadow-2xl">
-          <ShoppingBag size={56} className="text-white" strokeWidth={2.5} />
-        </div>
+        <MinibagIcon size={64} className="mb-6" />
 
         {/* Product Name */}
         <h1 className="text-4xl font-bold text-gray-900 mb-4">Minibag</h1>
