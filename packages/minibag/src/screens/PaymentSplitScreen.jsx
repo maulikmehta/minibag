@@ -491,7 +491,7 @@ function PaymentSplitScreen({
           <div className="flex gap-3">
             <button
               onClick={handleViewBill}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+              className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-lg text-base font-semibold transition-colors"
             >
               View Bill
             </button>
