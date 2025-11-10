@@ -29,6 +29,7 @@ export const sessionSchema = {
   created_at: "timestamp",
   expires_at: "timestamp",
   completed_at: "timestamp", // When session status changed to 'completed'
+  cancelled_at: "timestamp", // When session status changed to 'cancelled'
   financially_settled_at: "timestamp", // When all items were paid or skipped
 
   // Status tracking

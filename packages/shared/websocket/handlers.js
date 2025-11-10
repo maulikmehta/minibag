@@ -105,6 +105,19 @@ export function setupSocketHandlers(socket, io) {
   });
 
   /**
+   * SESSION CANCELLED
+   * Broadcast when host cancels the session prematurely
+   * Forces all participants to exit the session
+   */
+  socket.on('session-cancelled', (data) => {
+    const { sessionId, message } = data;
+    // Broadcast to all clients in the session room EXCEPT the sender (host)
+    socket.to(sessionId).emit('session-cancelled', {
+      message: message || 'This session has been cancelled by the host'
+    });
+  });
+
+  /**
    * SESSION UPDATE
    * Broadcast general session updates (status, metadata, etc.)
    */

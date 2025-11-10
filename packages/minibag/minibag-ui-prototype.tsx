@@ -213,54 +213,30 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
        * CURRENT BEHAVIOR: This defensive merge preserves items in client state when API returns empty.
        * It's a safety net that should eventually be removed once proper fix is fully adopted.
        */
-      setParticipants(prevParticipants => {
-        console.log('🔄 Merging participant data. Previous:', prevParticipants.map(p => ({
-          id: p.id,
-          itemsCount: Object.keys(p.items || {}).length
-        })));
+      // FIX: Always trust server data, no defensive merge
+      // If current user is a participant, restore their items from localStorage (takes precedence)
+      let finalParticipants = transformedParticipants;
 
-        const merged = transformedParticipants.map(newParticipant => {
-          // Find existing participant in state
-          const existingParticipant = prevParticipants.find(p => p.id === newParticipant.id);
+      if (currentParticipant && !currentParticipant.is_creator) {
+        const localItems = loadParticipantItemsFromLocalStorage(currentParticipant.id);
 
-          // If new participant has empty items but existing has items, preserve existing
-          const newItemsCount = Object.keys(newParticipant.items || {}).length;
-          const existingItemsCount = Object.keys(existingParticipant?.items || {}).length;
-
-          if (newItemsCount === 0 && existingItemsCount > 0) {
-            console.warn(`⚠️ API returned empty items for ${newParticipant.name}, preserving ${existingItemsCount} existing items`);
-            return {
-              ...newParticipant,
-              items: existingParticipant.items // Preserve existing items
-            };
-          }
-
-          // Otherwise use new data
-          return newParticipant;
-        });
-
-        // If current user is a participant, restore their items from localStorage (takes precedence)
-        if (currentParticipant && !currentParticipant.is_creator) {
-          const localItems = loadParticipantItemsFromLocalStorage(currentParticipant.id);
-
-          if (localItems) {
-            console.log('📦 Restoring current participant items from localStorage');
-            return merged.map(p => {
-              if (p.id === currentParticipant.id) {
-                return { ...p, items: localItems };
-              }
-              return p;
-            });
-          }
+        if (localItems) {
+          console.log('📦 Restoring current participant items from localStorage');
+          finalParticipants = transformedParticipants.map(p => {
+            if (p.id === currentParticipant.id) {
+              return { ...p, items: localItems };
+            }
+            return p;
+          });
         }
+      }
 
-        console.log('✅ Merged participants:', merged.map(p => ({
-          id: p.id,
-          itemsCount: Object.keys(p.items || {}).length
-        })));
+      console.log('✅ Setting participants from server data:', finalParticipants.map(p => ({
+        id: p.id,
+        itemsCount: Object.keys(p.items || {}).length
+      })));
 
-        return merged;
-      });
+      setParticipants(finalParticipants);
     }
   }, [session, apiParticipants, currentParticipant, loadParticipantItemsFromLocalStorage]);
 
@@ -484,6 +460,32 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     }
   }, [session?.session_id]);
 
+  // Listen for session cancellation
+  React.useEffect(() => {
+    if (session?.session_id && currentParticipant?.role === 'participant') {
+      const handleSessionCancelled = (data) => {
+        console.log('Session cancelled by host:', data);
+
+        // Show blocking modal
+        const message = data?.message || 'This session has been cancelled by the host';
+        alert(message);
+
+        // Force cleanup and return to home
+        leaveSession();
+        setHostItems({});
+        setParticipants([]);
+        setSelectedParticipant('host');
+        setCurrentScreen('home');
+      };
+
+      socketService.on('session-cancelled', handleSessionCancelled);
+
+      return () => {
+        socketService.off('session-cancelled', handleSessionCancelled);
+      };
+    }
+  }, [session?.session_id, currentParticipant?.role, leaveSession]);
+
   // Load payments when session is active
   React.useEffect(() => {
     if (session?.session_id) {
@@ -541,12 +543,27 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         console.warn('WebSocket not ready, skipping real-time broadcast. Status updated via API.');
       }
 
+      // FIX: Force state reset on critical transitions
+      if (status === 'shopping' || status === 'completed') {
+        console.log(`🔄 Resetting state on status transition to: ${status}`);
+
+        // Clear all local state to force refetch from server
+        setHostItems({});
+        setItemPayments({});
+        setParticipants([]);
+
+        // Refetch fresh data from server
+        loadSession(session.session_id).catch(err => {
+          console.error('Failed to reload session after status transition:', err);
+        });
+      }
+
       console.log(`Session status updated to: ${status}`);
     } catch (error) {
       console.error('Failed to update session status:', error);
       notify.error(error.userMessage || 'Failed to update session status');
     }
-  }, [session?.session_id, notify]);
+  }, [session?.session_id, notify, loadSession]);
 
   // Handle skip/unskip item toggle
   const handleSkipToggle = useCallback(async (itemId) => {
@@ -564,6 +581,11 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           const updated = { ...prev };
           delete updated[itemId];
           return updated;
+        });
+
+        // FIX: Invalidate cache and refetch from server
+        loadSession(session.session_id).catch(err => {
+          console.error('Failed to refresh session after unskip:', err);
         });
 
         notify.success('Item unmarked as skipped');
@@ -588,6 +610,11 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
             timestamp: Date.now()
           }
         }));
+
+        // FIX: Invalidate cache and refetch from server
+        loadSession(session.session_id).catch(err => {
+          console.error('Failed to refresh session after skip:', err);
+        });
 
         notify.info('Item marked as skipped');
 
@@ -629,7 +656,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   }, [currentScreen, currentParticipant, showScreenTour]);
 
   // Logo click handler - end session and go home
-  const handleLogoClick = useCallback(() => {
+  const handleLogoClick = useCallback(async () => {
     // If on home screen, do nothing
     if (currentScreen === 'home') return;
 
@@ -639,6 +666,23 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         'End session and start fresh? All progress will be lost.'
       );
       if (confirmed) {
+        // Update session status to cancelled
+        if (session?.session_id) {
+          try {
+            await handleUpdateSessionStatus('cancelled');
+
+            // Emit custom WebSocket event to notify participants
+            if (socketService.isConnected() && socketService.getCurrentSessionId()) {
+              socketService.emit('session-cancelled', {
+                message: 'This session has been cancelled by the host'
+              });
+            }
+          } catch (error) {
+            console.error('Failed to update session status to cancelled:', error);
+            // Continue with cleanup even if status update fails
+          }
+        }
+
         // End session completely - clear from state and localStorage
         leaveSession();
         setHostItems({});
@@ -650,7 +694,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       // No active session, navigate directly
       setCurrentScreen('home');
     }
-  }, [currentScreen, session, currentParticipant, leaveSession]);
+  }, [currentScreen, session, currentParticipant, leaveSession, handleUpdateSessionStatus]);
 
   // AUTO-LOAD TOURS REMOVED - Now using on-demand help icon instead
   // All tours are now triggered by clicking the help (?) icon in the header
@@ -1044,6 +1088,11 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
                 method: payment.method,
                 amount: payment.amount
               }
+            });
+
+            // FIX: Invalidate cache and refetch from server
+            loadSession(session.session_id).catch(err => {
+              console.error('Failed to refresh session after payment:', err);
             });
 
             // Emit WebSocket event for real-time sync

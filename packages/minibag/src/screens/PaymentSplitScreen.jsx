@@ -101,30 +101,19 @@ function PaymentSplitScreen({
     [hostItems, participants]
   );
 
-  // Use server data if available, otherwise calculate client-side
-  const totalPaid = billData?.total_paid || Object.values(itemPayments).reduce((sum, p) => sum + (p?.amount || 0), 0);
+  // FIX: Always use server data, no client-side fallback
+  const totalPaid = billData?.total_paid || 0;
 
-  // Calculate host cost (from server data or fallback to client calculation)
+  // FIX: Calculate host cost from server data only
   const hostCost = useMemo(() => {
     if (billData?.participants) {
       const host = billData.participants.find(p => p.is_creator);
       return host?.total_cost || 0;
     }
+    return 0;
+  }, [billData]);
 
-    // Fallback: client-side calculation
-    let cost = 0;
-    Object.entries(hostItems).forEach(([itemId, qty]) => {
-      const payment = itemPayments[itemId];
-      if (payment) {
-        const totalQty = allItems[itemId];
-        const pricePerKg = payment.amount / totalQty;
-        cost += pricePerKg * qty;
-      }
-    });
-    return cost;
-  }, [billData, hostItems, allItems, itemPayments]);
-
-  // Calculate participant costs with item details (from server data or fallback)
+  // FIX: Calculate participant costs from server data only
   const participantCosts = useMemo(() => {
     if (billData?.participants) {
       // Use server-calculated bills
@@ -145,38 +134,8 @@ function PaymentSplitScreen({
       });
       return costs;
     }
-
-    // Fallback: client-side calculation
-    const costs = {};
-    participants.forEach(p => {
-      const pName = p.nickname || p.name || 'Participant';
-      let cost = 0;
-      const itemDetails = [];
-
-      Object.entries(p.items || {}).forEach(([itemId, qty]) => {
-        const payment = itemPayments[itemId];
-        if (payment) {
-          const totalQty = allItems[itemId];
-          const pricePerKg = payment.amount / totalQty;
-          const itemCost = pricePerKg * qty;
-          cost += itemCost;
-
-          const veg = items.find(v => v.id === itemId);
-          itemDetails.push({
-            id: itemId,
-            name: getItemName(veg),
-            qty,
-            pricePerKg,
-            cost: itemCost,
-            emoji: veg?.emoji || '🥬'
-          });
-        }
-      });
-
-      costs[pName] = { total: cost, items: itemDetails };
-    });
-    return costs;
-  }, [billData, participants, allItems, itemPayments, items, getItemName]);
+    return {};
+  }, [billData]);
 
   const totalToReceive = useMemo(
     () => Object.values(participantCosts).reduce((sum, data) => sum + data.total, 0),

@@ -100,9 +100,9 @@ function ParticipantBillScreen({
     [hostItems, participants]
   );
 
-  // Calculate participant's bill (from server data or fallback)
+  // FIX: Calculate participant's bill from server data only
   const { participantCost, billItems } = useMemo(() => {
-    // Try to use server-calculated bill data first
+    // Use server-calculated bill data
     if (billData?.participants && participant?.id) {
       const serverBill = billData.participants.find(p => p.participant_id === participant.id);
 
@@ -121,31 +121,9 @@ function ParticipantBillScreen({
       }
     }
 
-    // Fallback: client-side calculation
-    console.log('⚠️ Falling back to client-side bill calculation for participant:', participant?.nickname);
-    let cost = 0;
-    const items = [];
-
-    Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
-      const veg = getItemName ? items.find(v => v.id === itemId) : null;
-      const payment = itemPayments[itemId];
-      if (payment) {
-        const totalQty = allItems[itemId];
-        const pricePerKg = payment.amount / totalQty;
-        const itemCost = pricePerKg * qty;
-        cost += itemCost;
-        items.push({
-          name: getItemName ? getItemName(veg) : `Item ${itemId}`,
-          qty,
-          pricePerKg: pricePerKg.toFixed(0),
-          itemCost: itemCost.toFixed(0),
-          emoji: veg?.emoji || '🥬'
-        });
-      }
-    });
-
-    return { participantCost: cost, billItems: items };
-  }, [billData, participant, allItems, itemPayments, items, getItemName]);
+    // No fallback - return empty if server data unavailable
+    return { participantCost: 0, billItems: [] };
+  }, [billData, participant]);
 
   // Handler for sending thank you message to host via WhatsApp
   const handleMessageHost = () => {
