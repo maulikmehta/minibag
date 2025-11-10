@@ -382,9 +382,9 @@ export default function SessionActiveScreen({
                             }
                           }}
                           disabled={myTotalWeight >= 10}
-                          className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:bg-gray-500 disabled:hover:bg-gray-500 transition-colors"
+                          className="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-150 active:scale-90"
                         >
-                          Add
+                          <Plus size={20} className="text-white" strokeWidth={2.5} />
                         </button>
                       )}
                     </div>

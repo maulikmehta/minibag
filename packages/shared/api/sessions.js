@@ -414,11 +414,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
 }
 
 /**
- * Mark a nickname as used in the pool
- */
-/**
- * Mark nickname as used - optimized version using atomic database function
- * Reduces from 4-5 sequential queries to 1 atomic operation
+ * Mark nickname as used in the pool
  * @param {string} nicknameId - UUID of the nickname to claim
  * @param {string} sessionId - Session ID claiming the nickname
  * @returns {Object} {data, error} - Updated nickname data or error
@@ -427,34 +423,61 @@ async function markNicknameAsUsed(nicknameId, sessionId) {
   if (!nicknameId) return { data: null, error: null }; // Return proper structure
 
   try {
-    // Call atomic database function that handles all validation and locking
-    const { data: result, error: rpcError } = await supabase
-      .rpc('claim_nickname', {
-        p_nickname_id: nicknameId,
-        p_session_id: sessionId,
-        p_current_time: new Date().toISOString()
-      })
+    // Fetch current nickname data to get times_used value and verify reservation
+    const { data: nickname, error: fetchError } = await supabase
+      .from('nicknames_pool')
+      .select('times_used, reserved_by_session, reserved_until')
+      .eq('id', nicknameId)
       .single();
 
-    if (rpcError) {
-      return { data: null, error: rpcError };
+    if (fetchError) {
+      return { data: null, error: fetchError };
     }
 
-    // Check if claiming was successful
-    if (!result.success) {
+    // CRITICAL: Verify reservation belongs to this session (or is expired/null)
+    // This prevents another session from claiming a reserved nickname
+    const reservedByOtherSession = nickname.reserved_by_session &&
+                                   nickname.reserved_by_session !== sessionId &&
+                                   nickname.reserved_until &&
+                                   new Date(nickname.reserved_until) > new Date();
+
+    if (reservedByOtherSession) {
       return {
         data: null,
-        error: new Error(result.error_message || 'Failed to claim nickname')
+        error: new Error('Nickname is reserved by another session')
       };
     }
 
-    // Return the nickname data (wrapped in array to match original format)
-    return {
-      data: result.nickname_data ? [result.nickname_data] : null,
-      error: null
-    };
+    // Convert reservation to permanent assignment
+    const { data, error } = await supabase
+      .from('nicknames_pool')
+      .update({
+        is_available: false,
+        currently_used_in: sessionId,
+        times_used: (nickname?.times_used || 0) + 1,
+        last_used: new Date().toISOString(),
+        // Clear reservation fields
+        reserved_until: null,
+        reserved_by_session: null
+      })
+      .eq('id', nicknameId)
+      .eq('is_available', true) // Extra safety: only mark if still available
+      .select(); // CRITICAL: Return updated data
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    // If no rows were updated, nickname was already taken
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return {
+        data: null,
+        error: new Error('Nickname no longer available')
+      };
+    }
+
+    return { data, error };
   } catch (err) {
-    logger.error({ err, nicknameId, sessionId }, 'Nickname claiming failed');
     return { data: null, error: err };
   }
 }

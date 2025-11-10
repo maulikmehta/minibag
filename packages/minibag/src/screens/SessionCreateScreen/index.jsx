@@ -429,9 +429,9 @@ export default function SessionCreateScreen({
                     }}
                     disabled={totalWeight >= 10 || isListLocked}
                     data-tour="quantity-controls"
-                    className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-button text-sm font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 transition-all duration-150 active:scale-95"
+                    className="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-150 active:scale-90"
                   >
-                    Add
+                    <Plus size={20} className="text-white" strokeWidth={2.5} />
                   </button>
                 )}
               </div>
