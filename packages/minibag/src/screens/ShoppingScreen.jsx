@@ -228,7 +228,7 @@ function ShoppingScreen({
                     {ENABLE_SKIP_ITEMS && (
                       <button
                         onClick={() => onSkipToggle && onSkipToggle(itemId)}
-                        className="w-12 h-12 flex items-center justify-center bg-white border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
+                        className="w-12 h-12 rounded-full bg-white border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 flex items-center justify-center flex-shrink-0 transition-all duration-150 active:scale-90"
                         title="Skip this item (didn't buy)"
                         aria-label="Skip this item"
                       >
@@ -241,9 +241,11 @@ function ShoppingScreen({
                         setSelectedItemForPayment(itemId);
                         setShowPaymentModal(true);
                       }}
-                      className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                      className="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 transition-all duration-150 active:scale-90"
+                      title="Record payment"
+                      aria-label="Record payment"
                     >
-                      Pay
+                      <Check size={20} strokeWidth={2.5} className="text-white" />
                     </button>
                   </div>
                 ) : null}

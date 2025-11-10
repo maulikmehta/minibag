@@ -37,7 +37,7 @@ function ParticipantAvatar({
 
   // Determine border styling based on state
   const borderClass = isSelected
-    ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+    ? 'bg-gradient-to-br from-green-500 via-cyan-400 to-cyan-500 p-[2px]'
     : hasItems
     ? 'border-2 border-green-600'
     : 'border-2 border-gray-300';

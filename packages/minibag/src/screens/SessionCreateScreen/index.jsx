@@ -579,7 +579,7 @@ export default function SessionCreateScreen({
                         <div className="relative">
                           <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
                             selectedHostNickname?.nickname === option.nickname
-                              ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[2px]'
+                              ? 'bg-gradient-to-br from-green-500 via-cyan-400 to-cyan-500 p-[2px]'
                               : 'border-2 border-gray-300 hover:border-gray-400'
                           }`}>
                             <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
