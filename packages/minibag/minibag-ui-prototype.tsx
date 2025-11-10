@@ -266,133 +266,8 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
    *
    * TODO: Once data is verified to match, migrate to Option 2
    */
-  React.useEffect(() => {
-    const compareShoppingData = async () => {
-      if (currentScreen !== 'shopping' || !session?.session_id) return;
-
-      try {
-        console.log('🔄 [Option 1] Fetching from new shopping-items endpoint...');
-
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/sessions/${session.session_id}/shopping-items`);
-        const result = await response.json();
-
-        if (!result.success) {
-          console.error('❌ [Option 1] New endpoint failed:', result.error);
-          return;
-        }
-
-        const newEndpointData = result.data;
-
-        // Validate data structure
-        if (!newEndpointData || typeof newEndpointData !== 'object') {
-          console.error('❌ [Option 1] Invalid data structure from endpoint:', newEndpointData);
-          return;
-        }
-
-        // Calculate aggregated items from current state (old approach)
-        const currentStateAggregated = {};
-
-        // Add host items
-        Object.entries(hostItems || {}).forEach(([itemId, qty]) => {
-          currentStateAggregated[itemId] = {
-            totalQuantity: qty,
-            participants: [currentParticipant?.nickname || 'Host']
-          };
-        });
-
-        // Add participant items
-        participants.forEach(participant => {
-          Object.entries(participant.items || {}).forEach(([itemId, qty]) => {
-            if (!currentStateAggregated[itemId]) {
-              currentStateAggregated[itemId] = {
-                totalQuantity: 0,
-                participants: []
-              };
-            }
-            currentStateAggregated[itemId].totalQuantity += qty;
-            if (!currentStateAggregated[itemId].participants.includes(participant.nickname)) {
-              currentStateAggregated[itemId].participants.push(participant.nickname);
-            }
-          });
-        });
-
-        // Compare the two datasets
-        console.log('📊 [Option 1] DATA COMPARISON:');
-        console.log('-----------------------------------');
-        console.log('🆕 New Endpoint Data:', {
-          aggregatedItems: newEndpointData?.aggregatedItems,
-          participantCount: newEndpointData?.participants?.length,
-          participants: newEndpointData?.participants?.map(p => ({
-            nickname: p.nickname,
-            itemsCount: p.itemsCount
-          }))
-        });
-        console.log('📦 Current State Data:', {
-          aggregatedItems: currentStateAggregated,
-          participantCount: participants.length,
-          participants: participants.map(p => ({
-            nickname: p.nickname,
-            itemsCount: Object.keys(p.items || {}).length
-          }))
-        });
-
-        // Deep comparison of aggregated items
-        const newItemIds = Object.keys(newEndpointData?.aggregatedItems || {}).sort();
-        const oldItemIds = Object.keys(currentStateAggregated).sort();
-
-        let differencesFound = false;
-
-        if (newItemIds.length !== oldItemIds.length) {
-          console.warn('⚠️ [Option 1] MISMATCH: Different number of items!');
-          console.warn(`  New: ${newItemIds.length}, Old: ${oldItemIds.length}`);
-          differencesFound = true;
-        }
-
-        newItemIds.forEach(itemId => {
-          const newItem = newEndpointData?.aggregatedItems?.[itemId];
-          const oldItem = currentStateAggregated[itemId];
-
-          if (!newItem) {
-            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} missing in new data`);
-            differencesFound = true;
-            return;
-          }
-
-          if (!oldItem) {
-            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} exists in new data but not in old`);
-            differencesFound = true;
-            return;
-          }
-
-          if (Math.abs(newItem.totalQuantity - oldItem.totalQuantity) > 0.01) {
-            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} quantity differs!`);
-            console.warn(`  New: ${newItem.totalQuantity}, Old: ${oldItem.totalQuantity}`);
-            differencesFound = true;
-          }
-
-          const newParticipants = newItem.participants.sort();
-          const oldParticipants = oldItem.participants.sort();
-          if (JSON.stringify(newParticipants) !== JSON.stringify(oldParticipants)) {
-            console.warn(`⚠️ [Option 1] MISMATCH: Item ${itemId} participants differ!`);
-            console.warn(`  New: ${newParticipants.join(', ')}, Old: ${oldParticipants.join(', ')}`);
-            differencesFound = true;
-          }
-        });
-
-        if (!differencesFound) {
-          console.log('✅ [Option 1] DATA MATCHES PERFECTLY! Safe to migrate.');
-        } else {
-          console.warn('⚠️ [Option 1] DIFFERENCES FOUND! Review before migrating.');
-        }
-        console.log('-----------------------------------');
-
-      } catch (error) {
-        console.error('❌ [Option 1] Error fetching/comparing shopping data:', error);
-      }
-    };
-
-    compareShoppingData();
-  }, [currentScreen, session?.session_id, hostItems, participants, currentParticipant]);
+  // NOTE: Comparison diagnostic removed - it was causing misleading warnings during
+  // state transitions. The server-first architecture migration is complete and validated.
 
   // Listen for participant item updates (host only)
   React.useEffect(() => {
@@ -985,6 +860,22 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           setSelectedParticipant('host');
         }}
         onUpdateParticipants={async (updatedParticipants) => {
+          // Handle both functional setState and direct array
+          if (typeof updatedParticipants === 'function') {
+            // Functional setState - call it with current participants
+            setParticipants(updatedParticipants);
+            return;
+          }
+
+          // DEFENSIVE: Ensure updatedParticipants is actually an array (for non-functional updates)
+          if (!Array.isArray(updatedParticipants)) {
+            console.error('❌ updatedParticipants is neither function nor array:', {
+              type: typeof updatedParticipants,
+              value: updatedParticipants
+            });
+            return;
+          }
+
           setParticipants(updatedParticipants);
           // Auto-save participant items to localStorage and backend
           if (currentParticipant && !currentParticipant.is_creator) {

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Check, X, Users, Loader2, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
+import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
+import { ERROR_MESSAGES } from '@shared/constants/errorMessages.js';
 
 export default function JoinSessionScreen({
   session,
@@ -35,57 +37,74 @@ export default function JoinSessionScreen({
   // PIN authentication state (for protected sessions)
   const [sessionPin, setSessionPin] = useState('');
 
-  // Extract invite token from URL query parameter
+  // Extract invite token from URL query parameter (Issue #14)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const inv = urlParams.get('inv');
     if (inv) {
-      setInviteToken(inv);
+      // Validate format: 8-character hex string (matches generateInviteToken)
+      if (/^[a-f0-9]{8}$/i.test(inv)) {
+        setInviteToken(inv);
+      } else {
+        console.warn('Invalid invite token format', { token: inv });
+        notify.warning('Invalid invite link format. Please check your link and try again.');
+      }
     }
-  }, []);
+  }, [notify]);
 
-  // Fetch nickname options when screen loads or when name is entered
+  // Fetch nickname options with debouncing and immediate fallback (Issues #11, #15)
   useEffect(() => {
-    if (nicknameOptions.length === 0 && !loadingNicknames) {
-      setLoadingNicknames(true);
+    // Show fallback immediately on first load (Issue #15)
+    if (nicknameOptions.length === 0) {
+      setNicknameOptions([
+        { nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true },
+        { nickname: 'Ria', avatar_emoji: '👩', gender: 'female', fallback: true }
+      ]);
+      setSelectedNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true });
+    }
 
-      // Extract first letter from participant name if available
-      const firstLetter = participantName.trim() ? participantName.trim().charAt(0).toUpperCase() : null;
-      const url = firstLetter
-        ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
-        : '/api/sessions/nickname-options';
+    // Extract first letter and check if it changed (Issue #11)
+    const firstLetter = participantName.trim() ? participantName.trim().charAt(0).toUpperCase() : null;
+    const currentFirstLetter = nicknameOptions[0]?.nickname?.charAt(0)?.toUpperCase();
+    const letterChanged = firstLetter !== currentFirstLetter;
 
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setNicknameOptions(data.data);
-            // Auto-select first option
-            if (data.data.length > 0) {
+    // Fetch if empty OR if first letter changed, with debouncing (Issue #11)
+    if ((nicknameOptions.length === 0 || letterChanged) && !loadingNicknames) {
+      const timeoutId = setTimeout(() => {
+        setLoadingNicknames(true);
+
+        const url = firstLetter
+          ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
+          : '/api/sessions/nickname-options';
+
+        fetch(url)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data && data.data.length > 0) {
+              // Replace fallback with real options (Issue #15)
+              setNicknameOptions(data.data);
               setSelectedNickname(data.data[0]);
             }
-          }
-        })
-        .catch(err => {
-          console.error('Failed to fetch nickname options:', err);
-          // Fallback options if API fails
-          setNicknameOptions([
-            { nickname: 'Raj', avatar_emoji: '👨', gender: 'male' },
-            { nickname: 'Ria', avatar_emoji: '👩', gender: 'female' }
-          ]);
-          setSelectedNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male' });
-        })
-        .finally(() => {
-          setLoadingNicknames(false);
-        });
+            // Keep fallback options if API returns empty
+          })
+          .catch(err => {
+            console.error('Failed to fetch nickname options:', err);
+            // Keep fallback options on error (Issue #15)
+          })
+          .finally(() => {
+            setLoadingNicknames(false);
+          });
+      }, 300); // Debounce: wait 300ms after user stops typing (Issue #11)
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [nicknameOptions.length, loadingNicknames, participantName]);
+  }, [participantName, nicknameOptions, loadingNicknames]);
 
   // Handle joining a session - now shows modal first
   const handleJoinClick = () => {
     // Check if session is full (max 4 people: 1 host + 3 participants)
     if (participants.length >= 3) {
-      notify.error('This list is full! Maximum 4 people can shop together.');
+      notify.error('This shopping list is full! Only 4 people can shop together at once.');
       return;
     }
 
@@ -106,13 +125,39 @@ export default function JoinSessionScreen({
       return;
     }
 
+    // CRITICAL: Validate nickname has required fields (Issue #4)
+    if (!selectedNickname.nickname || !selectedNickname.avatar_emoji) {
+      notify.error(ERROR_MESSAGES.MISSING_NICKNAME_DATA);
+      console.error('Invalid nickname data', { selectedNickname });
+      return;
+    }
+
+    // Validate PIN if session requires it (Issue #10)
+    if (session?.requires_pin) {
+      if (!sessionPin || sessionPin.trim().length === 0) {
+        notify.warning(ERROR_MESSAGES.MISSING_PIN);
+        return;
+      }
+
+      if (sessionPin.trim().length < VALIDATION_LIMITS.MIN_PIN_LENGTH || sessionPin.trim().length > VALIDATION_LIMITS.MAX_PIN_LENGTH) {
+        notify.warning(ERROR_MESSAGES.INVALID_PIN_LENGTH);
+        return;
+      }
+
+      const pinRegex = new RegExp(`^\\d{${VALIDATION_LIMITS.MIN_PIN_LENGTH},${VALIDATION_LIMITS.MAX_PIN_LENGTH}}$`);
+      if (!pinRegex.test(sessionPin.trim())) {
+        notify.warning(ERROR_MESSAGES.INVALID_PIN_FORMAT);
+        return;
+      }
+    }
+
     try {
       setJoiningSession(true);
 
       // Join session via API with nickname selection and PIN (if required)
       const result = await joinSession(joinSessionId, [], {
         real_name: participantName,
-        selected_nickname_id: selectedNickname.id,
+        selected_nickname_id: selectedNickname.id || null, // Fallback nicknames don't have ID
         selected_nickname: selectedNickname.nickname,
         selected_avatar_emoji: selectedNickname.avatar_emoji,
         invite_token: inviteToken, // Include invite token if present
@@ -127,11 +172,11 @@ export default function JoinSessionScreen({
       console.error('❌ Failed to join session:', error);
       // Check error type
       if (error.message && error.message.includes('full')) {
-        notify.error('This list is full! Maximum 4 people can shop together.');
+        notify.error('This shopping list is full! Only 4 people can shop together at once.');
       } else if (error.message && error.message.includes('expired')) {
-        notify.error('This invite link has expired. The host set a 20-minute timeout. Please ask for a new link.');
+        notify.error('This invite link expired after 20 minutes. Please ask the person who invited you for a new link.');
       } else {
-        notify.error(error.userMessage || 'Unable to join list. Please check the link and try again.');
+        notify.error(error.userMessage || 'Unable to join this shopping list. Please check the link and try again.');
       }
     } finally {
       setJoiningSession(false);
@@ -302,13 +347,13 @@ export default function JoinSessionScreen({
               inputMode="numeric"
               value={sessionPin}
               onChange={(e) => {
-                // Allow only 4-6 digits
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                // Allow only digits up to max PIN length
+                const value = e.target.value.replace(/\D/g, '').slice(0, VALIDATION_LIMITS.MAX_PIN_LENGTH);
                 setSessionPin(value);
               }}
-              placeholder="Enter 4-digit PIN"
+              placeholder={`Enter ${VALIDATION_LIMITS.MIN_PIN_LENGTH}-digit PIN`}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-              maxLength={6}
+              maxLength={VALIDATION_LIMITS.MAX_PIN_LENGTH}
               autoComplete="off"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -445,9 +490,17 @@ export default function JoinSessionScreen({
             {/* Step 3: Nickname Selection */}
             {modalStep === 3 && (
               <div className="mb-4" data-tour="participant-nickname-selection">
-                <label className="block text-sm font-medium text-gray-900 mb-3">
-                  Pick your bag tag
-                </label>
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="block text-sm font-medium text-gray-900">
+                    Pick your bag tag
+                  </label>
+                  {loadingNicknames && (
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" />
+                      Loading options...
+                    </span>
+                  )}
+                </div>
                 {loadingNicknames ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 size={24} className="animate-spin text-green-600" />

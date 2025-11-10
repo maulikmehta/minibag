@@ -39,6 +39,88 @@ export class ValidationError extends Error {
 }
 
 /**
+ * Normalize a timestamp value to valid ISO 8601 format
+ * Handles malformed timestamps by attempting to parse and normalize them
+ *
+ * @param {*} value - Timestamp value to normalize
+ * @param {string} fieldName - Name of the field (for logging)
+ * @param {string} participantId - Participant ID (for logging)
+ * @returns {string} - Valid ISO 8601 timestamp string
+ */
+function normalizeTimestamp(value, fieldName = 'timestamp', participantId = 'unknown') {
+  // If null/undefined, use current time
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  // If it's already a string, try to fix common malformations
+  if (typeof value === 'string') {
+    let processedValue = value;
+
+    // FIX: Handle the specific ":00:00" malformation where + was replaced with :
+    // Pattern: "2025-11-10T15:22:30.187:00:00"
+    //          Should be: "2025-11-10T15:22:30.187+00:00"
+    const malformedPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}):(\d{2}:\d{2})$/;
+    const match = processedValue.match(malformedPattern);
+
+    if (match) {
+      // Reconstruct with proper + sign
+      processedValue = `${match[1]}+${match[2]}`;
+      logger.warn('Fixed malformed timestamp (: → +)', {
+        participantId,
+        fieldName,
+        originalValue: value,
+        fixedValue: processedValue
+      });
+    }
+
+    try {
+      // Attempt to parse the (potentially fixed) date
+      const date = new Date(processedValue);
+
+      // Check if parsing succeeded
+      if (!isNaN(date.getTime())) {
+        // Successfully parsed - normalize to ISO format
+        return date.toISOString();
+      } else {
+        logger.error('Date parsing returned Invalid Date', {
+          participantId,
+          fieldName,
+          originalValue: value,
+          processedValue,
+          result: 'Invalid Date'
+        });
+      }
+    } catch (e) {
+      logger.error('Failed to parse timestamp', {
+        participantId,
+        fieldName,
+        value,
+        processedValue,
+        error: e.message
+      });
+    }
+  }
+
+  // If it's a Date object, convert to ISO
+  if (value instanceof Date) {
+    if (!isNaN(value.getTime())) {
+      return value.toISOString();
+    }
+  }
+
+  // Fallback: use current time for completely unparseable values
+  // This should rarely happen now that we fix the malformed format
+  logger.error('Timestamp completely unparseable, using current time fallback', {
+    participantId,
+    fieldName,
+    value,
+    valueType: typeof value
+  });
+  return new Date().toISOString();
+}
+
+/**
  * Transform participant items from API format to frontend format
  *
  * API format: Array of { item_id: UUID, quantity: number, catalog_item: { item_id: string, ... } }
@@ -134,9 +216,81 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
     return null;
   }
 
-  // Validate input with Zod schema
+  // Handle optimistic updates BEFORE validation (temporary participant objects before API confirmation)
+  if (apiParticipant._optimistic ||
+      apiParticipant.participant_id?.startsWith('temp-') ||
+      apiParticipant.id?.startsWith('temp-')) {
+    logger.debug('transformParticipant: Skipping validation for optimistic update', {
+      participant_id: apiParticipant.participant_id || apiParticipant.id,
+      is_optimistic: apiParticipant._optimistic
+    });
+
+    // Return simplified participant object without full validation
+    return {
+      id: apiParticipant.participant_id || apiParticipant.id,
+      name: apiParticipant.nickname || apiParticipant.real_name || 'Participant',
+      nickname: apiParticipant.nickname,
+      real_name: apiParticipant.real_name,
+      avatar_emoji: apiParticipant.avatar_emoji || '👤',
+      is_creator: apiParticipant.is_creator || false,
+      items: apiParticipant.items || {},
+      marked_not_coming: apiParticipant.marked_not_coming || false
+    };
+  }
+
+  // Validate input with Zod schema (only for real API data)
+  // Declare sanitizedParticipant outside try block so it's accessible in catch
+  let sanitizedParticipant = { ...apiParticipant };
+
   try {
-    const validatedInput = ParticipantSchema.parse(apiParticipant);
+    // 🔍 DIAGNOSTIC: Log participant structure before validation
+    console.log('🔍 DIAGNOSTIC - Participant before validation:', {
+      participant_id: apiParticipant?.id,
+      nickname: apiParticipant?.nickname,
+      has_joined_at: 'joined_at' in apiParticipant,
+      has_created_at: 'created_at' in apiParticipant,
+      joined_at_value: apiParticipant?.joined_at,
+      created_at_value: apiParticipant?.created_at,
+      joined_at_type: typeof apiParticipant?.joined_at,
+      created_at_type: typeof apiParticipant?.created_at,
+      joined_at_length: apiParticipant?.joined_at?.length,
+      all_keys: Object.keys(apiParticipant || {})
+    });
+
+    // 🛡️ DEFENSIVE: Sanitize timestamps before validation to handle corruption
+    sanitizedParticipant = { ...apiParticipant };
+
+    // Normalize joined_at timestamp
+    if (sanitizedParticipant.joined_at) {
+      const normalized = normalizeTimestamp(sanitizedParticipant.joined_at, 'joined_at', sanitizedParticipant.id);
+      if (normalized !== sanitizedParticipant.joined_at) {
+        logger.warn('Malformed joined_at timestamp sanitized', {
+          participantId: sanitizedParticipant.id,
+          originalValue: sanitizedParticipant.joined_at,
+          normalizedValue: normalized
+        });
+      }
+      sanitizedParticipant.joined_at = normalized;
+    }
+
+    // Remove created_at if undefined (column doesn't exist in DB schema)
+    if (sanitizedParticipant.created_at === undefined) {
+      delete sanitizedParticipant.created_at;
+    } else if (sanitizedParticipant.created_at) {
+      // Normalize if present
+      const normalized = normalizeTimestamp(sanitizedParticipant.created_at, 'created_at', sanitizedParticipant.id);
+      sanitizedParticipant.created_at = normalized;
+    }
+
+    // 🔍 DIAGNOSTIC: Log after sanitization
+    console.log('🛡️ After sanitization:', {
+      participant_id: sanitizedParticipant?.id,
+      joined_at_sanitized: sanitizedParticipant?.joined_at,
+      created_at_sanitized: sanitizedParticipant?.created_at,
+      joined_at_changed: apiParticipant?.joined_at !== sanitizedParticipant?.joined_at
+    });
+
+    const validatedInput = ParticipantSchema.parse(sanitizedParticipant);
 
     // Transform to frontend format
     const frontendParticipant = {
@@ -156,10 +310,30 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
 
   } catch (error) {
     if (error.name === 'ZodError') {
+      // Enhanced error details for debugging
+      const errorDetails = error.issues.map(issue => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+        received: issue.received,
+        expected: issue.expected,
+        code: issue.code
+      }));
+
       logger.error('transformParticipant: Validation failed', {
         participant: apiParticipant,
-        errors: error.issues
+        sanitizedParticipant: sanitizedParticipant,
+        errors: error.issues,
+        errorDetails
       });
+
+      // Log to console for immediate visibility
+      console.error('❌ VALIDATION FAILURE DETAILS:', {
+        participantId: apiParticipant?.id,
+        nickname: apiParticipant?.nickname,
+        errorDetails,
+        fullErrors: error.issues
+      });
+
       throw new ValidationError('Invalid participant data structure', error);
     }
     throw error;

@@ -11,15 +11,28 @@ import { z } from 'zod';
 export const ParticipantSchema = z.object({
   id: z.string().uuid(),
   session_id: z.string().uuid(),
+  user_id: z.string().uuid().optional().nullable(),
   nickname: z.string().min(2).max(20),
-  avatar_emoji: z.string().max(10).optional().nullable(),
+  avatar_emoji: z.string().max(10),
   real_name: z.string().min(1).max(100).optional().nullable(),
   is_creator: z.boolean().default(false),
   items_confirmed: z.boolean().default(false),
   marked_not_coming: z.boolean().default(false),
-  marked_not_coming_at: z.string().datetime().optional().nullable(),
+  marked_not_coming_at: z.string().datetime({ offset: true }).optional().nullable(),
+  timed_out_at: z.string().datetime({ offset: true }).optional().nullable(),
   claimed_invite_id: z.string().uuid().optional().nullable(),
-  created_at: z.string().datetime(),
+  joined_at: z.preprocess(
+    // Simplified: Only handle null/undefined here
+    // Malformed timestamp normalization is done in transformers
+    (val) => val ?? new Date().toISOString(),
+    z.string().datetime({ offset: true })
+  ),
+  locked: z.boolean().default(false),
+  locked_at: z.string().datetime({ offset: true }).optional().nullable(),
+  // Note: created_at and updated_at don't exist in participants table schema
+  // They are kept here as optional for backward compatibility with transformed data
+  created_at: z.string().datetime({ offset: true }).optional().nullable(),
+  updated_at: z.string().datetime({ offset: true }).optional().nullable(),
   // Joined data
   items: z.array(z.object({
     id: z.string().uuid(),
@@ -28,10 +41,17 @@ export const ParticipantSchema = z.object({
     unit: z.string().optional().nullable(),
     catalog_item: z.object({
       item_id: z.string(),
-      name_en: z.string(),
-      name_hi: z.string().optional()
+      name_en: z.string().optional().nullable(), // Can be undefined if catalog join fails
+      name_hi: z.string().optional().nullable()
     }).optional().nullable()
-  })).optional().default([])
+  })).optional().default([]),
+  // Joined invite data (null if participant joined without invite link)
+  invite: z.object({
+    id: z.string().uuid(),
+    invite_number: z.number().int().min(1).max(3),
+    invite_token: z.string().length(8),
+    status: z.enum(['pending', 'claimed', 'declined', 'expired'])
+  }).optional().nullable()
 });
 
 /**

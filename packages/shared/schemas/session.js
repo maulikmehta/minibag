@@ -19,14 +19,14 @@ export const SessionSchema = z.object({
   host_id: z.string().uuid(),
   location_text: z.string().min(1).max(255),
   neighborhood: z.string().max(100).optional().nullable(),
-  scheduled_time: z.string().datetime(),
+  scheduled_time: z.string().datetime({ offset: true }),
   title: z.string().max(255).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
   status: SessionStatusSchema,
-  created_at: z.string().datetime(),
-  completed_at: z.string().datetime().optional().nullable(),
+  created_at: z.string().datetime({ offset: true }),
+  completed_at: z.string().datetime({ offset: true }).optional().nullable(),
   expected_participants: z.number().int().min(0).max(3).optional().nullable(),
-  expected_participants_set_at: z.string().datetime().optional().nullable(),
+  expected_participants_set_at: z.string().datetime({ offset: true }).optional().nullable(),
   session_pin: z.string().regex(/^\d{4,6}$/).optional().nullable(), // 4-6 digit PIN
   creator_nickname: z.string().min(2).max(20).optional().nullable()
 });
@@ -37,7 +37,7 @@ export const SessionSchema = z.object({
 export const CreateSessionSchema = z.object({
   location_text: z.string().min(1, 'Location is required').max(255),
   neighborhood: z.string().max(100).optional(),
-  scheduled_time: z.string().datetime('Invalid date/time format'),
+  scheduled_time: z.string().datetime({ offset: true, message: 'Invalid date/time format' }),
   title: z.string().max(255).optional(),
   description: z.string().max(1000).optional(),
   items: z.array(z.object({
@@ -84,7 +84,7 @@ export const JoinSessionSchema = z.object({
   selected_avatar_emoji: z.string().max(10).optional(),
   session_pin: z.string().regex(/^\d{4,6}$/).optional().nullable(),
   marked_not_coming: z.boolean().optional().default(false),
-  invite_token: z.string().uuid().optional().nullable()
+  invite_token: z.string().regex(/^[a-f0-9]{8}$/i, 'Invalid invite token format').optional().nullable()
 });
 
 export default SessionSchema;

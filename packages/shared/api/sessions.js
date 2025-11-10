@@ -7,6 +7,8 @@ import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
 import { setHostTokenCookie, getHostToken } from '../utils/cookies.js';
 import logger from '../utils/logger.js';
+import { SESSION_LIMITS, VALIDATION_LIMITS, NICKNAME_LIMITS } from '../constants/limits.js';
+import { ERROR_MESSAGES } from '../constants/errorMessages.js';
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)
@@ -388,13 +390,14 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
     });
   }
 
-  // If pool is running low, add fallback options
+  // If pool is running low, add fallback options (Issue #7)
   if (options.length < 2) {
     const maleNames = FALLBACK_NAMES.filter((_, i) => i < 15); // First 15 are male
     const femaleNames = FALLBACK_NAMES.filter((_, i) => i >= 15); // Rest are female
 
     if (options.length === 0) {
       options.push({
+        id: `fallback-male-${crypto.randomBytes(8).toString('hex')}`, // Truly unique ID
         nickname: maleNames[Math.floor(Math.random() * maleNames.length)],
         avatar_emoji: '👨',
         gender: 'male',
@@ -403,6 +406,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
     }
 
     options.push({
+      id: `fallback-female-${crypto.randomBytes(8).toString('hex')}`, // Truly unique ID
       nickname: femaleNames[Math.floor(Math.random() * femaleNames.length)],
       avatar_emoji: '👩',
       gender: 'female',
@@ -449,30 +453,33 @@ async function markNicknameAsUsed(nicknameId, sessionId) {
     }
 
     // Convert reservation to permanent assignment
+    // ATOMIC CHECK: Ensure nickname is either unreserved, reserved by this session, or reservation expired
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('nicknames_pool')
       .update({
         is_available: false,
         currently_used_in: sessionId,
         times_used: (nickname?.times_used || 0) + 1,
-        last_used: new Date().toISOString(),
+        last_used: now,
         // Clear reservation fields
         reserved_until: null,
         reserved_by_session: null
       })
       .eq('id', nicknameId)
       .eq('is_available', true) // Extra safety: only mark if still available
+      .or(`reserved_by_session.is.null,reserved_by_session.eq.${sessionId},reserved_until.lt.${now}`) // CRITICAL: Atomic reservation check
       .select(); // CRITICAL: Return updated data
 
     if (error) {
       return { data: null, error };
     }
 
-    // If no rows were updated, nickname was already taken
+    // If no rows were updated, nickname was already taken or reserved by another session
     if (!data || (Array.isArray(data) && data.length === 0)) {
       return {
         data: null,
-        error: new Error('Nickname no longer available')
+        error: new Error('Nickname is no longer available or reserved by another session')
       };
     }
 
@@ -681,18 +688,18 @@ export async function createSession(req, res) {
         ? (async () => {
             // SECURITY: Validate nickname format to prevent SQL injection
             // NOTE: NO spaces allowed to maintain data integrity
-            const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
+            const NICKNAME_REGEX = new RegExp(`^[a-zA-Z0-9]{${VALIDATION_LIMITS.MIN_NICKNAME_LENGTH},${VALIDATION_LIMITS.MAX_NICKNAME_LENGTH}}$`);
             if (!NICKNAME_REGEX.test(selected_nickname)) {
-              throw new Error('Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).');
+              throw new Error(`Invalid nickname format. Use ${VALIDATION_LIMITS.MIN_NICKNAME_LENGTH}-${VALIDATION_LIMITS.MAX_NICKNAME_LENGTH} alphanumeric characters only (no spaces).`);
             }
 
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            const reservationCutoff = new Date(Date.now() - NICKNAME_LIMITS.RESERVATION_TTL_MINUTES * 60 * 1000).toISOString();
             const { data } = await supabase
               .from('sessions')
               .select('session_id, creator_nickname')
               .eq('creator_nickname', selected_nickname)
               .eq('status', 'open')
-              .gte('created_at', fiveMinutesAgo)
+              .gte('created_at', reservationCutoff)
               .limit(1)
               .maybeSingle();
 
@@ -710,7 +717,7 @@ export async function createSession(req, res) {
         success: true,
         data: {
           session: recentSession,
-          message: 'Returning existing session from last 5 minutes'
+          message: `Returning existing session from last ${NICKNAME_LIMITS.RESERVATION_TTL_MINUTES} minutes`
         }
       });
     }
@@ -959,8 +966,8 @@ export async function getSession(req, res) {
       }))
     });
 
-    // Calculate if invite link has expired (20 minutes after expected_participants_set_at)
-    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
+    // Calculate if invite link has expired
+    const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
     const is_invite_expired = session.expected_participants_set_at
       ? (new Date() - new Date(session.expected_participants_set_at)) >= TIMEOUT_MS
       : false;
@@ -1351,11 +1358,11 @@ export async function joinSession(req, res) {
     // SECURITY: Validate nickname format to prevent SQL injection
     // NOTE: NO spaces allowed to maintain data integrity
     if (selected_nickname) {
-      const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
+      const NICKNAME_REGEX = new RegExp(`^[a-zA-Z0-9]{${VALIDATION_LIMITS.MIN_NICKNAME_LENGTH},${VALIDATION_LIMITS.MAX_NICKNAME_LENGTH}}$`);
       if (!NICKNAME_REGEX.test(selected_nickname)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).'
+          error: ERROR_MESSAGES.INVALID_NICKNAME
         });
       }
     }
@@ -1414,14 +1421,14 @@ export async function joinSession(req, res) {
       });
     }
 
-    // Check if invite link has expired (20 minutes after expected_participants_set_at)
-    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes in milliseconds
+    // Check if invite link has expired
+    const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
     if (session.expected_participants_set_at) {
       const elapsed = new Date() - new Date(session.expected_participants_set_at);
       if (elapsed >= TIMEOUT_MS) {
         return res.status(410).json({
           success: false,
-          error: 'This invite link has expired. The host set a 20-minute timeout for participants to join.',
+          error: ERROR_MESSAGES.INVITE_EXPIRED,
           error_code: 'INVITE_EXPIRED'
         });
       }
@@ -1435,10 +1442,10 @@ export async function joinSession(req, res) {
 
     if (countError) throw countError;
 
-    if (participants && participants.length >= 20) {
+    if (participants && participants.length >= SESSION_LIMITS.MAX_PARTICIPANTS) {
       return res.status(403).json({
         success: false,
-        error: 'This session is full. Maximum 20 participants allowed.'
+        error: ERROR_MESSAGES.SESSION_FULL
       });
     }
 
@@ -1491,10 +1498,22 @@ export async function joinSession(req, res) {
       avatar_emoji = nicknameData.avatar_emoji;
     }
 
-    // Mark nickname as used if it was selected from pool
+    // Mark nickname as used if it was selected from pool (Issue #1)
     // BUT NOT if they're declining (no point wasting nicknames)
     if (selected_nickname_id && !marked_not_coming) {
-      await markNicknameAsUsed(selected_nickname_id, session.id);
+      const { data: nicknameData, error: nicknameError } = await markNicknameAsUsed(
+        selected_nickname_id,
+        session.id
+      );
+
+      // Check: error OR empty/null data array means nickname wasn't claimed
+      if (nicknameError || !nicknameData || (Array.isArray(nicknameData) && nicknameData.length === 0)) {
+        return res.status(409).json({
+          success: false,
+          error: ERROR_MESSAGES.NICKNAME_ALREADY_TAKEN,
+          error_code: 'NICKNAME_ALREADY_TAKEN'
+        });
+      }
     }
 
     // Create participant
@@ -1508,17 +1527,18 @@ export async function joinSession(req, res) {
         is_creator: false,
         marked_not_coming, // If participant is declining the invitation
         marked_not_coming_at: marked_not_coming ? new Date().toISOString() : null,
-        claimed_invite_id: invite?.id || null // Link to invite if used
+        claimed_invite_id: invite?.id || null, // Link to invite if used
+        joined_at: new Date().toISOString() // Explicitly set to avoid null
       })
       .select()
       .single();
 
     if (participantError) throw participantError;
 
-    // Update invite status if invite was used
+    // Update invite status if invite was used (Issue #5)
     if (invite) {
       const newStatus = marked_not_coming ? 'declined' : 'claimed';
-      await supabase
+      const { error: inviteUpdateError } = await supabase
         .from('invites')
         .update({
           status: newStatus,
@@ -1526,6 +1546,54 @@ export async function joinSession(req, res) {
           claimed_at: new Date().toISOString()
         })
         .eq('id', invite.id);
+
+      if (inviteUpdateError) {
+        logger.error('Invite claim failed - rolling back', {
+          participantId: participant.id,
+          inviteId: invite.id,
+          error: inviteUpdateError.message
+        });
+
+        // Rollback Step 1: Delete participant
+        const { error: deleteError } = await supabase
+          .from('participants')
+          .delete()
+          .eq('id', participant.id);
+
+        if (deleteError) {
+          logger.error('CRITICAL: Failed to rollback participant creation', {
+            participantId: participant.id,
+            error: deleteError.message
+          });
+        }
+
+        // Rollback Step 2: Release nickname (if it was from pool and not marked_not_coming)
+        if (selected_nickname_id && !marked_not_coming) {
+          const { error: releaseError } = await supabase
+            .from('nicknames_pool')
+            .update({
+              is_available: true,
+              currently_used_in: null,
+              reserved_until: null,
+              reserved_by_session: null
+              // Don't decrement times_used - keep audit trail
+            })
+            .eq('id', selected_nickname_id);
+
+          if (releaseError) {
+            logger.error('CRITICAL: Failed to rollback nickname allocation', {
+              nicknameId: selected_nickname_id,
+              error: releaseError.message
+            });
+          }
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: ERROR_MESSAGES.INVITE_CLAIM_FAILED,
+          error_code: 'INVITE_CLAIM_FAILED'
+        });
+      }
     }
 
     // Add items if provided
