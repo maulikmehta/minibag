@@ -248,7 +248,14 @@ function ShoppingScreen({
                       <Check size={20} strokeWidth={2.5} className="text-white" />
                     </button>
                   </div>
-                ) : null}
+                ) : (
+                  <button
+                    onClick={() => onSkipToggle && onSkipToggle(itemId)}
+                    className="text-sm text-gray-600 px-4 py-2 flex-shrink-0"
+                  >
+                    Undo
+                  </button>
+                )}
               </div>
             );
           })}
