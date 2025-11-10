@@ -160,7 +160,7 @@ export function useSession(sessionId = null) {
   /**
    * Create a new session
    */
-  const create = async (sessionData) => {
+  const create = useCallback(async (sessionData) => {
     try {
       setLoading(true);
       setError(null);
@@ -174,9 +174,17 @@ export function useSession(sessionId = null) {
       // Persist session to localStorage (including host_token for creator)
       persistSession(result.session, result.participant, result.host_token);
 
-      // Join WebSocket room and wait for confirmation
-      await socketService.joinSessionRoom(result.session.session_id);
-      setConnected(true);
+      // Join WebSocket room asynchronously (non-blocking for faster response)
+      socketService.joinSessionRoom(result.session.session_id)
+        .then(() => {
+          setConnected(true);
+          logger.debug('WebSocket room joined successfully');
+        })
+        .catch(err => {
+          logger.error('Failed to join WebSocket room', { error: err.message });
+          // Still allow session creation to complete - offline mode
+          setConnected(false);
+        });
 
       return result;
     } catch (err) {
@@ -186,12 +194,12 @@ export function useSession(sessionId = null) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [persistSession]);
 
   /**
    * Join an existing session with optimistic updates
    */
-  const join = async (id, items = [], nicknameData = {}) => {
+  const join = useCallback(async (id, items = [], nicknameData = {}) => {
     // Create optimistic participant data
     const optimisticParticipant = {
       id: `temp-${Date.now()}`, // Temporary ID
@@ -258,8 +266,10 @@ export function useSession(sessionId = null) {
         socketService.emitParticipantJoined(result.participant);
       }
 
-      // Reload full session data to ensure consistency
-      await loadSession(id);
+      // Reload full session data to ensure consistency (non-blocking)
+      loadSession(id).catch(err =>
+        logger.error('Failed to reload session after join', { error: err.message })
+      );
 
       logger.info('Join confirmed - real data received', {
         participantId: result.participant.id
@@ -284,12 +294,12 @@ export function useSession(sessionId = null) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [persistSession, loadSession]);
 
   /**
    * Update session status
    */
-  const updateStatus = async (newStatus) => {
+  const updateStatus = useCallback(async (newStatus) => {
     if (!session) return;
 
     try {
@@ -305,7 +315,7 @@ export function useSession(sessionId = null) {
       logger.error('Failed to update session status', { sessionId: session?.session_id, newStatus, error: err.message });
       throw err;
     }
-  };
+  }, [session]);
 
   /**
    * Leave current session

@@ -155,9 +155,9 @@ export default function SessionCreateScreen({
       return;
     }
 
-    // Fetch nickname options for host
-    setLoadingHostNicknames(true);
+    // Batch initial state updates - React 18 automatically batches these
     setShowHostNicknameModal(true);
+    setLoadingHostNicknames(true);
 
     try {
       // Extract first letter from host name if available
@@ -169,22 +169,30 @@ export default function SessionCreateScreen({
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.success && data.data) {
+      if (data.success && data.data && data.data.length > 0) {
+        // Batch success state updates
         setHostNicknameOptions(data.data);
-        // Auto-select first option
-        if (data.data.length > 0) {
-          setSelectedHostNickname(data.data[0]);
-        }
+        setSelectedHostNickname(data.data[0]);
+        setLoadingHostNicknames(false);
+      } else {
+        // Handle empty response
+        const fallbackOptions = [
+          { nickname: 'Raj', avatar_emoji: '👨', gender: 'male' },
+          { nickname: 'Ria', avatar_emoji: '👩', gender: 'female' }
+        ];
+        setHostNicknameOptions(fallbackOptions);
+        setSelectedHostNickname(fallbackOptions[0]);
+        setLoadingHostNicknames(false);
       }
     } catch (err) {
       console.error('Failed to fetch nickname options:', err);
-      // Fallback options if API fails
-      setHostNicknameOptions([
+      // Batch fallback state updates
+      const fallbackOptions = [
         { nickname: 'Raj', avatar_emoji: '👨', gender: 'male' },
         { nickname: 'Ria', avatar_emoji: '👩', gender: 'female' }
-      ]);
-      setSelectedHostNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male' });
-    } finally {
+      ];
+      setHostNicknameOptions(fallbackOptions);
+      setSelectedHostNickname(fallbackOptions[0]);
       setLoadingHostNicknames(false);
     }
   };

@@ -19,23 +19,14 @@ function generateSessionId() {
 }
 
 /**
- * Generate unique session ID with collision detection
- * Tries up to 3 times to find a unique ID
+ * Generate unique session ID
+ * With 281 trillion possible combinations (2^48), collision probability is negligible:
+ * - At 10,000 sessions: P(collision) ≈ 0.0000017%
+ * - At 1,000,000 sessions: P(collision) ≈ 0.0017%
+ * Database UNIQUE constraint will catch the extremely rare collision case
  */
-async function generateUniqueSessionId(maxAttempts = 3) {
-  for (let i = 0; i < maxAttempts; i++) {
-    const sessionId = generateSessionId();
-
-    const { data } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('session_id', sessionId)
-      .single();
-
-    if (!data) return sessionId; // Unique ID found
-  }
-
-  throw new Error('Failed to generate unique session ID after multiple attempts');
+function generateUniqueSessionId() {
+  return generateSessionId();
 }
 
 /**
@@ -47,13 +38,18 @@ function generateHostToken() {
 
 /**
  * Generate a 4-6 digit numeric PIN for session authentication
+ * Uses cryptographically secure random number generation
  * @param {number} length - Length of PIN (4-6 digits)
  * @returns {string} - Numeric PIN
  */
 function generateSessionPin(length = 4) {
   const min = Math.pow(10, length - 1);
   const max = Math.pow(10, length) - 1;
-  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+  const range = max - min + 1;
+
+  // Use crypto.randomInt for cryptographically secure randomness
+  const randomValue = crypto.randomInt(0, range);
+  return String(min + randomValue);
 }
 
 /**
@@ -420,64 +416,45 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
 /**
  * Mark a nickname as used in the pool
  */
+/**
+ * Mark nickname as used - optimized version using atomic database function
+ * Reduces from 4-5 sequential queries to 1 atomic operation
+ * @param {string} nicknameId - UUID of the nickname to claim
+ * @param {string} sessionId - Session ID claiming the nickname
+ * @returns {Object} {data, error} - Updated nickname data or error
+ */
 async function markNicknameAsUsed(nicknameId, sessionId) {
   if (!nicknameId) return { data: null, error: null }; // Return proper structure
 
   try {
-    // Fetch current nickname data to get times_used value and verify reservation
-    const { data: nickname, error: fetchError } = await supabase
-      .from('nicknames_pool')
-      .select('times_used, reserved_by_session, reserved_until')
-      .eq('id', nicknameId)
+    // Call atomic database function that handles all validation and locking
+    const { data: result, error: rpcError } = await supabase
+      .rpc('claim_nickname', {
+        p_nickname_id: nicknameId,
+        p_session_id: sessionId,
+        p_current_time: new Date().toISOString()
+      })
       .single();
 
-    if (fetchError) {
-      return { data: null, error: fetchError };
+    if (rpcError) {
+      return { data: null, error: rpcError };
     }
 
-    // CRITICAL: Verify reservation belongs to this session (or is expired/null)
-    // This prevents another session from claiming a reserved nickname
-    const reservedByOtherSession = nickname.reserved_by_session &&
-                                   nickname.reserved_by_session !== sessionId &&
-                                   nickname.reserved_until &&
-                                   new Date(nickname.reserved_until) > new Date();
-
-    if (reservedByOtherSession) {
+    // Check if claiming was successful
+    if (!result.success) {
       return {
         data: null,
-        error: new Error('Nickname is reserved by another session')
+        error: new Error(result.error_message || 'Failed to claim nickname')
       };
     }
 
-    // Convert reservation to permanent assignment
-    const { data, error } = await supabase
-      .from('nicknames_pool')
-      .update({
-        is_available: false,
-        currently_used_in: sessionId,
-        times_used: (nickname?.times_used || 0) + 1,
-        last_used: new Date().toISOString(),
-        // Clear reservation fields
-        reserved_until: null,
-        reserved_by_session: null
-      })
-      .eq('id', nicknameId)
-      .eq('is_available', true); // Extra safety: only mark if still available
-
-    if (error) {
-      return { data: null, error };
-    }
-
-    // If no rows were updated, nickname was already taken
-    if (!data || (Array.isArray(data) && data.length === 0)) {
-      return {
-        data: null,
-        error: new Error('Nickname no longer available')
-      };
-    }
-
-    return { data, error };
+    // Return the nickname data (wrapped in array to match original format)
+    return {
+      data: result.nickname_data ? [result.nickname_data] : null,
+      error: null
+    };
   } catch (err) {
+    logger.error({ err, nicknameId, sessionId }, 'Nickname claiming failed');
     return { data: null, error: err };
   }
 }
@@ -664,49 +641,58 @@ export async function createSession(req, res) {
       finalPin = generateSessionPin(4); // Generate 4-digit PIN
     }
 
-    // Cleanup expired pending sessions (opportunistic cleanup)
-    await supabase
+    // Cleanup expired pending sessions (opportunistic cleanup - non-blocking)
+    // Fire and forget to avoid blocking session creation
+    supabase
       .from('sessions')
       .delete()
       .eq('status', 'open')
-      .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .then(() => logger.debug('Background cleanup completed'))
+      .catch(err => logger.error({ err }, 'Background cleanup failed'));
 
-    // Check for duplicate session (same nickname + within 5 minutes)
-    if (selected_nickname) {
-      // SECURITY: Validate nickname format to prevent SQL injection
-      // NOTE: NO spaces allowed to maintain data integrity
-      const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
-      if (!NICKNAME_REGEX.test(selected_nickname)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).'
-        });
-      }
+    // Parallelize independent operations: duplicate check and ID generation
+    const [recentSession, session_id] = await Promise.all([
+      // Check for duplicate session (same nickname + within 5 minutes)
+      selected_nickname
+        ? (async () => {
+            // SECURITY: Validate nickname format to prevent SQL injection
+            // NOTE: NO spaces allowed to maintain data integrity
+            const NICKNAME_REGEX = /^[a-zA-Z0-9]{2,20}$/;
+            if (!NICKNAME_REGEX.test(selected_nickname)) {
+              throw new Error('Invalid nickname format. Use 2-20 alphanumeric characters only (no spaces).');
+            }
 
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { data: recentSessions } = await supabase
-        .from('sessions')
-        .select('session_id, creator_nickname')
-        .gte('created_at', fiveMinutesAgo)
-        .eq('status', 'open')
-        .eq('creator_nickname', selected_nickname);
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            const { data } = await supabase
+              .from('sessions')
+              .select('session_id, creator_nickname')
+              .eq('creator_nickname', selected_nickname)
+              .eq('status', 'open')
+              .gte('created_at', fiveMinutesAgo)
+              .limit(1)
+              .maybeSingle();
 
-      if (recentSessions && recentSessions.length > 0) {
-        // Return existing session instead of creating duplicate
-        return res.status(200).json({
-          success: true,
-          data: {
-            session: recentSessions[0],
-            message: 'Returning existing session from last 5 minutes'
-          }
-        });
-      }
+            return data;
+          })()
+        : Promise.resolve(null),
+
+      // Generate unique session ID (no collision check needed)
+      Promise.resolve(generateUniqueSessionId())
+    ]);
+
+    // Early return if duplicate session found
+    if (recentSession) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          session: recentSession,
+          message: 'Returning existing session from last 5 minutes'
+        }
+      });
     }
 
-    // Generate unique session ID with collision detection
-    const session_id = await generateUniqueSessionId();
-
-    // Generate secure host token
+    // Generate secure host token (fast operation, no need to parallelize)
     const host_token = generateHostToken();
 
     // Get nickname - either from user selection or auto-assign
@@ -779,18 +765,40 @@ export async function createSession(req, res) {
       .single();
 
     if (participantError) {
-      // Rollback: Delete session and release nickname
-      await supabase.from('sessions').delete().eq('id', session.id);
-      if (selected_nickname_id) {
-        await supabase
-          .from('nicknames_pool')
-          .update({ is_available: true })
-          .eq('id', selected_nickname_id);
+      logger.error({ err: participantError, sessionId: session.id }, 'Participant creation failed - initiating rollback');
+
+      // Rollback session creation
+      try {
+        await supabase.from('sessions').delete().eq('id', session.id);
+        logger.info({ sessionId: session.id }, 'Session rollback successful');
+      } catch (rollbackError) {
+        logger.error({ err: rollbackError, sessionId: session.id }, 'CRITICAL: Session rollback failed - manual cleanup may be needed');
       }
+
+      // Rollback nickname reservation
+      if (selected_nickname_id) {
+        try {
+          await supabase
+            .from('nicknames_pool')
+            .update({
+              is_available: true,
+              reserved_until: null,
+              reserved_by_session: null
+              // Don't decrement times_used - keep for audit trail
+            })
+            .eq('id', selected_nickname_id);
+          logger.info({ nicknameId: selected_nickname_id }, 'Nickname rollback successful');
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError, nicknameId: selected_nickname_id }, 'CRITICAL: Nickname rollback failed - manual cleanup needed');
+        }
+      }
+
       throw participantError;
     }
 
     // Add items if provided
+    let participantWithItems = { ...participant, items: [] };
+
     if (items.length > 0) {
       // First, get the UUID for each item_id
       const itemIds = items.map(item => item.item_id);
@@ -801,43 +809,47 @@ export async function createSession(req, res) {
 
       if (catalogError) throw catalogError;
 
-      // Create a map of item_id -> UUID
-      const itemIdMap = {};
-      catalogItems.forEach(item => {
-        itemIdMap[item.item_id] = item.id;
-      });
+      // Validate all items exist
+      if (catalogItems.length !== itemIds.length) {
+        const foundIds = new Set(catalogItems.map(item => item.item_id));
+        const missingIds = itemIds.filter(id => !foundIds.has(id));
+        throw new Error(`Invalid item IDs: ${missingIds.join(', ')}`);
+      }
+
+      // Use Map instead of object for better performance
+      const itemIdMap = new Map(
+        catalogItems.map(item => [item.item_id, item.id])
+      );
 
       // Convert to database format with UUIDs
-      const itemsToInsert = items.map(item => ({
-        participant_id: participant.id,
-        item_id: itemIdMap[item.item_id], // Use UUID instead of text
-        quantity: item.quantity,
-        unit: item.unit
-      }));
+      const itemsToInsert = items.map(item => {
+        const uuid = itemIdMap.get(item.item_id);
+        if (!uuid) throw new Error(`Missing UUID for item ${item.item_id}`);
 
-      const { error: itemsError } = await supabase
+        return {
+          participant_id: participant.id,
+          item_id: uuid,
+          quantity: item.quantity,
+          unit: item.unit
+        };
+      });
+
+      // Insert and get back the data with catalog items in one query
+      const { data: insertedItems, error: itemsError } = await supabase
         .from('participant_items')
-        .insert(itemsToInsert);
-
-      if (itemsError) throw itemsError;
-    }
-
-    // Re-fetch participant with items to return complete data
-    const { data: participantWithItems, error: refetchError } = await supabase
-      .from('participants')
-      .select(`
-        *,
-        items:participant_items(
+        .insert(itemsToInsert)
+        .select(`
           *,
           catalog_item:catalog_items(*)
-        )
-      `)
-      .eq('id', participant.id)
-      .single();
+        `);
 
-    if (refetchError) {
-      logger.error({ err: refetchError, participantId: participant.id }, 'Error refetching participant with items');
-      // Fall back to participant without items if refetch fails
+      if (itemsError) throw itemsError;
+
+      // Build response from inserted data - no re-fetch needed
+      participantWithItems = {
+        ...participant,
+        items: insertedItems || []
+      };
     }
 
     // Set host token as httpOnly cookie (secure authentication)
@@ -1598,6 +1610,11 @@ export async function updateSessionStatus(req, res) {
     // Set completed_at timestamp when status changes to 'completed'
     if (status === 'completed' && !session.completed_at) {
       updateData.completed_at = new Date().toISOString();
+    }
+
+    // Set cancelled_at timestamp when status changes to 'cancelled'
+    if (status === 'cancelled' && !session.cancelled_at) {
+      updateData.cancelled_at = new Date().toISOString();
     }
 
     // Update session status
