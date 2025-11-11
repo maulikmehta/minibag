@@ -1390,6 +1390,17 @@ export async function joinSession(req, res) {
       invite_token = null // Token from invite link URL parameter
     } = req.body;
 
+    // Debug logging for decline requests
+    logger.debug('joinSession request', {
+      session_id,
+      marked_not_coming,
+      has_real_name: !!real_name,
+      has_nickname: !!selected_nickname,
+      has_avatar: !!selected_avatar_emoji,
+      nickname: selected_nickname,
+      avatar: selected_avatar_emoji
+    });
+
     // SECURITY: Validate nickname format to prevent SQL injection
     // NOTE: NO spaces allowed to maintain data integrity
     if (selected_nickname) {
@@ -1440,8 +1451,9 @@ export async function joinSession(req, res) {
     }
 
     // **CRITICAL SECURITY CHECK: Validate PIN if session is PIN-protected**
-    if (session.session_pin) {
-      // Session requires PIN
+    // BUT skip PIN validation if user is declining (marked_not_coming)
+    if (session.session_pin && !marked_not_coming) {
+      // Session requires PIN for joining (not for declining)
       if (!session_pin) {
         return res.status(401).json({
           success: false,

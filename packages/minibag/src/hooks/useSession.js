@@ -227,10 +227,9 @@ export function useSession(sessionId = null) {
       // OPTIMISTIC UPDATE: Immediately update UI before API call
       setCurrentParticipant(optimisticParticipant);
 
-      // Only add to participants if not marked as not coming
-      if (!nicknameData.marked_not_coming) {
-        setParticipants(prev => [...prev, optimisticParticipant]);
-      }
+      // Add ALL participants to state (UI will filter for display)
+      // This includes declined participants for checkpoint calculation
+      setParticipants(prev => [...prev, optimisticParticipant]);
 
       logger.info('Optimistic join - UI updated immediately', {
         sessionId: id,
@@ -247,11 +246,8 @@ export function useSession(sessionId = null) {
       // Replace optimistic participant with real participant in list
       setParticipants(prev => {
         const withoutOptimistic = prev.filter(p => p.id !== optimisticParticipant.id);
-        // Only add real participant if not marked as not coming
-        if (!nicknameData.marked_not_coming) {
-          return [...withoutOptimistic, result.participant];
-        }
-        return withoutOptimistic;
+        // Add ALL participants (including declined) for checkpoint calculation
+        return [...withoutOptimistic, result.participant];
       });
 
       // Persist session to localStorage
@@ -262,9 +258,8 @@ export function useSession(sessionId = null) {
       setConnected(true);
 
       // Notify others via WebSocket (must be after room join is confirmed)
-      if (!nicknameData.marked_not_coming) {
-        socketService.emitParticipantJoined(result.participant);
-      }
+      // Broadcast ALL participants (including declined) so other clients can update checkpoint
+      socketService.emitParticipantJoined(result.participant);
 
       // Reload full session data to ensure consistency (non-blocking)
       loadSession(id).catch(err =>

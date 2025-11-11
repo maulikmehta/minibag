@@ -378,14 +378,16 @@ export function extractHostItems(apiParticipants, catalogItems = []) {
 export function extractNonHostParticipants(apiParticipants, catalogItems = []) {
   logger.debug('extractNonHostParticipants called', {
     totalParticipants: apiParticipants?.length,
-    nonHostCount: apiParticipants?.filter(p => p && !p.is_creator && !p.marked_not_coming).length
+    nonHostCount: apiParticipants?.filter(p => p && !p.is_creator).length
   });
 
   if (!apiParticipants || !Array.isArray(apiParticipants)) {
     return [];
   }
 
-  const nonHostParticipants = apiParticipants.filter(p => p && !p.is_creator && !p.marked_not_coming);
+  // Include ALL non-host participants (active AND declined) for checkpoint calculation
+  // UI components will filter for display using SessionParticipantList filter
+  const nonHostParticipants = apiParticipants.filter(p => p && !p.is_creator);
   logger.debug('Non-host participants', {
     participants: nonHostParticipants.map(p => ({
       id: p?.id,

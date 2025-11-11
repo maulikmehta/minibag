@@ -222,14 +222,22 @@ export default function JoinSessionScreen({
     } catch (error) {
       console.error('❌ Failed to decline session:', {
         error,
+        error_code: error.error_code,
         message: error.message,
         userMessage: error.userMessage,
+        details: error.details,
         nickname: selectedNickname,
         participantName
       });
 
-      // Distinguish error types for better user feedback
-      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      // Use error_code first (structured data), then fallback to message matching
+      if (error.error_code === 'MISSING_DECLINE_DATA') {
+        notify.error('Unable to process decline. Please refresh and try again.');
+      } else if (error.error_code === 'INVALID_NICKNAME') {
+        notify.error('There was an issue with nickname selection. Please try again.');
+      } else if (error.error_code === 'SESSION_EXPIRED' || error.error_code === 'INVITE_EXPIRED') {
+        notify.error('This invitation has expired.');
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
         notify.warning('Network error - you may still be declined, but the host might not be notified.');
       } else if (error.message?.includes('validation') || error.message?.includes('required')) {
         notify.error('Unable to process decline. Please try again.');

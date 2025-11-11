@@ -1,5 +1,6 @@
 import { body, param, validationResult } from 'express-validator';
 import { supabase } from '../db/supabase.js';
+import { VALIDATION_LIMITS } from '../constants/limits.js';
 
 // Validation middleware to check results
 export const validate = (req, res, next) => {
@@ -29,16 +30,16 @@ export const validateSessionCreation = [
     .optional()
     .isString()
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Selected nickname must be between 2 and 50 characters'),
+    .isLength({ min: VALIDATION_LIMITS.MIN_NICKNAME_LENGTH, max: VALIDATION_LIMITS.MAX_NICKNAME_LENGTH })
+    .withMessage(`Selected nickname must be between ${VALIDATION_LIMITS.MIN_NICKNAME_LENGTH} and ${VALIDATION_LIMITS.MAX_NICKNAME_LENGTH} characters`),
   body('selected_nickname_id')
     .optional()
     .custom((value) => {
       if (!value) return true; // null/undefined is okay
       // Accept UUID format (from nickname pool)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-      // Accept fallback format (generated client-side when pool empty)
-      const isFallback = /^fallback-(male|female)-[a-f0-9]{16}$/.test(value);
+      // Accept fallback format: both dynamic (16 hex chars) and static defaults
+      const isFallback = /^fallback-(male|female)-(?:[a-f0-9]{16}|default)$/.test(value);
       if (!isUUID && !isFallback) {
         throw new Error('Invalid nickname ID format');
       }
@@ -75,16 +76,16 @@ export const validateJoinSession = [
     .optional()
     .isString()
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Selected nickname must be between 2 and 50 characters'),
+    .isLength({ min: VALIDATION_LIMITS.MIN_NICKNAME_LENGTH, max: VALIDATION_LIMITS.MAX_NICKNAME_LENGTH })
+    .withMessage(`Selected nickname must be between ${VALIDATION_LIMITS.MIN_NICKNAME_LENGTH} and ${VALIDATION_LIMITS.MAX_NICKNAME_LENGTH} characters`),
   body('selected_nickname_id')
     .optional()
     .custom((value) => {
       if (!value) return true; // null/undefined is okay
       // Accept UUID format (from nickname pool)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-      // Accept fallback format (generated client-side when pool empty)
-      const isFallback = /^fallback-(male|female)-[a-f0-9]{16}$/.test(value);
+      // Accept fallback format: both dynamic (16 hex chars) and static defaults
+      const isFallback = /^fallback-(male|female)-(?:[a-f0-9]{16}|default)$/.test(value);
       if (!isUUID && !isFallback) {
         throw new Error('Invalid nickname ID format');
       }
@@ -104,6 +105,10 @@ export const validateJoinSession = [
     .optional()
     .matches(/^\d{4,6}$/)
     .withMessage('Session PIN must be a 4-6 digit number'),
+  body('marked_not_coming')
+    .optional()
+    .isBoolean()
+    .withMessage('marked_not_coming must be a boolean'),
   validate
 ];
 

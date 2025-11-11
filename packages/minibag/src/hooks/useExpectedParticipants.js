@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import logger from '../../../shared/utils/frontendLogger.js';
 
 /**
  * Hook for managing expected participants and checkpoint logic
@@ -75,6 +76,22 @@ export function useExpectedParticipants(session, participants) {
   const waitingCount = expectedCount !== null && expectedCount > 0 && !isInviteExpired
     ? expectedCount - joinedCount - notComingCount
     : 0;
+
+  // VALIDATION: Warn if checkpoint calculation seems incorrect
+  useEffect(() => {
+    if (expectedCount > 0 && !isInviteExpired) {
+      const totalResponses = joinedCount + notComingCount;
+      if (totalResponses < expectedCount && participants.length < expectedCount) {
+        logger.warn('Checkpoint: Fewer participants in state than expected', {
+          expectedCount,
+          participantsInState: participants.length,
+          joinedCount,
+          notComingCount,
+          hint: 'Check if declined participants are being filtered from state'
+        });
+      }
+    }
+  }, [expectedCount, joinedCount, notComingCount, participants.length, isInviteExpired]);
 
   return {
     expectedCount: localExpectedCount,
