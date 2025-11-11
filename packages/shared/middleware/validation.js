@@ -33,8 +33,17 @@ export const validateSessionCreation = [
     .withMessage('Selected nickname must be between 2 and 50 characters'),
   body('selected_nickname_id')
     .optional()
-    .isUUID()
-    .withMessage('Invalid nickname pool ID'),
+    .custom((value) => {
+      if (!value) return true; // null/undefined is okay
+      // Accept UUID format (from nickname pool)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      // Accept fallback format (generated client-side when pool empty)
+      const isFallback = /^fallback-(male|female)-[a-f0-9]{16}$/.test(value);
+      if (!isUUID && !isFallback) {
+        throw new Error('Invalid nickname ID format');
+      }
+      return true;
+    }),
   body('selected_avatar_emoji')
     .optional()
     .isString()
@@ -70,8 +79,17 @@ export const validateJoinSession = [
     .withMessage('Selected nickname must be between 2 and 50 characters'),
   body('selected_nickname_id')
     .optional()
-    .isUUID()
-    .withMessage('Invalid nickname pool ID'),
+    .custom((value) => {
+      if (!value) return true; // null/undefined is okay
+      // Accept UUID format (from nickname pool)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      // Accept fallback format (generated client-side when pool empty)
+      const isFallback = /^fallback-(male|female)-[a-f0-9]{16}$/.test(value);
+      if (!isUUID && !isFallback) {
+        throw new Error('Invalid nickname ID format');
+      }
+      return true;
+    }),
   body('selected_avatar_emoji')
     .optional()
     .isString()

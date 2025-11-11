@@ -20,6 +20,7 @@ import { getBillItems } from '../services/api.js';
  * @param {Array} items - Catalog items array
  * @param {function} getItemName - Function to get localized item name
  * @param {function} onGoHome - Callback to navigate to home screen
+ * @param {function} onExitSession - Callback to exit session with full cleanup
  * @param {Object} i18n - i18n instance for language management
  * @param {function} handleLanguageChange - Language change handler
  */
@@ -31,6 +32,7 @@ function ParticipantBillScreen({
   items,
   getItemName,
   onGoHome,
+  onExitSession,
   i18n,
   handleLanguageChange
 }) {
@@ -40,6 +42,7 @@ function ParticipantBillScreen({
   const [billData, setBillData] = useState(null);
   const [loadingBill, setLoadingBill] = useState(true);
   const [messageCopied, setMessageCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Fetch bill items from server (eliminates empty items race condition)
   useEffect(() => {
@@ -148,6 +151,11 @@ function ParticipantBillScreen({
       <AppHeader
         i18n={i18n}
         onLanguageChange={handleLanguageChange}
+        showEndSessionMenu={true}
+        endSessionMenuOpen={menuOpen}
+        onEndSessionMenuToggle={setMenuOpen}
+        onEndSession={onExitSession}
+        menuLabel="Close Bill"
       />
       <div className="p-6">
         <p className="text-2xl font-bold text-gray-900 mb-4">Your Bill</p>

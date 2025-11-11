@@ -9,6 +9,7 @@ import { setHostTokenCookie, getHostToken } from '../utils/cookies.js';
 import logger from '../utils/logger.js';
 import { SESSION_LIMITS, VALIDATION_LIMITS, NICKNAME_LIMITS } from '../constants/limits.js';
 import { ERROR_MESSAGES } from '../constants/errorMessages.js';
+import { buildPaymentMaps, buildCatalogMap } from '../utils/billCalculations.js';
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)
@@ -61,6 +62,16 @@ function generateSessionPin(length = 4) {
  */
 function isValidPinFormat(pin) {
   return /^\d{4,6}$/.test(pin);
+}
+
+/**
+ * Validate UUID format (standard UUID v4 format)
+ * @param {string} uuid - UUID to validate
+ * @returns {boolean}
+ */
+function isValidUUID(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
 }
 
 /**
@@ -278,13 +289,15 @@ async function reserveNickname(nicknameId, sessionId) {
  * Optionally matches first letter of user's name for personalization
  * Used to present options to user during join/create
  * NOW WITH RESERVATION: Nicknames are reserved for 5 minutes to prevent race conditions
+ * @param {string|null} firstLetter - First letter of user's name for personalization
+ * @param {string|null} sessionUuid - Session UUID (primary key) for reservation, not text session_id
  */
-async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
+async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
   let maleOption = null;
   let femaleOption = null;
 
   // Generate a temporary session ID if none provided (for reservation tracking)
-  const tempSessionId = sessionId || `temp-${Date.now()}`;
+  const tempSessionId = sessionUuid || `temp-${Date.now()}`;
   const now = new Date().toISOString();
 
   // If firstLetter provided, try to find matching nicknames
@@ -303,7 +316,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
       .single();
 
     // Immediately reserve if found
-    if (matchedMale && sessionId) {
+    if (matchedMale && sessionUuid) {
       const { data: reserved } = await reserveNickname(matchedMale.id, tempSessionId);
       if (reserved) maleOption = reserved;
     } else if (matchedMale) {
@@ -322,7 +335,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
       .single();
 
     // Immediately reserve if found
-    if (matchedFemale && sessionId) {
+    if (matchedFemale && sessionUuid) {
       const { data: reserved } = await reserveNickname(matchedFemale.id, tempSessionId);
       if (reserved) femaleOption = reserved;
     } else if (matchedFemale) {
@@ -342,7 +355,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
       .single();
 
     // Immediately reserve if found
-    if (anyMale && sessionId) {
+    if (anyMale && sessionUuid) {
       const { data: reserved } = await reserveNickname(anyMale.id, tempSessionId);
       if (reserved) maleOption = reserved;
     } else if (anyMale) {
@@ -361,7 +374,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionId = null) {
       .single();
 
     // Immediately reserve if found
-    if (anyFemale && sessionId) {
+    if (anyFemale && sessionUuid) {
       const { data: reserved } = await reserveNickname(anyFemale.id, tempSessionId);
       if (reserved) femaleOption = reserved;
     } else if (anyFemale) {
@@ -543,7 +556,7 @@ export async function releaseExpiredReservations() {
     }
 
     if (released > 0) {
-      console.log(`✅ Released ${released} expired nickname reservations`);
+      logger.info({ count: released }, '✅ Released expired nickname reservations');
     }
   } catch (error) {
     logger.error({ err: error }, 'Unexpected error in releaseExpiredReservations');
@@ -572,7 +585,7 @@ export async function releaseExpiredNicknames() {
     }
 
     if (!expiredSessions || expiredSessions.length === 0) {
-      console.log('No expired sessions found for nickname cleanup');
+      logger.debug('No expired sessions found for nickname cleanup');
       return;
     }
 
@@ -593,7 +606,10 @@ export async function releaseExpiredNicknames() {
       return;
     }
 
-    console.log(`✅ Nickname cleanup complete: Released ${releasedNicknames?.length || 0} nicknames from ${sessionIds.length} expired sessions`);
+    logger.info({
+      nicknamesReleased: releasedNicknames?.length || 0,
+      expiredSessionsCount: sessionIds.length
+    }, '✅ Nickname cleanup complete');
   } catch (error) {
     logger.error({ err: error }, 'Unexpected error in releaseExpiredNicknames');
   }
@@ -605,7 +621,7 @@ export async function releaseExpiredNicknames() {
  * - Session cleanup: Runs every hour (releases nicknames from expired sessions)
  */
 export function startNicknameCleanup() {
-  console.log('🔄 Starting nickname cleanup jobs...');
+  logger.info('🔄 Starting nickname cleanup jobs...');
 
   // Run immediately on startup
   releaseExpiredReservations();
@@ -619,7 +635,7 @@ export function startNicknameCleanup() {
 
   // Return cleanup function for graceful shutdown
   return () => {
-    console.log('Stopping nickname cleanup jobs...');
+    logger.info('Stopping nickname cleanup jobs...');
     clearInterval(reservationCleanupInterval);
     clearInterval(sessionCleanupInterval);
   };
@@ -771,7 +787,8 @@ export async function createSession(req, res) {
     }
 
     // Step 2: Mark nickname as used if it was selected from pool
-    if (selected_nickname_id) {
+    // Skip fallback IDs (those aren't in the database pool)
+    if (selected_nickname_id && !selected_nickname_id.startsWith('fallback-')) {
       const { error: nicknameError } = await markNicknameAsUsed(selected_nickname_id, session.id);
       if (nicknameError) {
         // Rollback: Delete session
@@ -953,7 +970,7 @@ export async function getSession(req, res) {
     if (participantsError) throw participantsError;
 
     // DEBUG: Log what we got from database
-    console.log('🗄️ [getSession] Database returned participants:', {
+    logger.debug({
       sessionId: session_id,
       sessionStatus: session.status,
       participantsCount: participants?.length,
@@ -964,7 +981,7 @@ export async function getSession(req, res) {
         items_count: p.items?.length,
         items_sample: p.items?.slice(0, 2) // Show first 2 items
       }))
-    });
+    }, '[getSession] Database returned participants');
 
     // Calculate if invite link has expired
     const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
@@ -1055,7 +1072,7 @@ export async function getShoppingItems(req, res) {
     // Process each participant item
     participantItems.forEach(item => {
       if (!item.catalog_item) {
-        console.warn('⚠️ [getShoppingItems] Missing catalog_item for item:', item);
+        logger.warn({ item }, '[getShoppingItems] Missing catalog_item for item');
         return;
       }
 
@@ -1063,7 +1080,7 @@ export async function getShoppingItems(req, res) {
       const participantId = item.participant?.id;
 
       if (!participantId) {
-        console.warn('⚠️ [getShoppingItems] Missing participant for item:', item);
+        logger.warn({ item }, '[getShoppingItems] Missing participant for item');
         return;
       }
 
@@ -1103,13 +1120,13 @@ export async function getShoppingItems(req, res) {
       itemsCount: participantItemCounts[p.id] || 0
     }));
 
-    console.log('✅ [getShoppingItems] Aggregated shopping items:', {
+    logger.info({
       sessionId: session_id,
       sessionStatus: session.status,
       totalUniqueItems: Object.keys(aggregatedItems).length,
       totalParticipants: participantSummaries.length,
       itemsSample: Object.values(aggregatedItems).slice(0, 3)
-    });
+    }, '✅ [getShoppingItems] Aggregated shopping items');
 
     res.json({
       success: true,
@@ -1186,16 +1203,9 @@ export async function getBillItems(req, res) {
 
     if (paymentsError) throw paymentsError;
 
-    // Build payment map by item_id (catalog item UUID)
-    const paymentMap = {};
-    const skippedItems = {};
-    (payments || []).forEach(p => {
-      if (p.skipped) {
-        skippedItems[p.item_id] = p;
-      } else {
-        paymentMap[p.item_id] = p;
-      }
-    });
+    // Build payment map and skipped items map using shared utility
+    // NOTE: payments.item_id contains TEXT item_id (e.g., "v001"), NOT catalog UUID
+    const { paymentMap, skippedItems } = buildPaymentMaps(payments);
 
     // Aggregate items by item_id and calculate quantities
     const itemTotals = {};
@@ -1208,8 +1218,15 @@ export async function getBillItems(req, res) {
 
     // Process each participant item
     participantItems.forEach(item => {
+      // Defensive validation: Ensure catalog_item exists
       if (!item.catalog_item) {
-        console.warn('⚠️ [getBillItems] Missing catalog_item for item:', item);
+        logger.warn({ item }, '[getBillItems] Missing catalog_item for item');
+        return;
+      }
+
+      // Defensive validation: Ensure required catalog fields exist
+      if (!item.catalog_item.name || !item.catalog_item.item_id) {
+        logger.warn({ item }, '[getBillItems] Missing required catalog fields (name or item_id)');
         return;
       }
 
@@ -1218,7 +1235,13 @@ export async function getBillItems(req, res) {
       const participantId = item.participant?.id;
 
       if (!participantId) {
-        console.warn('⚠️ [getBillItems] Missing participant for item:', item);
+        logger.warn({ item }, '[getBillItems] Missing participant for item');
+        return;
+      }
+
+      // Defensive validation: Ensure quantity is valid
+      if (typeof item.quantity !== 'number' || item.quantity <= 0) {
+        logger.warn({ item, quantity: item.quantity }, '[getBillItems] Invalid quantity for item');
         return;
       }
 
@@ -1231,8 +1254,8 @@ export async function getBillItems(req, res) {
       }
       participantItemsMap[participantId][itemId].quantity += item.quantity;
 
-      // Only count non-skipped items in totals
-      if (!skippedItems[catalogItemId]) {
+      // Only count non-skipped items in totals (use TEXT item_id to match payment map keys)
+      if (!skippedItems[itemId]) {
         if (!itemTotals[catalogItemId]) {
           itemTotals[catalogItemId] = {
             itemId,
@@ -1244,6 +1267,15 @@ export async function getBillItems(req, res) {
           };
         }
         itemTotals[catalogItemId].totalQuantity += item.quantity;
+      } else {
+        // Validation logging: Confirm skipped items are excluded from totals
+        logger.debug({
+          itemId,
+          catalogItemId,
+          name: item.catalog_item.name,
+          quantity: item.quantity,
+          skipReason: skippedItems[itemId]?.skip_reason
+        }, '[getBillItems] Item excluded from totals (skipped)');
       }
     });
 
@@ -1289,13 +1321,16 @@ export async function getBillItems(req, res) {
     });
 
     const totalPaid = (payments || []).reduce((sum, p) => p.skipped ? sum : sum + p.amount, 0);
+    const skippedItemsCount = Object.keys(skippedItems).length;
 
-    console.log('✅ [getBillItems] Calculated bill items:', {
+    logger.info({
       sessionId: session_id,
       sessionStatus: session.status,
       totalParticipants: participantBills.length,
       totalPaid: Math.round(totalPaid),
       paymentsCount: payments?.length || 0,
+      skippedItemsCount,
+      skippedItemsList: Object.keys(skippedItems),
       participantDetails: participantBills.map(p => ({
         nickname: p.nickname,
         total_cost: p.total_cost,
@@ -1304,7 +1339,7 @@ export async function getBillItems(req, res) {
       })),
       paymentMap: Object.keys(paymentMap),
       itemTotals: Object.keys(itemTotals)
-    });
+    }, '✅ [getBillItems] Calculated bill items');
 
     res.json({
       success: true,
@@ -1363,6 +1398,27 @@ export async function joinSession(req, res) {
         return res.status(400).json({
           success: false,
           error: ERROR_MESSAGES.INVALID_NICKNAME
+        });
+      }
+    }
+
+    // Validate required data based on flow (decline vs join)
+    if (marked_not_coming) {
+      // Declining - require minimal data (nickname and avatar for host notification)
+      if (!selected_nickname || !selected_avatar_emoji) {
+        return res.status(400).json({
+          success: false,
+          error: 'Nickname and avatar are required to decline invitation',
+          error_code: 'MISSING_DECLINE_DATA'
+        });
+      }
+    } else {
+      // Joining - require full data
+      if (!real_name || !selected_nickname || !selected_avatar_emoji) {
+        return res.status(400).json({
+          success: false,
+          error: ERROR_MESSAGES.MISSING_REQUIRED_FIELDS,
+          error_code: 'MISSING_JOIN_DATA'
         });
       }
     }
@@ -1500,7 +1556,8 @@ export async function joinSession(req, res) {
 
     // Mark nickname as used if it was selected from pool (Issue #1)
     // BUT NOT if they're declining (no point wasting nicknames)
-    if (selected_nickname_id && !marked_not_coming) {
+    // AND NOT if it's a fallback ID (those aren't in the database pool)
+    if (selected_nickname_id && !marked_not_coming && !selected_nickname_id.startsWith('fallback-')) {
       const { data: nicknameData, error: nicknameError } = await markNicknameAsUsed(
         selected_nickname_id,
         session.id
@@ -1895,11 +1952,20 @@ export async function getSessionInvites(req, res) {
  */
 export async function getNicknameOptions(req, res) {
   try {
-    const { firstLetter, sessionId } = req.query;
+    const { firstLetter, sessionUuid } = req.query;
 
-    // Pass sessionId to enable nickname reservation
-    // If no sessionId provided, nicknames are returned without reservation
-    const options = await getTwoNicknameOptions(firstLetter, sessionId);
+    // Validate sessionUuid format if provided
+    if (sessionUuid && !isValidUUID(sessionUuid)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session UUID format'
+      });
+    }
+
+    // Pass sessionUuid to enable nickname reservation
+    // sessionUuid is the database primary key (UUID), not the text session_id
+    // If no sessionUuid provided, nicknames are returned without reservation
+    const options = await getTwoNicknameOptions(firstLetter, sessionUuid);
 
     res.json({
       success: true,

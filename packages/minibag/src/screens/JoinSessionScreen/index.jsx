@@ -53,52 +53,61 @@ export default function JoinSessionScreen({
   }, [notify]);
 
   // Fetch nickname options with debouncing and immediate fallback (Issues #11, #15)
+  // Initialize fallback nicknames once on mount (Issue #15)
   useEffect(() => {
-    // Show fallback immediately on first load (Issue #15)
-    if (nicknameOptions.length === 0) {
-      setNicknameOptions([
-        { nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true },
-        { nickname: 'Ria', avatar_emoji: '👩', gender: 'female', fallback: true }
-      ]);
-      setSelectedNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true });
-    }
+    setNicknameOptions([
+      { nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true, id: 'fallback-male-default' },
+      { nickname: 'Ria', avatar_emoji: '👩', gender: 'female', fallback: true, id: 'fallback-female-default' }
+    ]);
+    setSelectedNickname({ nickname: 'Raj', avatar_emoji: '👨', gender: 'male', fallback: true, id: 'fallback-male-default' });
+  }, []); // Run once on mount
 
-    // Extract first letter and check if it changed (Issue #11)
-    const firstLetter = participantName.trim() ? participantName.trim().charAt(0).toUpperCase() : null;
-    const currentFirstLetter = nicknameOptions[0]?.nickname?.charAt(0)?.toUpperCase();
-    const letterChanged = firstLetter !== currentFirstLetter;
+  // Fetch nickname options when participant name changes (Issue #11)
+  useEffect(() => {
+    // Skip if no name entered yet
+    if (!participantName.trim()) return;
 
-    // Fetch if empty OR if first letter changed, with debouncing (Issue #11)
-    if ((nicknameOptions.length === 0 || letterChanged) && !loadingNicknames) {
-      const timeoutId = setTimeout(() => {
-        setLoadingNicknames(true);
+    // Skip if already loading
+    if (loadingNicknames) return;
 
-        const url = firstLetter
-          ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
-          : '/api/sessions/nickname-options';
+    // Debounce: wait 300ms after user stops typing
+    const timeoutId = setTimeout(() => {
+      setLoadingNicknames(true);
 
-        fetch(url)
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.data && data.data.length > 0) {
-              // Replace fallback with real options (Issue #15)
-              setNicknameOptions(data.data);
-              setSelectedNickname(data.data[0]);
-            }
-            // Keep fallback options if API returns empty
-          })
-          .catch(err => {
-            console.error('Failed to fetch nickname options:', err);
-            // Keep fallback options on error (Issue #15)
-          })
-          .finally(() => {
-            setLoadingNicknames(false);
-          });
-      }, 300); // Debounce: wait 300ms after user stops typing (Issue #11)
+      // Extract first letter for personalized matches
+      const firstLetter = participantName.trim().charAt(0).toUpperCase();
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [participantName, nicknameOptions, loadingNicknames]);
+      // Build URL with optional sessionUuid parameter (for reservation)
+      // Use session.id (UUID) not joinSessionId (TEXT) for proper reservation
+      let url = `/api/sessions/nickname-options?firstLetter=${firstLetter}`;
+
+      // Add session UUID for reservation (prevent race conditions)
+      // Only include if session is loaded with valid UUID
+      if (session?.id) {
+        url += `&sessionUuid=${session.id}`;
+      }
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data && data.data.length > 0) {
+            // Replace fallback with real options (Issue #15)
+            setNicknameOptions(data.data);
+            setSelectedNickname(data.data[0]);
+          }
+          // Keep fallback options if API returns empty
+        })
+        .catch(err => {
+          console.error('Failed to fetch nickname options:', err);
+          // Keep fallback options on error (Issue #15)
+        })
+        .finally(() => {
+          setLoadingNicknames(false);
+        });
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [participantName, session?.id]); // Only re-run when name or session UUID changes
 
   // Handle joining a session - now shows modal first
   const handleJoinClick = () => {
@@ -198,7 +207,7 @@ export default function JoinSessionScreen({
       // Use provided name or placeholder for anonymous declines
       await joinSession(joinSessionId, [], {
         real_name: participantName.trim() || 'Declined User',
-        selected_nickname_id: selectedNickname.id,
+        selected_nickname_id: selectedNickname.id || null, // Fallback nicknames don't have ID
         selected_nickname: selectedNickname.nickname,
         selected_avatar_emoji: selectedNickname.avatar_emoji,
         marked_not_coming: true,
@@ -211,9 +220,25 @@ export default function JoinSessionScreen({
       notify.info('You\'ve declined the invitation. The host has been notified.');
       onNavigateToHome();
     } catch (error) {
-      console.error('❌ Failed to decline session:', error);
-      // Still navigate away even if API fails
-      notify.info('You\'ve declined the invitation.');
+      console.error('❌ Failed to decline session:', {
+        error,
+        message: error.message,
+        userMessage: error.userMessage,
+        nickname: selectedNickname,
+        participantName
+      });
+
+      // Distinguish error types for better user feedback
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        notify.warning('Network error - you may still be declined, but the host might not be notified.');
+      } else if (error.message?.includes('validation') || error.message?.includes('required')) {
+        notify.error('Unable to process decline. Please try again.');
+      } else {
+        // For other errors, still navigate but show a warning
+        notify.warning('You\'ve declined, but there was an issue notifying the host.');
+      }
+
+      // Navigate away regardless - don't trap user on page
       onNavigateToHome();
     } finally {
       setJoiningSession(false);
