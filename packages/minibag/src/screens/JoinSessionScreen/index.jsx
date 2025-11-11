@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Check, X, Users, Loader2, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
@@ -36,6 +36,8 @@ export default function JoinSessionScreen({
 
   // PIN authentication state (for protected sessions)
   const [sessionPin, setSessionPin] = useState('');
+  const [pinDigits, setPinDigits] = useState(['', '', '', '']);
+  const pinInputRefs = useRef([null, null, null, null]);
 
   // Extract invite token from URL query parameter (Issue #14)
   useEffect(() => {
@@ -67,11 +69,15 @@ export default function JoinSessionScreen({
     // Skip if no name entered yet
     if (!participantName.trim()) return;
 
-    // Skip if already loading
-    if (loadingNicknames) return;
+    // Use closure to track loading state instead of state dependency
+    const loadingRef = { current: false };
 
     // Debounce: wait 300ms after user stops typing
     const timeoutId = setTimeout(() => {
+      // Skip if already loading
+      if (loadingRef.current) return;
+
+      loadingRef.current = true;
       setLoadingNicknames(true);
 
       // Extract first letter for personalized matches
@@ -102,12 +108,40 @@ export default function JoinSessionScreen({
           // Keep fallback options on error (Issue #15)
         })
         .finally(() => {
+          loadingRef.current = false;
           setLoadingNicknames(false);
         });
     }, 300);
 
     return () => clearTimeout(timeoutId);
   }, [participantName, session?.id]); // Only re-run when name or session UUID changes
+
+  // Handle PIN digit input changes
+  const handlePinChange = (index, value) => {
+    // Only allow single digit
+    const digit = value.replace(/\D/g, '').slice(-1);
+
+    // Update pinDigits array
+    const newPinDigits = [...pinDigits];
+    newPinDigits[index] = digit;
+    setPinDigits(newPinDigits);
+
+    // Update sessionPin string
+    setSessionPin(newPinDigits.join(''));
+
+    // Auto-focus next input if digit entered
+    if (digit && index < 3) {
+      pinInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  // Handle PIN backspace
+  const handlePinKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !pinDigits[index] && index > 0) {
+      // If current box is empty and backspace pressed, focus previous box
+      pinInputRefs.current[index - 1]?.focus();
+    }
+  };
 
   // Handle joining a session - now shows modal first
   const handleJoinClick = () => {
@@ -253,12 +287,23 @@ export default function JoinSessionScreen({
     }
   };
 
-  // Extract host nickname for personalized messaging
-  const host = participants?.find(p => p.is_creator);
-  const hostNickname = host?.nickname || session?.creator_nickname || 'Someone';
+  // Extract host display name with proper memoization and null handling
+  const hostDisplayName = useMemo(() => {
+    if (!session) return 'Someone';
 
-  // Filter items to show only what host has selected
-  const hostSelectedItems = items?.filter(item => hostItems && hostItems[item.id]) || [];
+    const hostNickname = session.creator_nickname || 'Someone';
+    const hostRealName = session.creator_real_name || null;
+
+    return hostRealName
+      ? `${hostRealName} @ ${hostNickname}`
+      : hostNickname;
+  }, [session]);
+
+  // Memoize item filtering for performance
+  const hostSelectedItems = useMemo(() => {
+    if (!items || !hostItems) return [];
+    return items.filter(item => hostItems[item.id]);
+  }, [items, hostItems]);
 
   // Check if session failed to load or doesn't exist
   const sessionNotFound = !sessionLoading && !session && joinSessionId;
@@ -266,11 +311,17 @@ export default function JoinSessionScreen({
   // Check if invite link has expired
   const isInviteExpired = session?.is_invite_expired || false;
 
+  // Memoize PIN validation
+  const isPinValid = useMemo(() => {
+    if (!session?.requires_pin) return true;
+    return sessionPin.length === 4;
+  }, [session?.requires_pin, sessionPin]);
+
   if (sessionNotFound) {
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
         <AppHeader />
-        <div className="p-6 flex flex-col items-center justify-center min-h-screen">
+        <div className="pt-20 p-6 flex flex-col items-center justify-center min-h-screen">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
             <X size={32} className="text-red-600" strokeWidth={2.5} />
           </div>
@@ -296,7 +347,7 @@ export default function JoinSessionScreen({
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
         <AppHeader />
-        <div className="p-6 flex flex-col items-center justify-center min-h-screen">
+        <div className="pt-20 p-6 flex flex-col items-center justify-center min-h-screen">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-amber-100 flex items-center justify-center">
             <Clock size={32} className="text-amber-600" strokeWidth={2.5} />
           </div>
@@ -321,15 +372,17 @@ export default function JoinSessionScreen({
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
       <AppHeader />
-      <div className="p-6">
+      <div className="pt-20 p-6">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
             <Users size={32} className="text-green-600" strokeWidth={2.5} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Join shopping list</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {hostDisplayName} has invited you!
+          </h1>
           <p className="text-sm text-gray-600">
-            {hostNickname} invited you to their Minibag!
+            Join their shopping list
           </p>
         </div>
 
@@ -360,24 +413,26 @@ export default function JoinSessionScreen({
         {/* PIN Input (if session requires it) - shown directly below items */}
         {session?.requires_pin && (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 mb-3 text-center">
               Session PIN
             </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={sessionPin}
-              onChange={(e) => {
-                // Allow only digits up to max PIN length
-                const value = e.target.value.replace(/\D/g, '').slice(0, VALIDATION_LIMITS.MAX_PIN_LENGTH);
-                setSessionPin(value);
-              }}
-              placeholder={`Enter ${VALIDATION_LIMITS.MIN_PIN_LENGTH}-digit PIN`}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-              maxLength={VALIDATION_LIMITS.MAX_PIN_LENGTH}
-              autoComplete="off"
-            />
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="flex gap-3 justify-center mb-2">
+              {[0, 1, 2, 3].map((index) => (
+                <input
+                  key={index}
+                  ref={(el) => (pinInputRefs.current[index] = el)}
+                  type="text"
+                  inputMode="numeric"
+                  value={pinDigits[index]}
+                  onChange={(e) => handlePinChange(index, e.target.value)}
+                  onKeyDown={(e) => handlePinKeyDown(index, e)}
+                  maxLength={1}
+                  className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none transition-colors"
+                  autoComplete="off"
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 text-center">
               Enter the PIN from your invite message
             </p>
           </div>
@@ -395,7 +450,7 @@ export default function JoinSessionScreen({
           </button>
           <button
             onClick={handleJoinClick}
-            disabled={joiningSession}
+            disabled={joiningSession || !isPinValid}
             className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
           >
             <Check size={18} strokeWidth={2.5} />

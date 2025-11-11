@@ -766,6 +766,7 @@ export async function createSession(req, res) {
         session_id,
         session_type: 'minibag',
         creator_nickname: nickname,
+        creator_real_name: real_name,
         location_text,
         neighborhood,
         scheduled_time,
