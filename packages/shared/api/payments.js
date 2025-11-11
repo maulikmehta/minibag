@@ -359,6 +359,26 @@ export async function getPaymentSplit(req, res) {
       });
     }
 
+    // Fetch catalog items to map UUID to TEXT item_id
+    const { data: catalogItems, error: catalogError } = await supabase
+      .from('catalog_items')
+      .select('id, item_id')
+      .eq('session_id', session_id);
+
+    if (catalogError) {
+      logger.error({ err: catalogError, sessionId: session_id }, 'Failed to fetch catalog items');
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch catalog data'
+      });
+    }
+
+    // Build UUID to TEXT item_id mapping
+    const uuidToTextMap = {};
+    catalogItems.forEach(item => {
+      uuidToTextMap[item.id] = item.item_id;
+    });
+
     // Build payment map by item_id (exclude skipped items from calculations)
     const paymentMap = {};
     const skippedItems = {};
@@ -374,8 +394,9 @@ export async function getPaymentSplit(req, res) {
     const itemTotals = {};
     sessionData.participants.forEach(participant => {
       participant.participant_items.forEach(item => {
+        const textItemId = uuidToTextMap[item.item_id]; // Convert UUID to TEXT
         // Only count non-skipped items
-        if (!skippedItems[item.item_id]) {
+        if (textItemId && !skippedItems[textItemId]) {
           itemTotals[item.item_id] = (itemTotals[item.item_id] || 0) + item.quantity;
         }
       });
@@ -387,8 +408,9 @@ export async function getPaymentSplit(req, res) {
       const itemBreakdown = [];
 
       participant.participant_items.forEach(item => {
-        const payment = paymentMap[item.item_id];
-        if (payment) {
+        const textItemId = uuidToTextMap[item.item_id]; // Convert UUID to TEXT
+        const payment = paymentMap[textItemId]; // Use TEXT item_id for payment lookup
+        if (payment && textItemId) {
           const totalQty = itemTotals[item.item_id];
           const pricePerKg = payment.amount / totalQty;
           const itemCost = pricePerKg * item.quantity;

@@ -6,6 +6,7 @@
 import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
 import logger from '../utils/logger.js';
+import { buildPaymentMaps, buildCatalogMap, calculateItemTotals } from '../utils/billCalculations.js';
 
 /**
  * POST /api/sessions/:session_id/bill-token
@@ -132,7 +133,7 @@ export async function getBillByToken(req, res) {
   try {
     const { token } = req.params;
 
-    console.log('🎫 [getBillByToken] Fetching bill for token:', token);
+    logger.debug({ token }, '[getBillByToken] Fetching bill for token');
 
     // Fetch and validate token
     const { data: tokenData, error: tokenError } = await supabase
@@ -141,12 +142,12 @@ export async function getBillByToken(req, res) {
       .eq('access_token', token)
       .single();
 
-    console.log('🎫 [getBillByToken] Token data:', {
+    logger.debug({
       hasToken: !!tokenData,
       participantId: tokenData?.participant_id,
       sessionId: tokenData?.session_id,
       expiresAt: tokenData?.expires_at
-    });
+    }, '[getBillByToken] Token data');
 
     if (tokenError || !tokenData) {
       return res.status(404).json({
@@ -247,10 +248,10 @@ export async function getBillByToken(req, res) {
 
     // If participant_id is set, fetch participant-specific bill
     if (tokenData.participant_id) {
-      console.log('📄 [getBillByToken] Calling getParticipantBill for participant:', tokenData.participant_id);
+      logger.debug({ participantId: tokenData.participant_id }, '[getBillByToken] Calling getParticipantBill');
       return await getParticipantBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount);
     } else {
-      console.log('📄 [getBillByToken] Calling getHostBill (no participant_id)');
+      logger.debug('[getBillByToken] Calling getHostBill (no participant_id)');
       // Return host/solo bill (full session)
       return await getHostBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount);
     }
@@ -295,31 +296,28 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     });
   }
 
-  // Build payment map and skipped items
-  const paymentMap = {};
-  const skippedItems = {};
-  payments.forEach(p => {
-    if (p.skipped) {
-      skippedItems[p.item_id] = p;
-    } else {
-      paymentMap[p.item_id] = p;
-    }
-  });
+  // Build payment map and skipped items using shared utility
+  const { paymentMap, skippedItems } = buildPaymentMaps(payments);
 
-  console.log('🔍 [getParticipantBill] Debug:', {
+  logger.debug({
     participantId: tokenData.participant_id,
     participantNickname: participant.nickname,
     participantItemsCount: participantItems?.length,
     paymentsCount: payments?.length,
     paymentMapKeys: Object.keys(paymentMap),
     participantItemsSample: participantItems?.slice(0, 2)
-  });
+  }, '[getParticipantBill] Debug data');
 
-  // Fetch all participant items for total quantity calculation
+  // Fetch all participant items for total quantity calculation (filtered by session)
+  // CRITICAL: Must filter by session to avoid cross-session data leak that inflates totals
   const { data: allParticipantItems, error: allItemsError } = await supabase
     .from('participant_items')
-    .select('*')
-    .in('item_id', participantItems.map(i => i.item_id));
+    .select(`
+      *,
+      participant:participants!inner(session_id)
+    `)
+    .in('item_id', participantItems.map(i => i.item_id))
+    .eq('participant.session_id', tokenData.session_id);
 
   if (allItemsError) {
     logger.error({ err: allItemsError, participantId: tokenData.participant_id }, 'Failed to fetch all participant items');
@@ -329,19 +327,11 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     });
   }
 
-  // Calculate total quantities per item
-  const itemTotals = {};
-  allParticipantItems.forEach(item => {
-    if (!skippedItems[item.item_id]) {
-      itemTotals[item.item_id] = (itemTotals[item.item_id] || 0) + item.quantity;
-    }
-  });
+  // Build catalog map keyed by UUID (primary key) for proper lookup using shared utility
+  const catalogMap = buildCatalogMap(catalogItems, 'id');
 
-  // Build catalog map
-  const catalogMap = {};
-  catalogItems.forEach(item => {
-    catalogMap[item.item_id] = item;
-  });
+  // Calculate total quantities per item (excluding skipped items) using shared utility
+  const itemTotals = calculateItemTotals(allParticipantItems, catalogMap, skippedItems);
 
   // Calculate bill items
   const billItems = [];
@@ -350,7 +340,7 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
   participantItems.forEach(item => {
     const catalog = catalogMap[item.item_id];
     if (!catalog) {
-      console.log('⚠️ No catalog entry for item UUID:', item.item_id);
+      logger.warn({ itemUUID: item.item_id }, '[getParticipantBill] No catalog entry for item UUID');
       return;  // Skip if no catalog entry
     }
 
@@ -358,28 +348,28 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     const itemId = catalog.item_id;
     const payment = paymentMap[itemId];
 
-    console.log('📊 Processing item:', {
+    logger.debug({
       itemUUID: item.item_id,
       catalogItemId: itemId,
       catalogName: catalog.name,
       hasPayment: !!payment,
       isSkipped: !!skippedItems[itemId],
       quantity: item.quantity
-    });
+    }, '[getParticipantBill] Processing item');
 
     if (payment && !skippedItems[itemId]) {
       const totalQty = itemTotals[item.item_id];  // UUID is correct for itemTotals
       const pricePerKg = payment.amount / totalQty;
       const itemCost = pricePerKg * item.quantity;
 
-      console.log('✅ Adding bill item:', {
+      logger.debug({
         name: catalog.name,
         totalQty,
         paymentAmount: payment.amount,
         pricePerKg,
         participantQty: item.quantity,
         itemCost
-      });
+      }, '[getParticipantBill] Adding bill item');
 
       billItems.push({
         item_name: catalog.name,
@@ -394,12 +384,12 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
 
       totalAmount += itemCost;
     } else {
-      console.log('❌ Skipping item:', {
+      logger.debug({
         reason: !payment ? 'No payment' : 'Item skipped',
         itemId,
         hasPayment: !!payment,
         isSkipped: !!skippedItems[itemId]
-      });
+      }, '[getParticipantBill] Skipping item');
     }
   });
 
@@ -432,11 +422,8 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
  */
 async function getHostBill(res, tokenData, session, catalogItems, payments, hostRealName, participantCount) {
 
-  // Build catalog map
-  const catalogMap = {};
-  catalogItems.forEach(item => {
-    catalogMap[item.item_id] = item;
-  });
+  // Build catalog map using shared utility (keyed by TEXT item_id for payment lookup)
+  const catalogMap = buildCatalogMap(catalogItems, 'item_id');
 
   // Build bill items from payments
   const billItems = [];

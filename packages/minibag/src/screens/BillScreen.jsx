@@ -106,7 +106,14 @@ const BillScreen = () => {
   };
 
   const handleCloseReceipt = () => {
-    window.close();
+    // Check if this window was opened via window.open()
+    if (window.opener) {
+      // This is a popup window, safe to close
+      window.close();
+    } else {
+      // Direct navigation (shared link, bookmark, etc.) - redirect to home page
+      window.location.href = '/';
+    }
   };
 
   const formatDate = (dateString) => {

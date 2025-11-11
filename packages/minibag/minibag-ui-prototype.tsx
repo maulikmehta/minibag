@@ -1062,6 +1062,25 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         items={items}
         getItemName={getItemName}
         onGoHome={() => setCurrentScreen('home')}
+        onExitSession={() => {
+          // Clear participant-specific localStorage
+          if (currentParticipant?.id) {
+            clearParticipantItemsFromLocalStorage(currentParticipant.id);
+          }
+
+          // Full session cleanup (WebSocket + localStorage + state)
+          leaveSession(); // Calls useSession.leave() hook
+
+          // Reset all session state
+          setHostItems({});
+          setParticipants([]);
+          setItemPayments({});
+          setSkippedItems({});
+          setSelectedParticipant('host');
+
+          // Navigate to home
+          setCurrentScreen('home');
+        }}
         i18n={i18n}
         handleLanguageChange={handleLanguageChange}
       />
