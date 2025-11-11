@@ -271,16 +271,10 @@ export default function JoinSessionScreen({
             This shopping list has expired or doesn't exist anymore.
           </p>
 
-          <div className="space-y-3 w-full">
-            <button
-              onClick={onNavigateToCreate}
-              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
-            >
-              Start your own list
-            </button>
+          <div className="w-full flex justify-center">
             <button
               onClick={onNavigateToHome}
-              className="w-full py-4 border-2 border-gray-300 hover:border-green-600 text-gray-900 hover:text-green-600 rounded-xl text-base font-medium transition-colors"
+              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
             >
               Go to home
             </button>
@@ -303,16 +297,10 @@ export default function JoinSessionScreen({
             This invite link expired 20 minutes after the host set their expectations. Please ask the host to send a new invite link.
           </p>
 
-          <div className="space-y-3 w-full">
-            <button
-              onClick={onNavigateToCreate}
-              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
-            >
-              Start your own list
-            </button>
+          <div className="w-full flex justify-center">
             <button
               onClick={onNavigateToHome}
-              className="w-full py-4 border-2 border-gray-300 hover:border-green-600 text-gray-900 hover:text-green-600 rounded-xl text-base font-medium transition-colors"
+              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-base font-semibold transition-colors"
             >
               Go to home
             </button>
