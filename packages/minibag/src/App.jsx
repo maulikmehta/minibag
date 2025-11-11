@@ -36,7 +36,14 @@ function MinibagLandingWrapper() {
 // Wrapper component to handle join session flow
 function JoinSessionWrapper() {
   const { sessionId } = useParams();
-  return <MinibagPrototype joinSessionId={sessionId} />;
+  const navigate = useNavigate();
+
+  return (
+    <MinibagPrototype
+      joinSessionId={sessionId}
+      onNavigateToHome={() => navigate('/app')}
+    />
+  );
 }
 
 

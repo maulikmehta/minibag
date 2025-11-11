@@ -42,7 +42,7 @@ import './src/styles/driver-custom.css';
 // 3-letter names matching backend pool
 const FALLBACK_NAMES = ['Raj', 'Avi', 'Ria', 'Dev', 'Sia', 'Jay', 'Pia', 'Sam'];
 
-export default function MinibagPrototype({ joinSessionId = null, billSessionId = null, billParticipantId = null }) {
+export default function MinibagPrototype({ joinSessionId = null, billSessionId = null, billParticipantId = null, onNavigateToHome = null }) {
   // Language translation
   const { t, i18n } = useTranslation();
 
@@ -133,6 +133,18 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
       console.error('Failed to clear participant items:', err);
     }
   }, []);
+
+  // Navigation helper - uses router navigation if available (for invite link flows),
+  // fallback to state navigation (for direct app access)
+  const navigateToHome = React.useCallback(() => {
+    if (onNavigateToHome) {
+      // Came from invite link route (/join/:sessionId) - use router to navigate to /app
+      onNavigateToHome();
+    } else {
+      // Direct app access - use state navigation
+      setCurrentScreen('home');
+    }
+  }, [onNavigateToHome]);
 
   // Handle join session if joinSessionId is provided
   React.useEffect(() => {
@@ -671,7 +683,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           hostItems={hostItems}
           joinSession={joinSession}
           onJoinSuccess={() => setCurrentScreen('session-active')}
-          onNavigateToHome={() => setCurrentScreen('home')}
+          onNavigateToHome={navigateToHome}
           onNavigateToCreate={() => setCurrentScreen('host-create')}
           i18n={i18n}
           handleLanguageChange={handleLanguageChange}
@@ -928,7 +940,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         onViewBill={() => setCurrentScreen('participant-bill')}
         onLanguageChange={handleLanguageChange}
         onHelpClick={() => {}}
-        onLogoClick={() => setCurrentScreen('home')}
+        onLogoClick={navigateToHome}
       />
     );
   }
@@ -1061,7 +1073,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         itemPayments={itemPayments}
         items={items}
         getItemName={getItemName}
-        onGoHome={() => setCurrentScreen('home')}
+        onGoHome={navigateToHome}
         onExitSession={() => {
           // Clear participant-specific localStorage
           if (currentParticipant?.id) {
@@ -1079,7 +1091,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
           setSelectedParticipant('host');
 
           // Navigate to home
-          setCurrentScreen('home');
+          navigateToHome();
         }}
         i18n={i18n}
         handleLanguageChange={handleLanguageChange}
