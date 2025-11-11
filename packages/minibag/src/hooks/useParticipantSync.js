@@ -36,22 +36,22 @@ export function useParticipantSync({
         if (participant.marked_not_coming) {
           // If they have an invite, show which invite was declined
           if (participant.invite?.invite_number) {
-            onShowNotification(`Invite ${participant.invite.invite_number} declined`);
+            onShowNotification(`Invite ${participant.invite.invite_number} declined`, 6000, 'high');
           } else {
-            onShowNotification(`${displayName} declined the invitation`);
+            onShowNotification(`${displayName} declined the invitation`, 6000, 'high');
           }
         } else {
           // They joined - show which invite if available
           if (participant.invite?.invite_number) {
-            onShowNotification(`Invite ${participant.invite.invite_number}: ${displayName} joined`);
+            onShowNotification(`Invite ${participant.invite.invite_number}: ${displayName} joined`, 6000, 'high');
           } else {
-            onShowNotification(`${displayName} joined the session`);
+            onShowNotification(`${displayName} joined the session`, 6000, 'high');
           }
         }
       } else {
         // Participants see generic message (privacy)
         if (!participant.marked_not_coming) {
-          onShowNotification('Someone joined the session');
+          onShowNotification('Someone joined the session', 6000, 'high');
         }
         // Don't show notification for declines to non-hosts
       }
@@ -157,10 +157,10 @@ export function useParticipantSync({
           const firstName = real_name?.split(' ')[0] || nickname;
           const alias = (nickname || '').toUpperCase();
           const displayName = real_name ? `${firstName} @ ${alias}` : alias;
-          onShowNotification(`${displayName} submitted the list`);
+          onShowNotification(`${displayName} submitted the list`, 6000, 'high');
         } else {
           // Participants see generic message (privacy)
-          onShowNotification('A participant confirmed their list');
+          onShowNotification('A participant confirmed their list', 6000, 'high');
         }
       }
     };

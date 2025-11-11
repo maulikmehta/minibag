@@ -18,6 +18,7 @@ import HomeScreen from './src/screens/HomeScreen.jsx';
 import ParticipantBillScreen from './src/screens/ParticipantBillScreen.jsx';
 import ShoppingScreen from './src/screens/ShoppingScreen.jsx';
 import PaymentSplitScreen from './src/screens/PaymentSplitScreen.jsx';
+import { SessionScreenSkeleton } from './src/components/skeletons';
 import SessionActiveScreen from './src/screens/SessionActiveScreen.jsx';
 import SessionCreateScreen from './src/screens/SessionCreateScreen/index.jsx';
 import JoinSessionScreen from './src/screens/JoinSessionScreen/index.jsx';
@@ -639,14 +640,9 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const totalWeight = useMemo(() => getTotalWeight(hostItems), [hostItems, getTotalWeight]);
 
 
-  // LOADING STATE
+  // LOADING STATE - Use skeleton for better UX
   if (catalogLoading) {
-    return (
-      <div className="max-w-md mx-auto bg-white min-h-screen flex flex-col items-center justify-center">
-        <Loader2 size={48} className="text-gray-900 animate-spin mb-4" />
-        <p className="text-lg text-gray-600">Loading catalog...</p>
-      </div>
-    );
+    return <SessionScreenSkeleton />;
   }
 
   // ERROR STATE

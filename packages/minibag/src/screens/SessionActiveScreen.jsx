@@ -80,6 +80,22 @@ export default function SessionActiveScreen({
     isInviteExpired
   } = useExpectedParticipants(session, participants);
 
+  // Reactive notification management: Show checkpoint success banner when all friends respond
+  useEffect(() => {
+    // Only act when checkpoint completes for group mode (expectedCount > 0)
+    if (checkpointComplete && expectedCount > 0 && waitingCount === 0) {
+      const joinedCount = participants.filter(p => !p.marked_not_coming).length;
+
+      // Show success message as NEW banner (replaces any existing banner)
+      const successMessage = joinedCount > 0
+        ? `${joinedCount} ${joinedCount === 1 ? 'friend has' : 'friends have'} joined! Ready to start`
+        : 'All friends have responded! Ready to start';
+
+      // Use notify.success() without priority to create banner (LOW priority = banner)
+      notify.success(successMessage);
+    }
+  }, [checkpointComplete, expectedCount, waitingCount, notify, participants]);
+
   // Determine if current user is host (needed early for invites fetch)
   const isHost = currentParticipant?.is_creator || false;
 
@@ -592,6 +608,15 @@ export default function SessionActiveScreen({
         expectedCount={expectedCount}
         onStartShopping={onNavigateToShopping}
         disabled={!checkpointComplete || Object.keys(allItems).length === 0 || (expectedCount > 0 && !allJoinedParticipantsConfirmed)}
+        disabledReason={
+          Object.keys(allItems).length === 0
+            ? 'no_items'
+            : !checkpointComplete
+              ? 'checkpoint_incomplete'
+              : (expectedCount > 0 && !allJoinedParticipantsConfirmed)
+                ? 'waiting_confirmations'
+                : null
+        }
       />
     </div>
   );

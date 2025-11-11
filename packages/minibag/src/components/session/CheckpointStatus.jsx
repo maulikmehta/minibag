@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
  * @param {Function} props.onStartShopping - Callback when start shopping button is clicked
  * @param {boolean} props.disabled - If true, button is disabled (no items, checkpoint incomplete, or waiting for confirmations)
  * @param {boolean} props.isLoading - If true, shows loading spinner
+ * @param {string} props.disabledReason - Optional reason why button is disabled (e.g., "no_items", "waiting_confirmations")
  */
 export default function CheckpointStatus({
   checkpointComplete,
@@ -31,7 +32,8 @@ export default function CheckpointStatus({
   expectedCount,
   onStartShopping,
   disabled = false,
-  isLoading = false
+  isLoading = false,
+  disabledReason = null
 }) {
   const [internalLoading, setInternalLoading] = useState(false);
 
@@ -48,16 +50,52 @@ export default function CheckpointStatus({
   };
 
   const showLoading = isLoading || internalLoading;
+
+  // Determine status message to show
+  const getStatusMessage = () => {
+    // If disabled due to no items
+    if (disabledReason === 'no_items') {
+      return 'Add items to your list to start shopping';
+    }
+
+    // If checkpoint is not complete, show waiting message
+    if (!checkpointComplete && expectedCount > 0) {
+      return `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond`;
+    }
+
+    // If checkpoint complete but waiting for confirmations
+    if (checkpointComplete && participantCount > 0 && !allJoinedParticipantsConfirmed) {
+      const waitingForConfirmations = participantCount - confirmedParticipants;
+      return `Waiting for ${waitingForConfirmations} joined ${waitingForConfirmations === 1 ? 'participant' : 'participants'} to confirm their list`;
+    }
+
+    // Show checkpoint completion status
+    if (checkpointComplete && participantCount > 0) {
+      if (isInviteExpired && autoTimedOutCount > 0) {
+        return `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`;
+      }
+      if (confirmedParticipants > 0) {
+        return `${confirmedParticipants} of ${participantCount} joined ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`;
+      }
+      return `${participantCount} ${participantCount === 1 ? 'participant has' : 'participants have'} joined`;
+    }
+
+    // Solo mode (expectedCount === 0)
+    if (expectedCount === 0 && checkpointComplete) {
+      return 'Shopping solo';
+    }
+
+    return null;
+  };
+
+  const statusMessage = getStatusMessage();
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto z-50">
-      {/* Show checkpoint status or timeout message */}
-      {checkpointComplete && participantCount > 0 && (
+      {/* Show status message */}
+      {statusMessage && (
         <p className="text-xs text-gray-600 mb-2 text-center">
-          {isInviteExpired && autoTimedOutCount > 0
-            ? `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`
-            : confirmedParticipants > 0
-              ? `${confirmedParticipants} of ${participantCount} joined ${confirmedParticipants === 1 ? 'participant has' : 'participants have'} confirmed`
-              : `${participantCount} ${participantCount === 1 ? 'participant has' : 'participants have'} joined`}
+          {statusMessage}
         </p>
       )}
 

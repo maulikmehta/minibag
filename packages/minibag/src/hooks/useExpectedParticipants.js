@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import logger from '../../../shared/utils/frontendLogger.js';
 
 /**
@@ -77,20 +77,73 @@ export function useExpectedParticipants(session, participants) {
     ? expectedCount - joinedCount - notComingCount
     : 0;
 
-  // VALIDATION: Warn if checkpoint calculation seems incorrect
+  // ENHANCED VALIDATION: Debounced checkpoint validation with better error detection
+  const validationTimerRef = useRef(null);
+  const lastInconsistentStateRef = useRef(null);
+
   useEffect(() => {
+    // Clear existing timer on every render
+    if (validationTimerRef.current) {
+      clearTimeout(validationTimerRef.current);
+    }
+
     if (expectedCount > 0 && !isInviteExpired) {
       const totalResponses = joinedCount + notComingCount;
+
+      // Critical error: More responses than expected
+      if (totalResponses > expectedCount) {
+        logger.error('Checkpoint: More participants responded than expected', {
+          expectedCount,
+          joinedCount,
+          notComingCount,
+          totalResponses,
+          participantsInState: participants.length,
+          hint: 'This should never happen - check participant filtering logic'
+        });
+      }
+
+      // Warning: Fewer participants than expected (might be normal during sync)
       if (totalResponses < expectedCount && participants.length < expectedCount) {
-        logger.warn('Checkpoint: Fewer participants in state than expected', {
+        const currentInconsistency = {
           expectedCount,
           participantsInState: participants.length,
           joinedCount,
           notComingCount,
-          hint: 'Check if declined participants are being filtered from state'
-        });
+          totalResponses,
+          timestamp: Date.now()
+        };
+
+        // If this is the first time we've seen this inconsistency, record it
+        if (!lastInconsistentStateRef.current) {
+          lastInconsistentStateRef.current = currentInconsistency;
+        }
+
+        // Only warn if inconsistency has persisted for >5 seconds
+        const inconsistencyDuration = Date.now() - lastInconsistentStateRef.current.timestamp;
+        if (inconsistencyDuration >= 5000) {
+          validationTimerRef.current = setTimeout(() => {
+            logger.warn('Checkpoint: Persistent participant count mismatch (>5s)', {
+              ...currentInconsistency,
+              inconsistencyDurationMs: inconsistencyDuration,
+              hint: 'Check if WebSocket sync is working or if declined participants are being filtered from state'
+            });
+          }, 0);
+        }
+      } else {
+        // State is consistent, clear the reference
+        lastInconsistentStateRef.current = null;
       }
+    } else {
+      // Not in group mode or invite expired, clear the reference
+      lastInconsistentStateRef.current = null;
     }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (validationTimerRef.current) {
+        clearTimeout(validationTimerRef.current);
+      }
+    };
   }, [expectedCount, joinedCount, notComingCount, participants.length, isInviteExpired]);
 
   return {

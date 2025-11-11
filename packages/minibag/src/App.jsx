@@ -3,17 +3,12 @@ import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-rout
 import { NotificationProvider } from './contexts/NotificationContext';
 import NotificationToast from './components/NotificationToast';
 import ErrorBoundary from './components/ErrorBoundary';
+import { SessionScreenSkeleton } from './components/skeletons';
 
 // Loading component for lazy-loaded routes
-function LoadingFallback({ message = 'Loading...' }) {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">{message}</p>
-      </div>
-    </div>
-  );
+// Uses skeleton loading instead of spinner for better UX
+function LoadingFallback() {
+  return <SessionScreenSkeleton />;
 }
 
 // Lazy load all routes to reduce main bundle size

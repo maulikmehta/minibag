@@ -10,8 +10,9 @@ const NotificationContext = createContext();
 
 /**
  * Maximum number of toast notifications to display simultaneously
+ * Increased to 5 for elderly users to see more event history
  */
-const MAX_NOTIFICATIONS = 3;
+const MAX_NOTIFICATIONS = 5;
 
 /**
  * Default duration for notifications (milliseconds)
@@ -35,31 +36,12 @@ export const NOTIFICATION_PRIORITY = {
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [bannerNotification, setBannerNotification] = useState(null);
-  const [bannerQueue, setBannerQueue] = useState([]);
 
   // Track active timers to prevent memory leaks
   const timersRef = React.useRef({
     banner: null,
     toasts: new Map()
   });
-
-  /**
-   * Show next banner notification from queue
-   * Notifications stay visible until next one arrives (no auto-dismiss)
-   */
-  const showNextBanner = useCallback(() => {
-    setBannerQueue(prev => {
-      if (prev.length === 0) {
-        // No more notifications in queue
-        return prev;
-      }
-
-      const [next, ...rest] = prev;
-      setBannerNotification(next);
-
-      return rest;
-    });
-  }, []);
 
   /**
    * Add a new notification to the queue
@@ -115,8 +97,9 @@ export function NotificationProvider({ children }) {
       // Auto-dismiss toast with timer tracking
       if (duration > 0) {
         const timerId = setTimeout(() => {
-          removeNotification(id);
+          // Clear timer reference first to prevent memory leak
           timersRef.current.toasts.delete(id);
+          removeNotification(id);
         }, duration);
 
         // Track timer to allow cleanup
@@ -160,6 +143,32 @@ export function NotificationProvider({ children }) {
     setBannerNotification(null);
   }, []);
 
+  /**
+   * Get current banner notification
+   * @returns {object|null} Current banner notification or null
+   */
+  const getBannerNotification = useCallback(() => {
+    return bannerNotification;
+  }, [bannerNotification]);
+
+  /**
+   * Update banner notification if it matches a condition
+   * @param {function} predicate - Function that tests if banner should be updated (receives current banner)
+   * @param {string} newMessage - New message to display
+   * @returns {boolean} True if banner was updated, false otherwise
+   */
+  const updateBanner = useCallback((predicate, newMessage) => {
+    if (bannerNotification && predicate(bannerNotification)) {
+      setBannerNotification({
+        ...bannerNotification,
+        message: newMessage,
+        timestamp: Date.now()
+      });
+      return true;
+    }
+    return false;
+  }, [bannerNotification]);
+
   // Cleanup all timers on unmount
   useEffect(() => {
     return () => {
@@ -180,7 +189,9 @@ export function NotificationProvider({ children }) {
     addNotification,
     removeNotification,
     clearAll,
-    clearBanner
+    clearBanner,
+    getBannerNotification,
+    updateBanner
   };
 
   return (

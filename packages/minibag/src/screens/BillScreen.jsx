@@ -5,6 +5,7 @@ import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import ErrorScreen from './ErrorScreen';
 import AppHeader from '../components/layout/AppHeader';
+import { BillScreenSkeleton } from '../components/skeletons';
 
 /**
  * Bill Screen - POS-style receipt display
@@ -33,7 +34,24 @@ const BillScreen = () => {
       setLoading(true);
       setError(null);
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      // Smart API URL detection for Cloudflare tunnel and local dev
+      const getApiUrl = () => {
+        // If explicitly set, use it
+        if (import.meta.env.VITE_API_URL) {
+          return import.meta.env.VITE_API_URL;
+        }
+
+        // Auto-detect based on current hostname
+        const hostname = window.location.hostname;
+        if (hostname === 'minibag.cc' || hostname === 'www.minibag.cc') {
+          return 'https://api.minibag.cc';
+        }
+
+        // Default to localhost for dev
+        return 'http://localhost:3000';
+      };
+
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/api/bill/${token}`);
       const data = await response.json();
 
@@ -132,8 +150,9 @@ const BillScreen = () => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(Math.round(amount));
   };
 
   // Get translated item name based on current language
@@ -144,16 +163,9 @@ const BillScreen = () => {
     return item.item_name; // fallback to English
   };
 
-  // Loading state
+  // Loading state - Use skeleton for better UX
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading bill...</p>
-        </div>
-      </div>
-    );
+    return <BillScreenSkeleton />;
   }
 
   // Error state

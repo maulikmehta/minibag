@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Check, X, Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Minus, Check, X, Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import VoiceSearch from '../../components/VoiceSearch.jsx';
 import CategoryButton from '../../components/performance/CategoryButton.jsx';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import ProgressBar from '../../components/layout/ProgressBar.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
+import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
+import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
 
 export default function SessionCreateScreen({
   categories,
@@ -39,6 +41,8 @@ export default function SessionCreateScreen({
 
   // Nickname modal state
   const [hostName, setHostName] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [nameTouched, setNameTouched] = useState(false);
   const [showHostNicknameModal, setShowHostNicknameModal] = useState(false);
   const [hostNicknameOptions, setHostNicknameOptions] = useState([]);
   const [selectedHostNickname, setSelectedHostNickname] = useState(null);
@@ -488,23 +492,59 @@ export default function SessionCreateScreen({
             {onboardingStep === 1 && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
-                  What's your name?
+                  What's your name? <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={hostName}
                   onChange={(e) => {
-                    // Allow only letters and spaces
-                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                    setHostName(value);
+                    // Sanitize input - remove invalid characters
+                    const cleaned = sanitizeName(e.target.value);
+                    setHostName(cleaned);
+
+                    // Real-time validation after first blur
+                    if (nameTouched) {
+                      const error = getNameValidationError(cleaned);
+                      setNameError(error || '');
+                    }
+                  }}
+                  onBlur={() => {
+                    setNameTouched(true);
+                    const error = getNameValidationError(hostName);
+                    setNameError(error || '');
                   }}
                   placeholder="Enter your name"
-                  className="input"
-                  maxLength={50}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none text-base transition-colors ${
+                    nameError
+                      ? 'border-red-500 focus:border-red-600'
+                      : 'border-gray-300 focus:border-green-600'
+                  }`}
+                  maxLength={VALIDATION_LIMITS.MAX_NAME_LENGTH}
+                  aria-invalid={!!nameError}
+                  aria-describedby={nameError ? "name-error" : "name-help"}
                   autoFocus
                   required
                 />
-                <p className="text-xs text-gray-500 mt-0.5">For payment tracking</p>
+
+                {/* Error message */}
+                {nameError && (
+                  <div id="name-error" role="alert" className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                    <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                    <span>{nameError}</span>
+                  </div>
+                )}
+
+                {/* Helper text - only show if no error */}
+                {!nameError && (
+                  <p id="name-help" className="mt-2 text-xs text-gray-500">
+                    Only letters and spaces allowed • Used for payment tracking
+                  </p>
+                )}
+
+                {/* Character counter */}
+                <p className="mt-1 text-xs text-gray-400 text-right">
+                  {hostName.length}/{VALIDATION_LIMITS.MAX_NAME_LENGTH}
+                </p>
               </div>
             )}
 
@@ -636,9 +676,9 @@ export default function SessionCreateScreen({
                     }
                     setOnboardingStep(onboardingStep + 1);
                   }}
-                  disabled={onboardingStep === 1 && !hostName.trim()}
+                  disabled={onboardingStep === 1 && (!hostName.trim() || !!nameError)}
                   className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
-                  title={`Next (${onboardingStep}/3)`}
+                  title={onboardingStep === 1 && nameError ? nameError : `Next (${onboardingStep}/3)`}
                 >
                   <ChevronRight size={20} strokeWidth={2} />
                 </button>

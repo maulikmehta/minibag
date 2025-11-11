@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Check, X, Users, Loader2, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, X, Users, Loader2, Clock, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
 import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
 import { ERROR_MESSAGES } from '@shared/constants/errorMessages.js';
+import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
 
 export default function JoinSessionScreen({
   session,
@@ -26,6 +27,8 @@ export default function JoinSessionScreen({
   // Local state for this screen
   const [joiningSession, setJoiningSession] = useState(false);
   const [participantName, setParticipantName] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [nameTouched, setNameTouched] = useState(false);
   const [nicknameOptions, setNicknameOptions] = useState([]);
   const [selectedNickname, setSelectedNickname] = useState(null);
   const [loadingNicknames, setLoadingNicknames] = useState(false);
@@ -497,24 +500,58 @@ export default function JoinSessionScreen({
             {modalStep === 1 && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-900 mb-2">
-                  What's your name?
+                  What's your name? <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={participantName}
                   onChange={(e) => {
-                    // Allow only letters and spaces
-                    const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                    setParticipantName(value);
+                    // Sanitize input - remove invalid characters
+                    const cleaned = sanitizeName(e.target.value);
+                    setParticipantName(cleaned);
+
+                    // Real-time validation after first blur
+                    if (nameTouched) {
+                      const error = getNameValidationError(cleaned);
+                      setNameError(error || '');
+                    }
+                  }}
+                  onBlur={() => {
+                    setNameTouched(true);
+                    const error = getNameValidationError(participantName);
+                    setNameError(error || '');
                   }}
                   placeholder="Enter your name"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-green-600 focus:outline-none text-base"
-                  maxLength={50}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none text-base transition-colors ${
+                    nameError
+                      ? 'border-red-500 focus:border-red-600'
+                      : 'border-gray-300 focus:border-green-600'
+                  }`}
+                  maxLength={VALIDATION_LIMITS.MAX_NAME_LENGTH}
+                  aria-invalid={!!nameError}
+                  aria-describedby={nameError ? "name-error" : "name-help"}
                   autoFocus
                   required
                 />
-                <p className="mt-2 text-xs text-gray-500">
-                  We'll use this for payment splits & receipts
+
+                {/* Error message */}
+                {nameError && (
+                  <div id="name-error" role="alert" className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                    <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                    <span>{nameError}</span>
+                  </div>
+                )}
+
+                {/* Helper text - only show if no error */}
+                {!nameError && (
+                  <p id="name-help" className="mt-2 text-xs text-gray-500">
+                    Only letters and spaces allowed • Used for payment splits & receipts
+                  </p>
+                )}
+
+                {/* Character counter */}
+                <p className="mt-1 text-xs text-gray-400 text-right">
+                  {participantName.length}/{VALIDATION_LIMITS.MAX_NAME_LENGTH}
                 </p>
               </div>
             )}
@@ -656,9 +693,9 @@ export default function JoinSessionScreen({
                     }
                     setModalStep(modalStep + 1);
                   }}
-                  disabled={modalStep === 1 && !participantName.trim()}
+                  disabled={modalStep === 1 && (!participantName.trim() || !!nameError)}
                   className="w-10 h-10 flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400 rounded-full text-white transition-all duration-150 active:scale-90 disabled:active:scale-100"
-                  title="Next"
+                  title={modalStep === 1 && nameError ? nameError : "Next"}
                 >
                   <ChevronRight size={20} strokeWidth={2} />
                 </button>
