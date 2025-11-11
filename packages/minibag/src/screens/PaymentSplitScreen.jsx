@@ -445,37 +445,20 @@ function PaymentSplitScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-        {participants.length === 0 ? (
-          // Solo mode: Two buttons in 50/50 ratio
-          <div className="flex gap-3">
-            <button
-              onClick={handleViewBill}
-              className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-lg text-base font-semibold transition-colors"
-            >
-              View Bill
-            </button>
-            <button
-              onClick={onDone}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          // Group mode: Original layout with amount and Done button
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-600">You'll receive</p>
-              <p className="text-2xl text-gray-900">₹{totalToReceive.toFixed(0)}</p>
-            </div>
-            <button
-              onClick={onDone}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-semibold transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        )}
+        <div className="flex gap-3">
+          <button
+            onClick={handleViewBill}
+            className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+          >
+            Your Bill
+          </button>
+          <button
+            onClick={onDone}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
