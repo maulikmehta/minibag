@@ -126,6 +126,13 @@ const BillScreen = () => {
   const handleCloseReceipt = () => {
     // Check if this window was opened via window.open()
     if (window.opener) {
+      // Send message to parent window to end the session
+      try {
+        window.opener.postMessage({ type: 'endSession' }, window.location.origin);
+        console.log('📤 Sent endSession message to parent window');
+      } catch (err) {
+        console.error('Failed to send message to parent:', err);
+      }
       // This is a popup window, safe to close
       window.close();
     } else {
@@ -201,7 +208,7 @@ const BillScreen = () => {
         endSessionMenuOpen={menuOpen}
         onEndSessionMenuToggle={setMenuOpen}
         onEndSession={handleCloseReceipt}
-        menuLabel="Close Receipt"
+        menuLabel="End Session"
         rightContent={
           <button
             onClick={handleDownloadJPG}

@@ -98,6 +98,22 @@ function PaymentSplitScreen({
     fetchBillItems();
   }, [session?.session_id]);
 
+  // Listen for session end messages from bill popup
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Verify message origin for security (in production, check event.origin)
+      if (event.data?.type === 'endSession') {
+        console.log('📨 Received endSession message from bill popup');
+        if (onDone) {
+          onDone();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onDone]);
+
   // Fallback: Calculate total quantities for all items (memoized for performance)
   const allItems = useMemo(
     () => aggregateAllItems(hostItems, participants),
@@ -439,20 +455,12 @@ function PaymentSplitScreen({
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-6 max-w-md mx-auto">
-        <div className="flex gap-3">
-          <button
-            onClick={handleViewBill}
-            className="flex-1 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-900 py-3 px-4 rounded-lg text-base font-semibold transition-colors"
-          >
-            Your Bill
-          </button>
-          <button
-            onClick={onDone}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
-          >
-            Done
-          </button>
-        </div>
+        <button
+          onClick={handleViewBill}
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg text-base font-semibold transition-colors"
+        >
+          Your Bill
+        </button>
       </div>
     </div>
   );
