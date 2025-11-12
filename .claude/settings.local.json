@@ -41,7 +41,12 @@
       "Bash(node verify-emoji-migration.js:*)",
       "Bash(npm run test:run:*)",
       "Bash(git stash show:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(/dev/null)",
+      "Bash(./cloudflared:*)",
+      "Bash(timeout 5 ./start-tunnel-production.sh:*)",
+      "Bash(npm run dev:*)",
+      "Bash(node test-db.js:*)"
     ],
     "deny": [],
     "ask": []

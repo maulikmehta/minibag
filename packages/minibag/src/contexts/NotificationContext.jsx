@@ -37,6 +37,9 @@ export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [bannerNotification, setBannerNotification] = useState(null);
 
+  // Use ref to track banner state without causing re-renders
+  const bannerNotificationRef = React.useRef(null);
+
   // Track active timers to prevent memory leaks
   const timersRef = React.useRef({
     banner: null,
@@ -77,6 +80,7 @@ export function NotificationProvider({ children }) {
         notificationPriority === NOTIFICATION_PRIORITY.NORMAL) {
       // Add to banner queue - new notifications immediately replace current one
       setBannerNotification(notification);
+      bannerNotificationRef.current = notification; // Sync ref
 
       // If there are more notifications coming, they'll replace this one
       // No auto-dismiss timer - stays until next notification arrives
@@ -141,6 +145,7 @@ export function NotificationProvider({ children }) {
    */
   const clearBanner = useCallback(() => {
     setBannerNotification(null);
+    bannerNotificationRef.current = null; // Sync ref
   }, []);
 
   /**
@@ -148,8 +153,8 @@ export function NotificationProvider({ children }) {
    * @returns {object|null} Current banner notification or null
    */
   const getBannerNotification = useCallback(() => {
-    return bannerNotification;
-  }, [bannerNotification]);
+    return bannerNotificationRef.current;
+  }, []); // Stable - no dependencies
 
   /**
    * Update banner notification if it matches a condition
@@ -158,16 +163,22 @@ export function NotificationProvider({ children }) {
    * @returns {boolean} True if banner was updated, false otherwise
    */
   const updateBanner = useCallback((predicate, newMessage) => {
-    if (bannerNotification && predicate(bannerNotification)) {
-      setBannerNotification({
-        ...bannerNotification,
-        message: newMessage,
-        timestamp: Date.now()
-      });
-      return true;
-    }
-    return false;
-  }, [bannerNotification]);
+    let updated = false;
+    setBannerNotification(current => {
+      if (current && predicate(current)) {
+        updated = true;
+        const newNotification = {
+          ...current,
+          message: newMessage,
+          timestamp: Date.now()
+        };
+        bannerNotificationRef.current = newNotification; // Sync ref
+        return newNotification;
+      }
+      return current;
+    });
+    return updated;
+  }, []); // Stable - no dependencies
 
   // Cleanup all timers on unmount
   useEffect(() => {

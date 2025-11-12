@@ -38,11 +38,7 @@ function HomeScreen({
         {/* Tagline */}
         <div className="text-center space-y-3 max-w-sm">
           <p className="text-2xl font-semibold text-gray-900 leading-tight">
-            Track your shopping,<br />
-            <span className="text-green-600">split with neighbors</span>
-          </p>
-          <p className="text-base text-gray-600 mt-4">
-            Simple lists that work alone or together
+            Simple lists that work alone or <span style={{ color: '#7c3aed' }}>together</span>
           </p>
         </div>
 

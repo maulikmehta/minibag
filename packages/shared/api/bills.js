@@ -378,8 +378,10 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
         emoji: catalog.emoji,
         quantity: item.quantity,
         unit: catalog.unit,
-        price_per_unit: Math.round(pricePerKg * 100) / 100,
-        total: Math.round(itemCost * 100) / 100
+        price_per_unit: Math.round(pricePerKg),
+        total: Math.round(itemCost),
+        payment_method: payment.method,
+        billed_to: [participant.real_name || participant.nickname]
       });
 
       totalAmount += itemCost;
@@ -408,10 +410,11 @@ async function getParticipantBill(res, tokenData, session, catalogItems, payment
     },
     participant: {
       nickname: participant.nickname,
-      avatar_emoji: participant.avatar_emoji
+      avatar_emoji: participant.avatar_emoji,
+      real_name: participant.real_name
     },
     items: billItems,
-    total_amount: Math.round(totalAmount * 100) / 100,
+    total_amount: Math.round(totalAmount),
     participant_count: participantCount || 0,
     expires_at: tokenData.expires_at
   });
@@ -424,6 +427,36 @@ async function getHostBill(res, tokenData, session, catalogItems, payments, host
 
   // Build catalog map using shared utility (keyed by TEXT item_id for payment lookup)
   const catalogMap = buildCatalogMap(catalogItems, 'item_id');
+
+  // Fetch all participant items for the session to calculate quantities
+  const { data: allParticipantItems } = await supabase
+    .from('participant_items')
+    .select(`
+      *,
+      participant:participants!inner(session_id, real_name, nickname)
+    `)
+    .eq('participant.session_id', tokenData.session_id);
+
+  // Build payment map and skipped items using shared utility
+  const { paymentMap, skippedItems } = buildPaymentMaps(payments);
+
+  // Build catalog map keyed by UUID for itemTotals calculation
+  const catalogMapByUuid = buildCatalogMap(catalogItems, 'id');
+
+  // Calculate total quantities per item (excluding skipped items)
+  const itemTotals = calculateItemTotals(allParticipantItems || [], catalogMapByUuid, skippedItems);
+
+  // Build participant names map per item (keyed by UUID)
+  const itemParticipants = {};
+  (allParticipantItems || []).forEach(pi => {
+    if (!itemParticipants[pi.item_id]) {
+      itemParticipants[pi.item_id] = [];
+    }
+    const displayName = pi.participant?.real_name || pi.participant?.nickname || 'Unknown';
+    if (!itemParticipants[pi.item_id].includes(displayName)) {
+      itemParticipants[pi.item_id].push(displayName);
+    }
+  });
 
   // Build bill items from payments
   const billItems = [];
@@ -453,17 +486,26 @@ async function getHostBill(res, tokenData, session, catalogItems, payments, host
         totalItemsPaid++;
         totalAmount += payment.amount;
 
+        // Calculate quantity and price per unit if participant items exist
+        const catalog_uuid = catalogItems.find(c => c.item_id === payment.item_id)?.id;
+        const totalQty = itemTotals[catalog_uuid] || 0;
+        const pricePerKg = totalQty > 0 ? payment.amount / totalQty : 0;
+
+        // Get participants who ordered this item
+        const billedTo = itemParticipants[catalog_uuid] || [];
+
         billItems.push({
           item_name: catalog.name,
           item_name_hi: catalog.name_hi,
           item_name_gu: catalog.name_gu,
           emoji: catalog.emoji,
-          quantity: null, // Host bill doesn't show quantity breakdown
+          quantity: totalQty > 0 ? totalQty : null,
           unit: catalog.unit,
-          price_per_unit: null,
-          total: Math.round(payment.amount * 100) / 100,
+          price_per_unit: totalQty > 0 ? Math.round(pricePerKg) : null,
+          total: Math.round(payment.amount),
           payment_method: payment.method,
-          vendor_name: payment.vendor_name
+          vendor_name: payment.vendor_name,
+          billed_to: billedTo
         });
       }
     }
@@ -484,7 +526,7 @@ async function getHostBill(res, tokenData, session, catalogItems, payments, host
       real_name: hostRealName
     },
     items: billItems,
-    total_amount: Math.round(totalAmount * 100) / 100,
+    total_amount: Math.round(totalAmount),
     total_items_paid: totalItemsPaid,
     total_items_skipped: totalItemsSkipped,
     participant_count: participantCount || 0,

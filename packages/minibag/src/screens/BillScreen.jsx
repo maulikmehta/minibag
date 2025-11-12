@@ -15,7 +15,7 @@ import { BillScreenSkeleton } from '../components/skeletons';
  */
 const BillScreen = () => {
   const { token } = useParams();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [billData, setBillData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -245,6 +245,17 @@ const BillScreen = () => {
               <p className="text-xs text-gray-600 mt-1">
                 Session ID: {billData.session.session_id}
               </p>
+              {/* Billed to - shows participant or host name */}
+              {isParticipantBill && billData.participant && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {t('bill.billedTo')}: {billData.participant.real_name || billData.participant.nickname}
+                </p>
+              )}
+              {!isParticipantBill && billData.host?.real_name && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {t('bill.billedTo')}: {billData.host.real_name}
+                </p>
+              )}
             </div>
 
             {/* Dotted separator */}
@@ -252,9 +263,6 @@ const BillScreen = () => {
 
             {/* Receipt Info */}
             <div className="text-xs text-gray-600 mb-4 space-y-1">
-              {isParticipantBill && billData.participant && (
-                <p>For: {billData.participant.nickname}</p>
-              )}
               <p>Date: {formatDate(billData.session.created_at)}</p>
               <p>Receipt: {formatDate(new Date().toISOString())}</p>
               {billData.session.completed_at && (
@@ -282,9 +290,14 @@ const BillScreen = () => {
                           {getItemName(item)}
                           {item.skipped && <span className="ml-1 text-xs text-gray-500">(Skipped)</span>}
                         </p>
-                        {isParticipantBill && item.quantity && (
+                        {item.quantity && (
                           <p className="text-xs text-gray-600 mt-0.5">
                             {item.quantity}{item.unit} × {formatCurrency(item.price_per_unit)}/{item.unit}
+                          </p>
+                        )}
+                        {item.payment_method && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {item.payment_method.toUpperCase()}
                           </p>
                         )}
                         {item.skip_reason && (

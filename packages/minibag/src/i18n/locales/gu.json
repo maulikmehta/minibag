@@ -19,9 +19,26 @@
       "potatoes": "બટાકા"
     }
   },
+  "errors": {
+    "failedToCopyLink": "લિંક કોપી કરવામાં નિષ્ફળ",
+    "failedToGenerateBill": "બિલ બનાવવામાં નિષ્ફળ। ફરી પ્રયાસ કરો।"
+  },
   "whatsapp": {
     "invitation": "🛒 હેય! હું જલદી શોપિંગ કરવા જાઉં છું.\n\nલિસ્ટમાં કંઈક ઉમેરવું છે? હું તમારા માટે લઈ આવીશ 😊\n\n{{url}}",
-    "thankYouMessage": "શોપિંગ માટે આભાર! 😊 ક્યારે લઈ શકું અને ચૂકવણી કરું?"
+    "thankYouMessage": "શોપિંગ માટે આભાર! 😊 ક્યારે લઈ શકું અને ચૂકવણી કરું?",
+    "inviteTitle": "મારી શોપિંગ યાદીમાં જોડાઓ!",
+    "invitePin": "પિન: {{pin}}",
+    "inviteLink": "લિંક: {{url}}",
+    "splitBillsLater": "અમે પછીથી બિલ વહેંચીશું",
+    "shareTitle": "મારી શોપિંગ યાદીમાં જોડાઓ"
+  },
+  "payment": {
+    "greeting": "નમસ્તે! તમારું શોપિંગ બિલ તૈયાર છે।",
+    "bagTag": "બેગ ટેગ: \"{{name}}\"",
+    "total": "કુલ: ₹{{amount}}",
+    "viewBill": "📄 બિલ જુઓ અને ડાઉનલોડ કરો:",
+    "sendBill": "બિલ મોકલો",
+    "copyRequest": "ચુકવણી વિનંતી કોપી કરો"
   },
   "bill": {
     "title": "MiniBag રસીદ",
@@ -49,6 +66,7 @@
     "shoppingCompleted": "શોપિંગ પૂર્ણ",
     "thankYou": "સ્થાનિક પડોશને ટેકો આપવા બદલ\nઆભાર!",
     "from": "તરફથી",
-    "expiryNotice": "આ બિલ લિંક {{date}} ને સમાપ્ત થશે"
+    "expiryNotice": "આ બિલ લિંક {{date}} ને સમાપ્ત થશે",
+    "billedTo": "બિલ કોને મોકલ્યું"
   }
 }

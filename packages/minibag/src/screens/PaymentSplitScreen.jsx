@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Share2, Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/layout/AppHeader.jsx';
 import ProgressBar from '../components/layout/ProgressBar.jsx';
 import UserIdentity from '../components/UserIdentity.jsx';
@@ -48,6 +49,8 @@ function PaymentSplitScreen({
   onLogoClick,
   onDone
 }) {
+  const { t } = useTranslation();
+
   // State for expanded participants in compact view
   const [expandedParticipants, setExpandedParticipants] = useState({});
 
@@ -113,6 +116,15 @@ function PaymentSplitScreen({
     return 0;
   }, [billData]);
 
+  // Extract host items from server data for shopping summary
+  const hostItemsData = useMemo(() => {
+    if (billData?.participants) {
+      const host = billData.participants.find(p => p.is_creator);
+      return host?.items || [];
+    }
+    return [];
+  }, [billData]);
+
   // FIX: Calculate participant costs from server data only
   const participantCosts = useMemo(() => {
     if (billData?.participants) {
@@ -152,21 +164,18 @@ function PaymentSplitScreen({
       const billTokenData = await generateBillToken(session.session_id, participant.id);
       const billUrl = billTokenData.bill_url;
 
-      const itemsList = costData.items
-        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
-        .join('%0A');
-
-      const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}\n\n📄 View & Download Bill:\n${billUrl}`);
+      // Success case: Clean message with bill URL (no item details needed)
+      const message = encodeURIComponent(`${t('payment.greeting')}\n\n${t('payment.bagTag', { name: pName })}\n\n${t('payment.total', { amount: Math.round(costData.total) })}\n\n${t('payment.viewBill')}\n${billUrl}`);
 
       window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
     } catch (error) {
       console.error('Failed to generate bill token:', error);
-      // Fallback to message without bill URL
+      // Fallback: Include item details when bill URL is unavailable
       const itemsList = costData.items
         .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
-        .join('%0A');
+        .join('\n');
 
-      const message = encodeURIComponent(`Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList.replace(/%0A/g, '\n')}\n\nTotal: ₹${Math.round(costData.total)}`);
+      const message = encodeURIComponent(`${t('payment.greeting')}\n\n${t('payment.bagTag', { name: pName })}\n\n${itemsList}\n\n${t('payment.total', { amount: Math.round(costData.total) })}`);
 
       window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
     }
@@ -182,23 +191,20 @@ function PaymentSplitScreen({
       const billTokenData = await generateBillToken(session.session_id, participant.id);
       const billUrl = billTokenData.bill_url;
 
-      const itemsList = costData.items
-        .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
-        .join('\n');
-
-      const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}\n\n📄 View & Download Bill:\n${billUrl}`;
+      // Success case: Clean message with bill URL (no item details needed)
+      const message = `${t('payment.greeting')}\n\n${t('payment.bagTag', { name: pName })}\n\n${t('payment.total', { amount: Math.round(costData.total) })}\n\n${t('payment.viewBill')}\n${billUrl}`;
 
       await navigator.clipboard.writeText(message);
       setCopiedParticipantId(participant.id || pName);
       setTimeout(() => setCopiedParticipantId(null), 2000);
     } catch (error) {
       console.error('Failed to copy or generate bill token:', error);
-      // Fallback to message without bill URL
+      // Fallback: Include item details when bill URL is unavailable
       const itemsList = costData.items
         .map(item => `${item.name} ${item.qty}kg - ₹${Math.round(item.cost)}`)
         .join('\n');
 
-      const message = `Hi! Your shopping bill is ready.\n\nBag tag: "${pName}"\n\n${itemsList}\n\nTotal: ₹${Math.round(costData.total)}`;
+      const message = `${t('payment.greeting')}\n\n${t('payment.bagTag', { name: pName })}\n\n${itemsList}\n\n${t('payment.total', { amount: Math.round(costData.total) })}`;
 
       try {
         await navigator.clipboard.writeText(message);
@@ -225,7 +231,7 @@ function PaymentSplitScreen({
       window.open(billTokenData.bill_url, '_blank');
     } catch (error) {
       console.error('Failed to generate bill token:', error);
-      alert('Failed to generate bill. Please try again.');
+      alert(t('errors.failedToGenerateBill'));
     }
   };
 
@@ -279,35 +285,23 @@ function PaymentSplitScreen({
         {/* Solo shopper summary */}
         {participants.length === 0 && (
           <div className="border border-gray-300 rounded-lg p-4 mb-6">
-            <div className="text-sm text-gray-600 space-y-2">
-              {Object.entries(hostItems).map(([itemId, qty]) => {
-                const veg = items.find(v => v.id === itemId);
-                const payment = itemPayments[itemId];
-                if (!payment) {
-                  return (
-                    <div key={itemId} className="flex justify-between items-center py-2">
-                      <div>
-                        <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                        <p className="text-sm text-gray-700">{qty}kg</p>
-                      </div>
-                      <p className="text-sm text-gray-400">-</p>
-                    </div>
-                  );
-                }
-                const totalQty = allItems[itemId];
-                const pricePerKg = payment.amount / totalQty;
-                const itemCost = pricePerKg * qty;
-                return (
-                  <div key={itemId} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+            {loadingBills ? (
+              <div className="text-center py-4 text-gray-500">Loading...</div>
+            ) : hostItemsData.length > 0 ? (
+              <div className="text-sm text-gray-600 space-y-2">
+                {hostItemsData.map((item) => (
+                  <div key={item.item_id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                     <div>
-                      <p className="text-base text-gray-900">{getItemName(veg)}</p>
-                      <p className="text-sm text-gray-700">{qty}kg × ₹{pricePerKg.toFixed(0)}/kg</p>
+                      <p className="text-base text-gray-900">{item.emoji} {item.name}</p>
+                      <p className="text-sm text-gray-700">{item.quantity}{item.unit} × ₹{item.price_per_kg}/{item.unit}</p>
                     </div>
-                    <p className="text-base text-gray-900 font-medium">₹{itemCost.toFixed(0)}</p>
+                    <p className="text-base text-gray-900 font-medium">₹{item.item_cost}</p>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">No items yet</div>
+            )}
           </div>
         )}
 

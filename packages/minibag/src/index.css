@@ -331,6 +331,30 @@ body {
   }
 }
 
+/* Word shuffle animation - slide up effect */
+@keyframes wordShuffle {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  18% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  22% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Shimmer skeleton background */
 .skeleton {
   background: linear-gradient(

@@ -1,8 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingBag, CheckCircle, Users, Share2, ArrowRight, Lock, Zap, ChevronDown, List, Heart } from 'lucide-react';
 import { Logo } from '@localloops/ui-components';
 import { getProduct, PLATFORM } from '@localloops/ui-components/config';
 import MinibagIcon from './components/MinibagIcon.jsx';
+
+// Animated word shuffle component
+function ShuffleWord() {
+  const words = [
+    { text: 'neighbors', color: '#7c3aed' },  // purple-600
+    { text: 'elders', color: '#2563eb' },     // blue-600
+    { text: 'friends', color: '#ec4899' },    // pink-600
+    { text: 'relatives', color: '#dc2626' },  // red-600
+    { text: 'roommates', color: '#22c55e' }   // green-600
+  ];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loopCount, setLoopCount] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+
+  useEffect(() => {
+    // Stop after 2.5 full cycles (showing all words 2.5 times)
+    if (loopCount >= 2 && currentIndex >= words.length) {
+      setIsAnimating(false);
+      setCurrentIndex(words.length - 1); // Stay on last word
+      return;
+    }
+
+    if (!isAnimating) return;
+
+    const timer = setTimeout(() => {
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % words.length;
+        if (next === 0) {
+          setLoopCount((c) => c + 1);
+        }
+        return next;
+      });
+    }, 3000); // 3 seconds per word
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, loopCount, isAnimating]);
+
+  const currentWord = words[currentIndex];
+
+  return (
+    <span
+      className="inline-block relative"
+      style={{
+        width: '10.5em',
+        height: '1.2em',
+        verticalAlign: 'baseline',
+        textAlign: 'left',
+        overflow: 'visible'
+      }}
+    >
+      <span
+        key={currentIndex}
+        className="inline-block"
+        style={{
+          color: currentWord.color,
+          animation: isAnimating ? 'wordShuffle 3s ease-in-out' : 'none'
+        }}
+      >
+        {currentWord.text}
+      </span>
+    </span>
+  );
+}
 
 export default function LandingPage({ onGetStarted }) {
   const minibag = getProduct('minibag');
@@ -31,11 +95,11 @@ export default function LandingPage({ onGetStarted }) {
               <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
                 Track shopping,
                 <br />
-                <span className="text-green-600">split with neighbors</span>
+                split with <ShuffleWord />
               </h1>
 
               <p className="text-xl text-gray-600 mb-8">
-                Simple shopping lists for vegetables. Works alone or together. No app, no signup.
+                Simple shopping lists for your daily staples—solo or with neighbors.
               </p>
 
               {/* CTA */}
@@ -43,7 +107,7 @@ export default function LandingPage({ onGetStarted }) {
                 onClick={onGetStarted}
                 className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
               >
-                Start Shopping
+                Get Started Free
                 <ArrowRight size={20} strokeWidth={2.5} />
               </button>
 
@@ -56,10 +120,6 @@ export default function LandingPage({ onGetStarted }) {
                 <span className="flex items-center gap-1">
                   <CheckCircle size={16} className="text-green-600" />
                   No signup
-                </span>
-                <span className="flex items-center gap-1">
-                  <CheckCircle size={16} className="text-green-600" />
-                  Works offline
                 </span>
               </div>
             </div>
@@ -134,7 +194,7 @@ export default function LandingPage({ onGetStarted }) {
 
                       {/* CTA Button */}
                       <button className="w-full bg-green-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                        Start Shopping
+                        Get Started Free
                       </button>
                     </div>
                   </div>
@@ -175,7 +235,7 @@ export default function LandingPage({ onGetStarted }) {
                 Create list
               </h3>
               <p className="text-sm text-gray-600">
-                Add vegetables and quantities in seconds
+                Add items in seconds
               </p>
             </div>
 
@@ -187,7 +247,7 @@ export default function LandingPage({ onGetStarted }) {
                 Go shopping
               </h3>
               <p className="text-sm text-gray-600">
-                Track payments as you buy (UPI or cash)
+                Record payments as you shop
               </p>
             </div>
 
@@ -199,7 +259,7 @@ export default function LandingPage({ onGetStarted }) {
                 Share bill
               </h3>
               <p className="text-sm text-gray-600">
-                Send summary via WhatsApp automatically
+                Download bill summary
               </p>
             </div>
           </div>
@@ -230,8 +290,8 @@ export default function LandingPage({ onGetStarted }) {
               {/* Feature 3 */}
               <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <Lock size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
-                <h3 className="font-semibold text-gray-900 mb-2">Privacy first</h3>
-                <p className="text-sm text-gray-600">No phone numbers shared. Ever.</p>
+                <h3 className="font-semibold text-gray-900 mb-2">Privacy by design</h3>
+                <p className="text-sm text-gray-600">Just first names. No tracking.</p>
               </div>
 
               {/* Feature 4 */}
@@ -245,14 +305,14 @@ export default function LandingPage({ onGetStarted }) {
               <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <CheckCircle size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
                 <h3 className="font-semibold text-gray-900 mb-2">Skip items</h3>
-                <p className="text-sm text-gray-600">Mark poor quality items as skipped.</p>
+                <p className="text-sm text-gray-600">Skip unavailable items or mark poor quality.</p>
               </div>
 
               {/* Feature 6 */}
               <div className="bg-white rounded-xl p-6 border border-gray-200">
-                <Heart size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
-                <h3 className="font-semibold text-gray-900 mb-2">Free forever</h3>
-                <p className="text-sm text-gray-600">No hidden costs. No premium tiers.</p>
+                <Zap size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">Fast checkout</h3>
+                <p className="text-sm text-gray-600">Record prices as you shop, settle up later.</p>
               </div>
             </div>
           </div>
@@ -279,7 +339,7 @@ export default function LandingPage({ onGetStarted }) {
               </button>
               {openFaq === 0 && (
                 <div className="px-6 pb-4 text-gray-600">
-                  No! Just enter your first name. No password, email, or phone number needed.
+                  No! Just enter your first name. No password, email, or phone number needed for free version. Pro account will save your history and require Sign-up.
                 </div>
               )}
             </div>
@@ -317,7 +377,7 @@ export default function LandingPage({ onGetStarted }) {
               </button>
               {openFaq === 2 && (
                 <div className="px-6 pb-4 text-gray-600">
-                  No. You pay the vendor directly (cash or UPI). Minibag just helps you track what you bought.
+                  We don't want you to change how you pay. Just record what you pay for splitting bills!
                 </div>
               )}
             </div>
@@ -347,9 +407,9 @@ export default function LandingPage({ onGetStarted }) {
             <div className="flex items-start gap-3">
               <Lock size={20} className="text-green-600 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Your privacy matters</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">Built for privacy, not profit</h3>
                 <p className="text-sm text-gray-700">
-                  No phone numbers • Only first names • Data deleted in 30 days • No payment info stored
+                  We believe shopping lists shouldn't require your personal data. That's why Minibag works with just first names—no phone numbers, no emails, no tracking.
                 </p>
               </div>
             </div>
@@ -366,7 +426,7 @@ export default function LandingPage({ onGetStarted }) {
             onClick={onGetStarted}
             className="inline-flex items-center gap-2 px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
           >
-            Try it now – it's free
+            Get Started Free
             <ArrowRight size={20} strokeWidth={2.5} />
           </button>
         </div>

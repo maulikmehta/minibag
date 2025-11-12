@@ -32,7 +32,8 @@ export default defineConfig({
     open: true,
     allowedHosts: [
       '.trycloudflare.com',
-      'localhost'
+      'localhost',
+      'minibag.cc'
     ],
     proxy: {
       '/api': {

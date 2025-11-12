@@ -17,6 +17,33 @@ export function buildInviteUrl(sessionId, inviteToken = null) {
 }
 
 /**
+ * Build a localized invite message for Web Share API (URL passed separately)
+ * @param {string|null} pin - The session PIN (required for joining)
+ * @param {Function} t - The i18n translation function
+ * @returns {string} Localized invite message without URL
+ */
+export function buildShareMessage(pin, t) {
+  return `${t('whatsapp.inviteTitle')}
+${t('whatsapp.invitePin', { pin: pin || 'N/A' })}
+${t('whatsapp.splitBillsLater')}`;
+}
+
+/**
+ * Build a localized invite message for clipboard copy (includes URL)
+ * @param {string} inviteUrl - The invite URL to include in the message
+ * @param {string|null} pin - The session PIN (required for joining)
+ * @param {Function} t - The i18n translation function
+ * @returns {string} Localized invite message with URL
+ */
+export function buildCopyMessage(inviteUrl, pin, t) {
+  return `${t('whatsapp.inviteTitle')}
+${t('whatsapp.inviteLink', { url: inviteUrl })}
+${t('whatsapp.invitePin', { pin: pin || 'N/A' })}
+${t('whatsapp.splitBillsLater')}`;
+}
+
+/**
+ * @deprecated Use buildShareMessage() or buildCopyMessage() instead
  * Build a localized invite message with the URL and PIN
  * @param {string} inviteUrl - The invite URL to include in the message
  * @param {string|null} pin - The session PIN (required for joining)
@@ -24,10 +51,7 @@ export function buildInviteUrl(sessionId, inviteToken = null) {
  * @returns {string} Localized invite message
  */
 export function buildInviteMessage(inviteUrl, pin, t) {
-  return `Join my shopping list!
-Link: ${inviteUrl}
-PIN: ${pin || 'N/A'}
-We will split bills later`;
+  return buildCopyMessage(inviteUrl, pin, t);
 }
 
 /**
@@ -40,14 +64,14 @@ We will split bills later`;
  */
 export async function copyInviteToClipboard(inviteUrl, pin, t, notify = null) {
   try {
-    const shareText = buildInviteMessage(inviteUrl, pin, t);
+    const shareText = buildCopyMessage(inviteUrl, pin, t);
     await navigator.clipboard.writeText(shareText);
     // No success notification - UI will show inline feedback
     return true;
   } catch (error) {
     console.error('Failed to copy:', error);
     if (notify) {
-      notify.error('Failed to copy link');
+      notify.error(t('errors.failedToCopyLink'));
     }
     return false;
   }
@@ -63,12 +87,12 @@ export async function copyInviteToClipboard(inviteUrl, pin, t, notify = null) {
  * @returns {Promise<boolean>} True if share succeeded or was cancelled, false if failed
  */
 export async function shareInvite(inviteUrl, pin, t, notify, fallbackCopy = null) {
-  const shareText = buildInviteMessage(inviteUrl, pin, t);
+  const shareText = buildShareMessage(pin, t);
 
   if (navigator.share) {
     try {
       await navigator.share({
-        title: 'Join my shopping list',
+        title: t('whatsapp.shareTitle'),
         text: shareText,
         url: inviteUrl
       });
