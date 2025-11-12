@@ -80,3 +80,35 @@ export const THRESHOLDS = {
   HIGH_CONCURRENT_USERS_WARNING: 50,
   SESSION_NEAR_FULL_THRESHOLD: 18 // Warn when 18/20 participants
 };
+
+/**
+ * Quantity input configuration for item weights
+ */
+export const QUANTITY_LIMITS = {
+  MIN_QUANTITY: 0.05,      // 50g minimum
+  MAX_QUANTITY: 10,        // 10kg maximum per item
+  STEP_SIZE: 0.05,         // 50g increments (rounding precision)
+  BUTTON_INCREMENT: 0.5,   // Default increment for +/- buttons
+  DECIMAL_PLACES: 2        // Display precision for quantities
+};
+
+/**
+ * Helper function to round quantity to valid increment
+ * @param {number} value - Raw quantity value
+ * @returns {number} Rounded quantity within valid range
+ */
+export function roundQuantity(value) {
+  const parsed = parseFloat(value);
+  if (isNaN(parsed)) {
+    return QUANTITY_LIMITS.MIN_QUANTITY;
+  }
+
+  // Round to nearest step size (0.05 kg = 50g)
+  const rounded = Math.round(parsed / QUANTITY_LIMITS.STEP_SIZE) * QUANTITY_LIMITS.STEP_SIZE;
+
+  // Clamp to valid range
+  return Math.max(
+    QUANTITY_LIMITS.MIN_QUANTITY,
+    Math.min(QUANTITY_LIMITS.MAX_QUANTITY, rounded)
+  );
+}

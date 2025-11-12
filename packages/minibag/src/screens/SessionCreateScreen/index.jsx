@@ -6,7 +6,7 @@ import CategoryButton from '../../components/performance/CategoryButton.jsx';
 import AppHeader from '../../components/layout/AppHeader.jsx';
 import ProgressBar from '../../components/layout/ProgressBar.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
-import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
+import { VALIDATION_LIMITS, QUANTITY_LIMITS, roundQuantity } from '@shared/constants/limits.js';
 import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
 
 export default function SessionCreateScreen({
@@ -358,9 +358,9 @@ export default function SessionCreateScreen({
                       <input
                         type="number"
                         inputMode="decimal"
-                        step="0.5"
-                        min="0.25"
-                        max="10"
+                        step={QUANTITY_LIMITS.STEP_SIZE}
+                        min={QUANTITY_LIMITS.MIN_QUANTITY}
+                        max={QUANTITY_LIMITS.MAX_QUANTITY}
                         value={quantity}
                         onChange={(e) => {
                           if (isListLocked) return;
@@ -389,7 +389,7 @@ export default function SessionCreateScreen({
                               .reduce((sum, [_, qty]) => sum + (typeof qty === 'number' ? qty : 0), 0);
 
                             // Check if new total exceeds limit
-                            if (numToStore >= 0 && otherItemsWeight + numToStore <= 10) {
+                            if (numToStore >= 0 && otherItemsWeight + numToStore <= QUANTITY_LIMITS.MAX_QUANTITY) {
                               return { ...prevItems, [veg.id]: numToStore };
                             }
 
@@ -399,17 +399,13 @@ export default function SessionCreateScreen({
                         }}
                         onBlur={(e) => {
                           if (isListLocked) return;
-                          const val = parseFloat(e.target.value);
 
-                          // Only reset if truly invalid (not just incomplete)
-                          if (isNaN(val) || val < 0.25 || e.target.value === '') {
-                            // Set to minimum valid value
-                            setHostItems(prev => ({ ...prev, [veg.id]: 0.25 }));
-                          } else {
-                            // Round to nearest 0.25 for consistency
-                            const rounded = Math.round(val * 4) / 4;
-                            setHostItems(prev => ({ ...prev, [veg.id]: rounded }));
-                          }
+                          // Use shared rounding logic for consistency
+                          const rounded = roundQuantity(e.target.value);
+                          setHostItems(prev => ({
+                            ...prev,
+                            [veg.id]: parseFloat(rounded.toFixed(QUANTITY_LIMITS.DECIMAL_PLACES))
+                          }));
                         }}
                         disabled={isListLocked}
                         style={{
@@ -425,11 +421,11 @@ export default function SessionCreateScreen({
                       <button
                         onClick={() => {
                           if (isListLocked) return;
-                          if (totalWeight < 10) {
-                            updateItemQuantity(veg.id, quantity + 0.5, 0.5);
+                          if (totalWeight < QUANTITY_LIMITS.MAX_QUANTITY) {
+                            updateItemQuantity(veg.id, quantity + QUANTITY_LIMITS.BUTTON_INCREMENT, QUANTITY_LIMITS.BUTTON_INCREMENT);
                           }
                         }}
-                        disabled={totalWeight >= 10 || isListLocked}
+                        disabled={totalWeight >= QUANTITY_LIMITS.MAX_QUANTITY || isListLocked}
                         className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
                       >
                         <ChevronUp size={16} strokeWidth={2} className="text-gray-700" />
@@ -437,8 +433,8 @@ export default function SessionCreateScreen({
                       <button
                         onClick={() => {
                           if (isListLocked) return;
-                          const newVal = Math.max(0, quantity - 0.5);
-                          updateItemQuantity(veg.id, newVal, -0.5);
+                          const newVal = Math.max(0, quantity - QUANTITY_LIMITS.BUTTON_INCREMENT);
+                          updateItemQuantity(veg.id, newVal, -QUANTITY_LIMITS.BUTTON_INCREMENT);
                         }}
                         disabled={isListLocked}
                         className="w-8 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 active:scale-95"
@@ -451,12 +447,12 @@ export default function SessionCreateScreen({
                   <button
                     onClick={() => {
                       if (isListLocked) return;
-                      if (totalWeight < 10) {
-                        updateItemQuantity(veg.id, 0.5, 0.5);
+                      if (totalWeight < QUANTITY_LIMITS.MAX_QUANTITY) {
+                        updateItemQuantity(veg.id, QUANTITY_LIMITS.BUTTON_INCREMENT, QUANTITY_LIMITS.BUTTON_INCREMENT);
                         setSearchQuery(''); // Clear search after adding item
                       }
                     }}
-                    disabled={totalWeight >= 10 || isListLocked}
+                    disabled={totalWeight >= QUANTITY_LIMITS.MAX_QUANTITY || isListLocked}
                     data-tour="quantity-controls"
                     className="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center flex-shrink-0 disabled:bg-gray-500 disabled:cursor-not-allowed transition-all duration-150 active:scale-90"
                   >
