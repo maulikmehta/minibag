@@ -335,7 +335,10 @@ export default function JoinSessionScreen({
   if (sessionNotFound) {
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
-        <AppHeader />
+        <AppHeader
+          i18n={i18n}
+          onLanguageChange={handleLanguageChange}
+        />
         <div className="pt-20 p-6 flex flex-col items-center justify-center min-h-screen">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
             <X size={32} className="text-red-600" strokeWidth={2.5} />
@@ -361,7 +364,10 @@ export default function JoinSessionScreen({
   if (isInviteExpired) {
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
-        <AppHeader />
+        <AppHeader
+          i18n={i18n}
+          onLanguageChange={handleLanguageChange}
+        />
         <div className="pt-20 p-6 flex flex-col items-center justify-center min-h-screen">
           <div className="w-16 h-16 mb-4 rounded-2xl bg-amber-100 flex items-center justify-center">
             <Clock size={32} className="text-amber-600" strokeWidth={2.5} />
@@ -386,7 +392,10 @@ export default function JoinSessionScreen({
 
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
-      <AppHeader />
+      <AppHeader
+        i18n={i18n}
+        onLanguageChange={handleLanguageChange}
+      />
       <div className="pt-20 p-6">
         {/* Header */}
         <div className="text-center mb-6">
