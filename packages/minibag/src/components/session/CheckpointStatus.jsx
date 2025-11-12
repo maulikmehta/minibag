@@ -60,7 +60,7 @@ export default function CheckpointStatus({
 
     // If checkpoint is not complete, show waiting message
     if (!checkpointComplete && expectedCount > 0) {
-      return `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond`;
+      return `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond (or 20 min)`;
     }
 
     // If checkpoint complete but waiting for confirmations
@@ -106,12 +106,12 @@ export default function CheckpointStatus({
           disabled && !showLoading
             ? 'bg-gray-400 text-white cursor-not-allowed'
             : 'bg-green-600 hover:bg-green-700 text-white active:scale-95'
-        } ${!checkpointComplete && !showLoading ? 'animate-pulse-glow' : ''}`}
+        } ${!disabled && !showLoading ? 'animate-pulse-glow' : ''}`}
         title={
           expectedCount === null
             ? 'Set how many friends joining above'
             : !checkpointComplete
-              ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond`
+              ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond (or 20 min timeout)`
               : (participantCount > 0 && !allJoinedParticipantsConfirmed
                   ? `Waiting for ${participantCount - confirmedParticipants} joined ${participantCount - confirmedParticipants === 1 ? 'participant' : 'participants'} to confirm their list`
                   : '')
@@ -120,7 +120,7 @@ export default function CheckpointStatus({
         {showLoading && (
           <Loader2 size={20} className="animate-spin" />
         )}
-        <span className={!checkpointComplete && !showLoading ? 'animate-gradient-pulse' : ''}>
+        <span className={!disabled && !showLoading ? 'animate-gradient-pulse' : ''}>
           {showLoading
             ? 'Starting...'
             : (expectedCount === null

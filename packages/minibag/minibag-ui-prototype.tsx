@@ -464,8 +464,16 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
         // Unskip: Delete the skip record
         await deletePayment(isCurrentlySkipped.paymentId);
 
-        // Update local state
+        // Update local state - remove from skippedItems
         setSkippedItems(prev => {
+          const updated = { ...prev };
+          delete updated[itemId];
+          return updated;
+        });
+
+        // CRITICAL FIX: Also remove from itemPayments to prevent stale payment ID
+        // Without this, the old payment ID remains and causes 404 when user tries to add payment
+        setItemPayments(prev => {
           const updated = { ...prev };
           delete updated[itemId];
           return updated;
@@ -604,9 +612,12 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     [items, vegCategoryIds]
   );
 
-  // Memoize getTotalWeight function with useCallback
+  // Memoize getTotalWeight function with useCallback - with type safety
   const getTotalWeight = useCallback((items) => {
-    return Object.values(items).reduce((sum, qty) => sum + qty, 0);
+    return Object.values(items).reduce((sum, qty) => {
+      const numQty = typeof qty === 'number' ? qty : (parseFloat(qty) || 0);
+      return sum + numQty;
+    }, 0);
   }, []);
 
   // Handle language change - memoized with useCallback
@@ -964,11 +975,31 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
             // Check if we're editing an existing payment or creating a new one
             if (paymentId) {
-              // Update existing payment
-              payment = await updatePayment(paymentId, {
-                amount: parseFloat(amount),
-                method: method
-              });
+              try {
+                // Try to update existing payment
+                payment = await updatePayment(paymentId, {
+                  amount: parseFloat(amount),
+                  method: method,
+                  // Critical: When updating from skipped state, mark as paid
+                  skipped: false,
+                  status: 'paid',
+                  skip_reason: null
+                });
+              } catch (updateError) {
+                // If payment not found (404), create a new one instead
+                if (updateError.status === 404) {
+                  console.warn(`Payment ${paymentId} not found, creating new payment`);
+                  payment = await recordPayment(session.session_id, {
+                    item_id: itemId,
+                    amount: parseFloat(amount),
+                    method: method,
+                    recorded_by: currentParticipant?.id || null
+                  });
+                } else {
+                  // Re-throw other errors
+                  throw updateError;
+                }
+              }
             } else {
               // Create new payment
               payment = await recordPayment(session.session_id, {
@@ -979,15 +1010,15 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
               });
             }
 
-            // Update local state
-            setItemPayments({
-              ...itemPayments,
+            // Update local state - use functional update to avoid stale closures
+            setItemPayments(prev => ({
+              ...prev,
               [itemId]: {
                 id: payment.id,
                 method: payment.method,
                 amount: payment.amount
               }
-            });
+            }));
 
             // FIX: Invalidate cache and refetch from server
             loadSession(session.session_id).catch(err => {

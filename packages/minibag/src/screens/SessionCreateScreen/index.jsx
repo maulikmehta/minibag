@@ -325,8 +325,8 @@ export default function SessionCreateScreen({
         {/* Items */}
         <div className="divide-y divide-gray-200">
           {filteredItems.map(veg => {
-            const quantity = hostItems[veg.id] || 0;
-            const isSelected = quantity > 0;
+            const quantity = typeof hostItems[veg.id] === 'number' ? hostItems[veg.id] : 0;
+            const isSelected = veg.id in hostItems;
 
             return (
               <div
@@ -364,26 +364,51 @@ export default function SessionCreateScreen({
                         value={quantity}
                         onChange={(e) => {
                           if (isListLocked) return;
-                          const val = parseFloat(e.target.value);
+                          const inputValue = e.target.value;
 
-                          // Allow empty input for editing
-                          if (e.target.value === '') {
-                            setHostItems({ ...hostItems, [veg.id]: '' });
+                          // Allow empty input - remove item from state entirely
+                          if (inputValue === '') {
+                            const { [veg.id]: _, ...rest } = hostItems;
+                            setHostItems(rest);
                             return;
                           }
 
-                          if (!isNaN(val) && val > 0) {
-                            const otherItemsWeight = getTotalWeight(hostItems) - (quantity || 0);
-                            if (otherItemsWeight + val <= 10) {
-                              setHostItems({ ...hostItems, [veg.id]: val });
+                          // Parse and validate numeric input
+                          const val = parseFloat(inputValue);
+
+                          // Reject non-numeric input (but allow partial decimals during typing)
+                          if (isNaN(val) && !inputValue.endsWith('.')) return;
+
+                          // For partial inputs like "0.", store the number 0 temporarily
+                          const numToStore = isNaN(val) ? 0 : val;
+
+                          // Validate against total weight limit using functional update
+                          setHostItems(prevItems => {
+                            const otherItemsWeight = Object.entries(prevItems)
+                              .filter(([id]) => id !== veg.id)
+                              .reduce((sum, [_, qty]) => sum + (typeof qty === 'number' ? qty : 0), 0);
+
+                            // Check if new total exceeds limit
+                            if (numToStore >= 0 && otherItemsWeight + numToStore <= 10) {
+                              return { ...prevItems, [veg.id]: numToStore };
                             }
-                          }
+
+                            // If exceeds limit, don't update state
+                            return prevItems;
+                          });
                         }}
                         onBlur={(e) => {
                           if (isListLocked) return;
                           const val = parseFloat(e.target.value);
-                          if (isNaN(val) || val <= 0 || e.target.value === '') {
-                            setHostItems({ ...hostItems, [veg.id]: 0.25 });
+
+                          // Only reset if truly invalid (not just incomplete)
+                          if (isNaN(val) || val < 0.25 || e.target.value === '') {
+                            // Set to minimum valid value
+                            setHostItems(prev => ({ ...prev, [veg.id]: 0.25 }));
+                          } else {
+                            // Round to nearest 0.25 for consistency
+                            const rounded = Math.round(val * 4) / 4;
+                            setHostItems(prev => ({ ...prev, [veg.id]: rounded }));
                           }
                         }}
                         disabled={isListLocked}

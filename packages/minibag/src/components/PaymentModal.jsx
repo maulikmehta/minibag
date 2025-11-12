@@ -15,7 +15,9 @@ import ModalWrapper from './shared/ModalWrapper.jsx';
  * @param {function} onConfirm - Callback when payment is confirmed (method, amount, paymentId)
  */
 function PaymentModal({ itemId, items, existingPayment = null, onClose, onConfirm }) {
-  const [method, setMethod] = useState(existingPayment?.method || 'upi');
+  // If editing a skipped payment, default to 'upi' instead of 'skip'
+  const initialMethod = existingPayment?.method === 'skip' ? 'upi' : (existingPayment?.method || 'upi');
+  const [method, setMethod] = useState(initialMethod);
   const [amount, setAmount] = useState(existingPayment?.amount?.toString() || '');
   const veg = items.find(v => v.id === itemId);
 

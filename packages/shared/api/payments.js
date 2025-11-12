@@ -161,13 +161,50 @@ export async function getSessionPayments(req, res) {
 export async function updatePayment(req, res) {
   try {
     const { payment_id } = req.params;
-    const { amount, method, vendor_name } = req.body;
+    const { amount, method, vendor_name, skipped, status, skip_reason } = req.body;
+
+    // Validate UUID format
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(payment_id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payment ID format'
+      });
+    }
+
+    // Check if payment exists first
+    const { data: existingPayment, error: fetchError } = await supabase
+      .from('payments')
+      .select('id, session_id, item_id, amount, method, status, skipped')
+      .eq('id', payment_id)
+      .single();
+
+    if (fetchError || !existingPayment) {
+      logger.error({ err: fetchError, paymentId: payment_id }, 'Payment not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Payment not found',
+        details: `No payment exists with ID: ${payment_id}`
+      });
+    }
 
     // Build update object
     const updates = {};
-    if (amount !== undefined) updates.amount = parseFloat(amount);
+    if (amount !== undefined) {
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid amount value'
+        });
+      }
+      updates.amount = parsedAmount;
+    }
     if (method !== undefined) updates.method = method;
-    if (vendor_name !== undefined) updates.vendor_name = vendor_name;
+    if (vendor_name !== undefined) updates.vendor_name = vendor_name ? vendor_name.trim() : vendor_name;
+    if (skipped !== undefined) updates.skipped = skipped;
+    if (status !== undefined) updates.status = status;
+    if (skip_reason !== undefined) updates.skip_reason = skip_reason;
 
     // Validate method if provided
     if (method && !['upi', 'cash', 'skip'].includes(method)) {
@@ -175,6 +212,55 @@ export async function updatePayment(req, res) {
         success: false,
         error: 'method must be "upi", "cash", or "skip"'
       });
+    }
+
+    // Validate status if provided
+    if (status && !['paid', 'pending', 'skipped', 'refunded'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'status must be "paid", "pending", "skipped", or "refunded"'
+      });
+    }
+
+    // Validate consistency between fields for state transitions
+    if (skipped !== undefined || method !== undefined || status !== undefined) {
+      // When marking as not skipped, ensure proper values
+      if (skipped === false) {
+        if (method && method === 'skip') {
+          return res.status(400).json({
+            success: false,
+            error: 'Cannot have method="skip" when skipped=false'
+          });
+        }
+        if (status && status === 'skipped') {
+          return res.status(400).json({
+            success: false,
+            error: 'Cannot have status="skipped" when skipped=false'
+          });
+        }
+        if (amount !== undefined && parseFloat(amount) <= 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Amount must be greater than 0 for non-skipped payments'
+          });
+        }
+      }
+
+      // When marking as skipped, ensure proper values
+      if (skipped === true) {
+        if (method && method !== 'skip') {
+          return res.status(400).json({
+            success: false,
+            error: 'method must be "skip" when skipped=true'
+          });
+        }
+        if (status && status !== 'skipped') {
+          return res.status(400).json({
+            success: false,
+            error: 'status must be "skipped" when skipped=true'
+          });
+        }
+      }
     }
 
     const { data: payment, error } = await supabase
@@ -185,10 +271,18 @@ export async function updatePayment(req, res) {
       .single();
 
     if (error) {
-      logger.error({ err: error, paymentId: payment_id }, 'Failed to update payment');
+      logger.error({
+        err: error,
+        paymentId: payment_id,
+        errorCode: error.code,
+        errorDetails: error.details,
+        errorHint: error.hint
+      }, 'Failed to update payment - constraint or RLS violation');
       return res.status(500).json({
         success: false,
-        error: 'Failed to update payment'
+        error: 'Failed to update payment',
+        details: error.message || error.toString(),
+        hint: error.hint || 'Check validation rules or database constraints'
       });
     }
 
@@ -200,7 +294,8 @@ export async function updatePayment(req, res) {
     logger.error({ err: error, paymentId: req.params.payment_id }, 'Error updating payment');
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
+      details: error.message || error.toString()
     });
   }
 }

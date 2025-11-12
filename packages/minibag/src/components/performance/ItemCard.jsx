@@ -55,10 +55,14 @@ const ItemCard = React.memo(({
               value={quantity}
               onChange={onQuantityChange}
               onBlur={(e) => {
-                // Ensure valid value on blur
+                // Ensure valid value on blur - only reset if truly invalid
                 const val = parseFloat(e.target.value);
-                if (isNaN(val) || val <= 0) {
+                if (isNaN(val) || val < 0.25 || e.target.value === '') {
                   onQuantityChange({ target: { value: '0.25' } });
+                } else {
+                  // Round to nearest 0.25 for consistency
+                  const rounded = Math.round(val * 4) / 4;
+                  onQuantityChange({ target: { value: rounded.toString() } });
                 }
               }}
               className="w-14 h-9 text-center text-base border border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none appearance-none"

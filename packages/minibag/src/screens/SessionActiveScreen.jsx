@@ -50,18 +50,26 @@ export default function SessionActiveScreen({
   // Track if we've shown the initial "joined" notification
   const hasShownJoinedNotification = useRef(false);
 
+  // Track if we've shown checkpoint completion notification (prevents duplicate firings)
+  const hasShownCheckpointComplete = useRef(false);
+
+  // Ref for mode prompt button to auto-scroll into view
+  const modePromptRef = useRef(null);
+
   // Show one-time "You're joined" notification when session loads
   useEffect(() => {
     if (currentParticipant && session && !hasShownJoinedNotification.current) {
       const isHost = currentParticipant?.is_creator || false;
       const displayName = currentParticipant?.nickname || currentParticipant?.real_name?.split(' ')[0] || 'You';
 
-      const message = `You're joined as ${displayName}${isHost ? ' (Host)' : ''}`;
+      const message = isHost
+        ? `You're joined as ${displayName} (Host)`
+        : `You're joined as ${displayName}`;
       notify.success(message);
 
       hasShownJoinedNotification.current = true;
     }
-  }, [currentParticipant, session, notify]);
+  }, [currentParticipant, session, notify, t]);
 
   useParticipantSync({
     session,
@@ -84,17 +92,24 @@ export default function SessionActiveScreen({
   useEffect(() => {
     // Only act when checkpoint completes for group mode (expectedCount > 0)
     if (checkpointComplete && expectedCount > 0 && waitingCount === 0) {
+      // Guard: only show once per checkpoint completion
+      if (hasShownCheckpointComplete.current) return;
+
       const joinedCount = participants.filter(p => !p.marked_not_coming).length;
 
       // Show success message as NEW banner (replaces any existing banner)
       const successMessage = joinedCount > 0
         ? `${joinedCount} ${joinedCount === 1 ? 'friend has' : 'friends have'} joined! Ready to start`
-        : 'All friends have responded! Ready to start';
+        : 'Friends have joined! Ready to start';
 
       // Use notify.success() without priority to create banner (LOW priority = banner)
       notify.success(successMessage);
+      hasShownCheckpointComplete.current = true; // Mark as shown
+    } else if (!checkpointComplete) {
+      // Reset guard when checkpoint becomes incomplete
+      hasShownCheckpointComplete.current = false;
     }
-  }, [checkpointComplete, expectedCount, waitingCount, notify, participants]);
+  }, [checkpointComplete, expectedCount, waitingCount, notify, participants.length]);
 
   // Determine if current user is host (needed early for invites fetch)
   const isHost = currentParticipant?.is_creator || false;
@@ -114,9 +129,9 @@ export default function SessionActiveScreen({
     notify.success(
       selectedMode === 0
         ? 'Ready to shop solo!'
-        : `Waiting for ${selectedMode} friend${selectedMode > 1 ? 's' : ''} to join`
+        : `Invited ${selectedMode} ${selectedMode === 1 ? 'friend' : 'friends'} to join`
     );
-  }, [notify]);
+  }, [notify, t]);
 
   // Initialize modeConfirmed if mode was already chosen (page refresh scenario)
   // Either timeout started OR solo mode was selected
@@ -125,6 +140,21 @@ export default function SessionActiveScreen({
       setModeConfirmed(true);
     }
   }, [session?.expected_participants_set_at, session?.expected_participants]);
+
+  // Auto-scroll to "Who are we shopping for?" prompt on load (mobile fix)
+  useEffect(() => {
+    if (!modeConfirmed && modePromptRef.current && currentParticipant?.is_creator) {
+      // Small delay to ensure layout is settled before scrolling
+      const scrollTimer = setTimeout(() => {
+        modePromptRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 300);
+
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [modeConfirmed, currentParticipant?.is_creator]);
 
   // Fetch invites for the session
   const [invites, setInvites] = useState([]);
@@ -307,7 +337,7 @@ export default function SessionActiveScreen({
               <div className="divide-y divide-gray-200">
                 {hostSelectedItems.map(veg => {
                   const quantity = myItems[veg.id] || 0;
-                  const isSelected = quantity > 0;
+                  const isSelected = veg.id in myItems;
 
                   return (
                     <div
@@ -337,18 +367,21 @@ export default function SessionActiveScreen({
                               max="10"
                               value={quantity}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value);
+                                const inputValue = e.target.value;
 
                                 // Allow empty input for editing
-                                if (e.target.value === '') {
+                                if (inputValue === '') {
                                   updateMyItemQuantity(veg.id, '');
                                   return;
                                 }
 
-                                if (!isNaN(val) && val > 0) {
+                                // Allow any numeric input during editing (including partial like "0.", "0")
+                                const val = parseFloat(inputValue);
+                                if (!isNaN(val)) {
                                   const otherItemsWeight = myTotalWeight - (quantity || 0);
-                                  if (otherItemsWeight + val <= 10) {
-                                    updateMyItemQuantity(veg.id, val);
+                                  // Allow partial inputs like "0." or values within limit
+                                  if (inputValue.endsWith('.') || (val >= 0 && otherItemsWeight + val <= 10)) {
+                                    updateMyItemQuantity(veg.id, inputValue);
                                   }
                                 }
                               }}
@@ -476,7 +509,7 @@ export default function SessionActiveScreen({
 
         {/* Shopping Preference Prompt - Only for Host */}
         {currentParticipant?.is_creator && !modeConfirmed && (
-          <div className="mb-6">
+          <div className="mb-6" ref={modePromptRef}>
             <button
               onClick={handleOpenModeModal}
               className="w-full p-4 bg-white border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors group"
