@@ -6,6 +6,18 @@ import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
 import { ERROR_MESSAGES } from '@shared/constants/errorMessages.js';
 import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
 
+// Vibrant color palette from LocalLoops landing page for item bubbles
+const BUBBLE_COLORS = [
+  { border: 'border-purple-600', text: 'text-purple-700' },
+  { border: 'border-blue-600', text: 'text-blue-700' },
+  { border: 'border-pink-600', text: 'text-pink-700' },
+  { border: 'border-red-600', text: 'text-red-700' },
+  { border: 'border-green-600', text: 'text-green-700' },
+  { border: 'border-cyan-600', text: 'text-cyan-700' },
+  { border: 'border-orange-600', text: 'text-orange-700' },
+  { border: 'border-amber-600', text: 'text-amber-700' },
+];
+
 export default function JoinSessionScreen({
   session,
   sessionLoading,
@@ -395,20 +407,21 @@ export default function JoinSessionScreen({
             <p className="text-sm font-medium text-gray-900 mb-3">
               Items in this list ({hostSelectedItems.length})
             </p>
-            <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
-              {hostSelectedItems.map(item => (
-                <div key={item.id} className="flex items-center gap-3 py-3 px-3">
-                  {/* Emoji */}
-                  <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-lg flex-shrink-0">
-                    {item.emoji || '🥬'}
-                  </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {hostSelectedItems.map((item, index) => {
+                const color = BUBBLE_COLORS[index % BUBBLE_COLORS.length];
 
-                  {/* Name */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">{getItemName(item)}</p>
+                return (
+                  <div
+                    key={item.id}
+                    className={`inline-flex items-center px-3 py-1.5 border-2 rounded-full bg-white ${color.border} ${color.text}`}
+                  >
+                    <span className="text-sm whitespace-nowrap">
+                      {getItemName(item)}
+                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
