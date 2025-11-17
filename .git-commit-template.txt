@@ -1,0 +1,31 @@
+type(scope): short summary (max 72 chars)
+
+[Roadmap: Week X, Day Y, Task Z]
+
+Problem:
+- What issue this addresses (include file:line if applicable)
+- Why this change is needed
+
+Solution:
+- What was changed
+- How it solves the problem
+
+Testing:
+- How this was verified
+- Edge cases considered
+
+References:
+- Roadmap: infrastructure-improvements-roadmap.md:L___
+
+# Commit Types:
+# fix:       Bug fixes (especially the 6 critical bugs)
+# feat:      New features (logging service, error boundaries)
+# refactor:  Code improvements without behavior change
+# test:      Adding tests
+# perf:      Performance improvements
+# security:  Security fixes (SQL injection, CORS)
+# chore:     Infrastructure (install Zod, setup Vitest)
+# docs:      Documentation updates
+#
+# Common Scopes:
+# socket, session-api, transformers, hooks, validation, db, logging, tests

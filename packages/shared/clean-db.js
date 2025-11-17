@@ -25,10 +25,15 @@ async function getDetailedStats() {
       .select('*')
       .eq('is_available', false);
 
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('*');
+
     return {
       sessions: sessions || [],
       participants: participants || [],
       items: items || [],
+      payments: payments || [],
       usedNicknames: nicknames || []
     };
   } catch (error) {
@@ -55,6 +60,7 @@ async function cleanDatabase() {
   console.log(`  - Sessions: ${stats.sessions.length}`);
   console.log(`  - Participants: ${stats.participants.length}`);
   console.log(`  - Participant Items: ${stats.items.length}`);
+  console.log(`  - Payments: ${stats.payments.length}`);
   console.log(`  - Used Nicknames: ${stats.usedNicknames.length}\n`);
 
   if (stats.sessions.length === 0) {
@@ -75,9 +81,24 @@ async function cleanDatabase() {
   // Delete in correct order (respecting foreign keys)
   console.log('Starting cleanup...\n');
 
-  // 1. Delete participant items first
+  // 1. Delete payments first (no foreign key dependencies)
+  if (stats.payments.length > 0) {
+    console.log('1. Deleting payments...');
+    const { error: paymentsError } = await supabase
+      .from('payments')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+    if (paymentsError) {
+      console.error('Error deleting payments:', paymentsError.message);
+    } else {
+      console.log(`   ✓ Deleted ${stats.payments.length} payments`);
+    }
+  }
+
+  // 2. Delete participant items
   if (stats.items.length > 0) {
-    console.log('1. Deleting participant items...');
+    console.log('2. Deleting participant items...');
     const { error: itemsError } = await supabase
       .from('participant_items')
       .delete()
@@ -90,9 +111,9 @@ async function cleanDatabase() {
     }
   }
 
-  // 2. Delete participants
+  // 3. Delete participants
   if (stats.participants.length > 0) {
-    console.log('2. Deleting participants...');
+    console.log('3. Deleting participants...');
     const { error: participantsError } = await supabase
       .from('participants')
       .delete()
@@ -105,9 +126,9 @@ async function cleanDatabase() {
     }
   }
 
-  // 3. Delete sessions
+  // 4. Delete sessions
   if (stats.sessions.length > 0) {
-    console.log('3. Deleting sessions...');
+    console.log('4. Deleting sessions...');
     const { error: sessionsError } = await supabase
       .from('sessions')
       .delete()
@@ -120,9 +141,9 @@ async function cleanDatabase() {
     }
   }
 
-  // 4. Reset nicknames pool
+  // 5. Reset nicknames pool
   if (stats.usedNicknames.length > 0) {
-    console.log('4. Resetting nicknames pool...');
+    console.log('5. Resetting nicknames pool...');
     const { error: nicknamesError } = await supabase
       .from('nicknames_pool')
       .update({
@@ -139,13 +160,14 @@ async function cleanDatabase() {
   }
 
   // Verify cleanup
-  console.log('\n5. Verifying cleanup...');
+  console.log('\n6. Verifying cleanup...');
   const newStats = await getDetailedStats();
 
   console.log('\nFinal Database Statistics:');
   console.log(`  - Sessions: ${newStats.sessions.length}`);
   console.log(`  - Participants: ${newStats.participants.length}`);
   console.log(`  - Participant Items: ${newStats.items.length}`);
+  console.log(`  - Payments: ${newStats.payments.length}`);
   console.log(`  - Used Nicknames: ${newStats.usedNicknames.length}`);
 
   console.log('\n=================================');

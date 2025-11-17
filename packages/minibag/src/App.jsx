@@ -1,9 +1,21 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import LocalLoopsLanding from './LocalLoopsLanding';
-import LandingPage from './LandingPage';
-import MinibagPrototype from '../minibag-ui-prototype';
-import AdminDashboard from './AdminDashboard';
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationToast from './components/NotificationToast';
+import ErrorBoundary from './components/ErrorBoundary';
+import { SessionScreenSkeleton } from './components/skeletons';
+
+// Loading component for lazy-loaded routes
+// Uses skeleton loading instead of spinner for better UX
+function LoadingFallback() {
+  return <SessionScreenSkeleton />;
+}
+
+// Lazy load all routes to reduce main bundle size
+// Each screen becomes a separate chunk, loaded only when accessed
+const LandingPage = lazy(() => import('./LandingPage'));
+const MinibagPrototype = lazy(() => import('../minibag-ui-prototype'));
+const BillScreen = lazy(() => import('./screens/BillScreen'));
 
 // Wrapper component to navigate to app on button click
 function MinibagLandingWrapper() {
@@ -19,29 +31,36 @@ function MinibagLandingWrapper() {
 // Wrapper component to handle join session flow
 function JoinSessionWrapper() {
   const { sessionId } = useParams();
-  return <MinibagPrototype joinSessionId={sessionId} />;
+  const navigate = useNavigate();
+
+  return (
+    <MinibagPrototype
+      joinSessionId={sessionId}
+      onNavigateToHome={() => navigate('/app')}
+    />
+  );
 }
 
-// Wrapper component to view participant bill
-function BillViewWrapper() {
-  const { sessionId, participantId } = useParams();
-  return <MinibagPrototype billSessionId={sessionId} billParticipantId={participantId} />;
-}
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Direct to app for field testing */}
-        <Route path="/" element={<MinibagPrototype />} />
-        <Route path="/home" element={<LocalLoopsLanding />} />
-        <Route path="/minibag" element={<MinibagLandingWrapper />} />
-        <Route path="/app" element={<MinibagPrototype />} />
-        <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
-        <Route path="/bill/:sessionId/:participantId" element={<BillViewWrapper />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <NotificationProvider>
+        <BrowserRouter>
+          <Suspense fallback={<LoadingFallback />}>
+            <NotificationToast />
+            <Routes>
+              {/* Landing page as home - Get Started navigates to /app */}
+              <Route path="/" element={<MinibagLandingWrapper />} />
+              <Route path="/minibag" element={<MinibagLandingWrapper />} />
+              <Route path="/app" element={<MinibagPrototype />} />
+              <Route path="/join/:sessionId" element={<JoinSessionWrapper />} />
+              <Route path="/bill/:token" element={<BillScreen />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </NotificationProvider>
+    </ErrorBoundary>
   );
 }
 

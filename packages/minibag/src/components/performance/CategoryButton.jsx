@@ -19,7 +19,7 @@ const CategoryButton = React.memo(({
     >
       <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 transition-all ${
         isSelected
-          ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 p-[3px]'
+          ? 'bg-gradient-to-br from-green-500 via-cyan-400 to-cyan-500 p-[3px]'
           : 'border-2 border-gray-300 bg-gray-50'
       }`}>
         <div className={`w-full h-full rounded-full flex items-center justify-center ${

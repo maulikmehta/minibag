@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../db/supabase.js';
+import logger from '../utils/logger.js';
 
 /**
  * GET /api/analytics/overview
@@ -25,12 +26,13 @@ export async function getAnalyticsOverview(req, res) {
 
     if (participantsError) throw participantsError;
 
-    // Get all payments
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('*');
+    // Get active subscriptions for revenue (NOT payments - those are grocery transactions)
+    const { data: subscriptions, error: subscriptionsError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('status', 'active');
 
-    if (paymentsError) throw paymentsError;
+    if (subscriptionsError) throw subscriptionsError;
 
     // Calculate metrics
     const totalSessions = sessions.length;
@@ -39,8 +41,12 @@ export async function getAnalyticsOverview(req, res) {
     const totalParticipants = participants.length;
     const uniqueUsers = new Set(participants.map(p => p.user_id).filter(Boolean)).size;
 
-    // Total revenue from payments
-    const totalRevenue = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    // Calculate MRR (Monthly Recurring Revenue) from active subscriptions
+    const monthlyRevenue = subscriptions.reduce((sum, sub) => {
+      const amount = parseFloat(sub.amount) || 0;
+      // Convert yearly subscriptions to monthly equivalent
+      return sum + (sub.billing_cycle === 'yearly' ? amount / 12 : amount);
+    }, 0);
 
     // Sessions by type
     const sessionsByType = {
@@ -73,7 +79,8 @@ export async function getAnalyticsOverview(req, res) {
           completedSessions,
           totalParticipants,
           uniqueUsers,
-          totalRevenue: Math.round(totalRevenue),
+          monthlyRevenue: Math.round(monthlyRevenue),  // MRR from subscriptions
+          activeSubscriptions: subscriptions.length,
           weeklySessions,
           completionRate
         },
@@ -82,7 +89,7 @@ export async function getAnalyticsOverview(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching analytics overview:', error);
+    logger.error({ err: error, endpoint: 'analytics-overview' }, 'Error fetching analytics overview');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics overview'
@@ -136,7 +143,7 @@ export async function getWeeklySessionTrends(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching weekly trends:', error);
+    logger.error({ err: error, endpoint: 'weekly-trends' }, 'Error fetching weekly trends');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch weekly trends'
@@ -146,44 +153,32 @@ export async function getWeeklySessionTrends(req, res) {
 
 /**
  * GET /api/analytics/revenue
- * Get revenue breakdown by product
+ * Get MRR (Monthly Recurring Revenue) breakdown by product type
  */
 export async function getRevenueAnalytics(req, res) {
   try {
-    // Get all payments with session info
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('amount, session_id');
+    // Get all active subscriptions
+    const { data: subscriptions, error: subscriptionsError } = await supabase
+      .from('subscriptions')
+      .select('product_type, amount, billing_cycle')
+      .eq('status', 'active');
 
-    if (paymentsError) throw paymentsError;
+    if (subscriptionsError) throw subscriptionsError;
 
-    // Get session types for each payment
-    const sessionIds = [...new Set(payments.map(p => p.session_id))];
-
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('sessions')
-      .select('session_id, session_type')
-      .in('session_id', sessionIds);
-
-    if (sessionsError) throw sessionsError;
-
-    // Create session type lookup
-    const sessionTypeMap = {};
-    sessions.forEach(s => {
-      sessionTypeMap[s.session_id] = s.session_type;
-    });
-
-    // Calculate revenue by type
+    // Calculate MRR by product type
     const revenueByType = {
       minibag: 0,
       partybag: 0,
       fitbag: 0
     };
 
-    payments.forEach(payment => {
-      const sessionType = sessionTypeMap[payment.session_id];
-      if (sessionType) {
-        revenueByType[sessionType] += parseFloat(payment.amount) || 0;
+    subscriptions.forEach(sub => {
+      const amount = parseFloat(sub.amount) || 0;
+      // Convert to monthly revenue
+      const monthlyAmount = sub.billing_cycle === 'yearly' ? amount / 12 : amount;
+
+      if (revenueByType.hasOwnProperty(sub.product_type)) {
+        revenueByType[sub.product_type] += monthlyAmount;
       }
     });
 
@@ -206,7 +201,7 @@ export async function getRevenueAnalytics(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error fetching revenue analytics:', error);
+    logger.error({ err: error, endpoint: 'revenue-analytics' }, 'Error fetching revenue analytics');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch revenue analytics'
@@ -238,10 +233,125 @@ export async function getRecentSessions(req, res) {
       data: sessions
     });
   } catch (error) {
-    console.error('Error fetching recent sessions:', error);
+    logger.error({ err: error, endpoint: 'recent-sessions' }, 'Error fetching recent sessions');
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recent sessions'
+    });
+  }
+}
+
+/**
+ * GET /api/analytics/sessions/completions
+ * Get session completion metrics for LocalLoops analytics
+ */
+export async function getSessionCompletions(req, res) {
+  try {
+    const { start_date, end_date, session_type } = req.query;
+
+    // Build query for completed sessions
+    let query = supabase
+      .from('sessions')
+      .select('*')
+      .not('completed_at', 'is', null);
+
+    if (start_date) query = query.gte('completed_at', start_date);
+    if (end_date) query = query.lte('completed_at', end_date);
+    if (session_type) query = query.eq('session_type', session_type);
+
+    const { data: sessions, error: sessionsError } = await query;
+
+    if (sessionsError) throw sessionsError;
+
+    // Get payments for transaction volume metrics (NOT LocalLoops revenue)
+    const sessionIds = sessions.map(s => s.id);
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('session_id, amount, method, skipped')
+      .in('session_id', sessionIds);
+
+    if (paymentsError) throw paymentsError;
+
+    // Calculate metrics
+    const totalCompleted = sessions.length;
+    const soloSessions = sessions.filter(s => s.participant_count === 0).length;
+    const groupSessions = sessions.filter(s => s.participant_count > 0).length;
+    const financiallySettled = sessions.filter(s => s.financially_settled_at).length;
+
+    // Calculate average duration (in minutes)
+    const durations = sessions.map(s => {
+      const start = new Date(s.created_at);
+      const end = new Date(s.completed_at);
+      return (end - start) / 60000; // Convert to minutes
+    });
+    const avgDuration = durations.length > 0
+      ? Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
+      : 0;
+
+    // Transaction volume metrics (total grocery spending on platform - NOT LocalLoops revenue)
+    let totalTransactionVolume = 0;
+    let upiAmount = 0;
+    let cashAmount = 0;
+    let itemsPurchased = 0;
+
+    payments.forEach(payment => {
+      if (!payment.skipped) {
+        const amount = parseFloat(payment.amount) || 0;
+        totalTransactionVolume += amount;
+        itemsPurchased++;
+
+        if (payment.method === 'upi') {
+          upiAmount += amount;
+        } else if (payment.method === 'cash') {
+          cashAmount += amount;
+        }
+      }
+    });
+
+    // Group by session type
+    const byType = {
+      minibag: {
+        count: sessions.filter(s => s.session_type === 'minibag').length,
+        solo: sessions.filter(s => s.session_type === 'minibag' && s.participant_count === 0).length,
+        group: sessions.filter(s => s.session_type === 'minibag' && s.participant_count > 0).length
+      },
+      partybag: {
+        count: sessions.filter(s => s.session_type === 'partybag').length,
+        solo: sessions.filter(s => s.session_type === 'partybag' && s.participant_count === 0).length,
+        group: sessions.filter(s => s.session_type === 'partybag' && s.participant_count > 0).length
+      },
+      fitbag: {
+        count: sessions.filter(s => s.session_type === 'fitbag').length,
+        solo: sessions.filter(s => s.session_type === 'fitbag' && s.participant_count === 0).length,
+        group: sessions.filter(s => s.session_type === 'fitbag' && s.participant_count > 0).length
+      }
+    };
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalCompleted,
+          soloSessions,
+          groupSessions,
+          financiallySettled,
+          avgDurationMinutes: avgDuration
+        },
+        transactionMetrics: {
+          totalVolume: Math.round(totalTransactionVolume),  // Total grocery spending (not LocalLoops revenue)
+          upiAmount: Math.round(upiAmount),
+          cashAmount: Math.round(cashAmount),
+          itemsPurchased
+        },
+        byType,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error({ err: error, endpoint: 'session-completions' }, 'Error fetching session completions');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch session completions'
     });
   }
 }

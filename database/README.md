@@ -78,7 +78,13 @@ LIMIT 10;
 
 - `001_initial_schema.sql` - Creates all tables, indexes, RLS policies, triggers
 - `002_seed_data.sql` - Loads initial nicknames and Minibag catalog items
+- `003_clear_seed_data.sql` - Clears test seed data
+- `004-020_*.sql` - Various schema updates and improvements
+- `021_add_performance_indexes_supabase.sql` - ⭐ **NEW** Performance indexes (35+ indexes, 5-20x faster queries)
+- `021_INDEXES_README.md` - Documentation for migration 021
 - `README.md` - This file
+
+**Latest Migration (2025-11-07):** Migration 021 adds 35+ performance indexes. See `021_INDEXES_README.md` for details.
 
 ## What Was Created
 
@@ -92,10 +98,63 @@ LIMIT 10;
 7. **user_patterns** - User behavior patterns
 
 ### Security
-- Row-Level Security (RLS) enabled on all tables
-- Public read access for active sessions and catalog
-- User-specific access for participant data
-- Guest mode support (no authentication required)
+
+#### Row-Level Security (RLS) Overview
+- **Status:** RLS enabled on all tables
+- **Backend Access:** Backend uses **service role key** (bypasses RLS)
+- **Defense-in-Depth:** RLS policies protect against accidental anon key usage
+
+#### Current RLS Model
+**Backend (Service Role - Bypasses RLS):**
+- All API operations use `supabase` client with service role key
+- Full database access without RLS restrictions
+- Secure because service key is never exposed to clients
+
+**Frontend (Anon Key - Respects RLS - NOT CURRENTLY USED):**
+- `supabaseClient` with anon key available but unused
+- If used in future, RLS policies would be enforced
+- Current policies allow guest-mode access
+
+#### RLS Policies Summary
+
+**Sessions:**
+- ✅ Anyone can view active sessions (guest mode)
+- ✅ Anyone can create sessions (guest mode)
+- ⚠️ Creators can update their sessions
+
+**Participants:**
+- ✅ Session members can view participants
+- ✅ Anyone can join sessions (guest mode)
+- ✅ Users can update own participant records
+
+**Payments:**
+- ⚠️ **OVERLY PERMISSIVE** - Anyone can view/insert/update/delete
+- **Risk:** Low (service role bypasses RLS)
+- **Mitigation:** Backend validation enforces rules
+- **Future:** Should tighten if direct client access is added
+
+**Catalog:**
+- ✅ Anyone can view active items and categories (public catalog)
+
+#### Security Considerations
+
+**Current Security Model:**
+1. Backend uses service role (bypasses RLS)
+2. Frontend makes API calls to backend
+3. Backend enforces business logic and authorization
+4. RLS acts as defense-in-depth only
+
+**If Direct Client Access Added (Future):**
+1. Would need to use anon key
+2. RLS policies would be enforced
+3. Must tighten payment delete policies
+4. Consider session-scoped access patterns
+
+**Recommended RLS Improvements (If Needed):**
+- Restrict payment deletes to session hosts only
+- Add session PIN validation in RLS policies
+- Implement time-based access (expired sessions)
+- Add audit logging for sensitive operations
 
 ### Data Loaded
 - **50+ nicknames** with emojis (Hindi, Gujarati, English)
@@ -112,6 +171,209 @@ LIMIT 10;
 - Session expiry
 - Price history tracking
 - Anonymous participation
+
+## Database Backup & Recovery
+
+### Supabase Automatic Backups
+
+**Status:** Included in Supabase free tier
+
+**Backup Schedule:**
+- **Frequency:** Daily automatic backups
+- **Retention:** 7 days (free tier)
+- **Type:** Full database snapshots
+- **Location:** Supabase infrastructure (automatic)
+
+**Accessing Backups:**
+1. Go to Supabase Dashboard
+2. Navigate to **Database** → **Backups** section
+3. View available backup points (last 7 days)
+4. Click **Restore** to restore to a specific point
+
+### Manual Backup Procedures
+
+#### Option 1: SQL Dump (Recommended)
+```bash
+# Full database dump
+pg_dump "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT].supabase.co:5432/postgres" > backup_$(date +%Y%m%d).sql
+
+# Schema only
+pg_dump --schema-only "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT].supabase.co:5432/postgres" > schema_$(date +%Y%m%d).sql
+
+# Data only
+pg_dump --data-only "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT].supabase.co:5432/postgres" > data_$(date +%Y%m%d).sql
+```
+
+#### Option 2: Supabase CLI
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Login
+supabase login
+
+# Link to project
+supabase link --project-ref [YOUR-PROJECT-REF]
+
+# Generate migration from current database
+supabase db dump -f backup.sql
+```
+
+#### Option 3: Supabase Dashboard Export
+1. Dashboard → **Database** → **Backups**
+2. Click **Download** on desired backup
+3. Saves as .tar.gz file
+
+### Backup Best Practices
+
+**Before Critical Operations:**
+- ✅ Always backup before running migrations
+- ✅ Backup before bulk data operations
+- ✅ Test restore procedure in development first
+
+**Regular Backups:**
+- ✅ Weekly manual backups (in addition to automatic)
+- ✅ Store backups in multiple locations
+- ✅ Test restore quarterly
+
+**What to Backup:**
+1. **Full database** - Complete snapshot
+2. **Migration history** - Track schema changes
+3. **Environment variables** - Secure copy of .env.example
+4. **Application code** - Git repository
+
+### Restore Procedures
+
+#### Restore from Supabase Automatic Backup
+1. Go to **Database** → **Backups**
+2. Select backup point
+3. Click **Restore**
+4. Confirm (⚠️ This will overwrite current data)
+5. Wait for completion (typically 1-5 minutes)
+
+#### Restore from SQL Dump
+```bash
+# Restore full dump
+psql "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT].supabase.co:5432/postgres" < backup_20251102.sql
+
+# Or use pg_restore for custom format
+pg_restore -d "postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT].supabase.co:5432/postgres" backup.dump
+```
+
+#### Restore Specific Table
+```sql
+-- Export single table
+COPY sessions TO '/tmp/sessions_backup.csv' CSV HEADER;
+
+-- Import single table
+COPY sessions FROM '/tmp/sessions_backup.csv' CSV HEADER;
+```
+
+### Disaster Recovery Plan
+
+**If Database is Corrupted:**
+1. **Immediate:** Stop all write operations
+2. **Assess:** Check Supabase status page
+3. **Restore:** Use most recent backup (within 7 days)
+4. **Verify:** Run verification queries
+5. **Resume:** Restart services
+
+**If Data is Accidentally Deleted:**
+1. **Stop:** Immediately stop the application
+2. **Check:** Verify deletion scope
+3. **Restore:** If within 7 days, use point-in-time restore
+4. **Audit:** Review what caused the deletion
+5. **Prevent:** Update RLS policies or add safeguards
+
+**If Migration Fails:**
+1. **Don't panic** - Automatic backups are available
+2. **Restore** to pre-migration state
+3. **Fix** the migration SQL
+4. **Test** in development
+5. **Re-apply** the corrected migration
+
+### Verification Queries
+
+After restore, verify data integrity:
+
+```sql
+-- Check table row counts
+SELECT
+  schemaname,
+  tablename,
+  n_live_tup as row_count
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
+ORDER BY n_live_tup DESC;
+
+-- Verify recent sessions
+SELECT COUNT(*) as recent_sessions
+FROM sessions
+WHERE created_at > NOW() - INTERVAL '7 days';
+
+-- Check data consistency
+SELECT
+  s.session_id,
+  s.participant_count,
+  COUNT(DISTINCT p.id) as actual_participants
+FROM sessions s
+LEFT JOIN participants p ON p.session_id = s.id
+GROUP BY s.id, s.session_id, s.participant_count
+HAVING s.participant_count != COUNT(DISTINCT p.id);
+
+-- Verify RLS policies are enabled
+SELECT
+  schemaname,
+  tablename,
+  rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;
+```
+
+### Backup Schedule Recommendation
+
+**Development Environment:**
+- Manual backups before major changes
+- Git commit before migrations
+
+**Production Environment:**
+- **Automatic:** Supabase daily backups (7 day retention)
+- **Manual Weekly:** Full SQL dump stored off-site
+- **Before Deploys:** Snapshot before each production deployment
+- **Monthly Archive:** Long-term storage of monthly snapshots
+
+### Off-Site Backup Storage
+
+**Recommended Services (Free Tiers Available):**
+- **GitHub:** Store SQL dumps in private repo
+- **Google Drive:** Manual backup uploads
+- **Dropbox:** Automated backup sync
+- **AWS S3:** Glacier for long-term archives
+
+**Backup Retention:**
+- Daily: 7 days (Supabase automatic)
+- Weekly: 4 weeks (manual)
+- Monthly: 12 months (archive)
+- Yearly: Indefinite (compliance)
+
+### Security Notes
+
+⚠️ **Backup Files Contain Sensitive Data:**
+- Encrypt backups at rest
+- Use secure transfer protocols (HTTPS, SCP)
+- Never commit backups to git
+- Limit access to authorized personnel only
+- Include session PINs and participant data
+
+**Encryption Example:**
+```bash
+# Encrypt backup
+gpg --symmetric --cipher-algo AES256 backup_20251102.sql
+
+# Decrypt backup
+gpg backup_20251102.sql.gpg
+```
 
 ## Troubleshooting
 

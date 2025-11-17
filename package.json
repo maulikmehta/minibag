@@ -24,5 +24,9 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "zod": "^4.1.12"
   }
 }

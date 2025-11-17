@@ -7,29 +7,6 @@
     "loading": "Loading...",
     "error": "Something went wrong"
   },
-  "home": {
-    "title": "Track your shopping,\nsplit with neighbors",
-    "subtitle": "Simple lists that work alone or together",
-    "newRun": "New list",
-    "pastRuns": "Past lists",
-    "goPro": "Go Pro"
-  },
-  "session": {
-    "create": {
-      "title": "New list",
-      "capacity": "{{weight}}kg of {{max}}kg",
-      "searchPlaceholder": "Search items...",
-      "createButton": "Create list"
-    },
-    "active": {
-      "title": "Your list",
-      "participants": "{{count}} of {{max}} people",
-      "yourItems": "Your items",
-      "participantItems": "{{name}}'s items",
-      "groupTotal": "Group total",
-      "startShopping": "Head to the store"
-    }
-  },
   "items": {
     "categories": {
       "veggies": "Veggies",
@@ -46,51 +23,54 @@
     "sessionFull": "This list is full ({{current}}/{{max}})",
     "capacityExceeded": "Can't add more. {{max}}kg limit reached.",
     "sessionExpired": "This list ended. Start a new one?",
-    "networkError": "Connection lost. Retrying..."
+    "networkError": "Connection lost. Retrying...",
+    "failedToCopyLink": "Failed to copy link",
+    "failedToGenerateBill": "Failed to generate bill. Please try again."
   },
   "whatsapp": {
-    "invitation": "🛒 Hey! I'm going shopping soon.\n\nWant to add anything to the list? I'll grab it for you 😊\n\n{{url}}\n\nWe'll split the expense later!"
+    "invitation": "Hey!\nI'm going to the market. Want anything?\nJoin the list here - \n{{url}}\nWe'll settle the bill later.",
+    "thankYouMessage": "Thanks for the shopping!\nWhen can I come and collect the items? I'll make the payment as well.",
+    "inviteTitle": "Join my shopping list!",
+    "invitePin": "PIN: {{pin}}",
+    "inviteLink": "Link: {{url}}",
+    "splitBillsLater": "We will split bills later",
+    "shareTitle": "Join my shopping list"
   },
-  "tooltips": {
-    "fabMenu": {
-      "title": "Start here!",
-      "description": "Tap here to create a new shopping session, view history, or upgrade to Pro"
-    },
-    "backNavigation": {
-      "title": "Edit anytime",
-      "description": "You can go back to edit your list before starting the session"
-    },
-    "voiceSearch": {
-      "title": "Voice search",
-      "description": "Tap the mic icon to search items using your voice"
-    },
-    "quantityControls": {
-      "title": "Add items",
-      "description": "Use + and - buttons to add items in 0.5kg increments"
-    },
-    "categoryFilters": {
-      "title": "More coming soon",
-      "description": "Currently only vegetables are available. More categories coming soon!"
-    },
-    "languageSwitcher": {
-      "title": "Switch language",
-      "description": "Tap to switch between English, Gujarati, and Hindi"
-    },
-    "shoppingHistory": {
-      "title": "View past sessions",
-      "description": "Access your previous shopping sessions and bills here"
-    },
-    "goPro": {
-      "title": "Unlock more features",
-      "description": "Upgrade to Pro for unlimited sessions and advanced features"
-    },
-    "participantsList": {
-      "title": "Live participants",
-      "description": "See who's in your session in real-time!"
-    },
-    "shareButton": {
-      "title": "Invite friends",
-      "description": "Share this session link via WhatsApp to invite neighbors"
-    }
+  "payment": {
+    "greeting": "Hi! Your shopping bill is ready.",
+    "bagTag": "Bag tag: \"{{name}}\"",
+    "total": "Total: ₹{{amount}}",
+    "viewBill": "📄 View & Download Bill:",
+    "sendBill": "Send bill",
+    "copyRequest": "Copy payment request"
+  },
+  "bill": {
+    "title": "MiniBag Receipt",
+    "loading": "Loading bill...",
+    "downloading": "Downloading...",
+    "downloadError": "Failed to download bill. Please try again.",
+    "expired": "This bill link has expired",
+    "invalid": "Invalid bill link",
+    "failed": "Failed to load bill",
+    "connectionError": "Connection error. Please check your internet connection.",
+    "notAvailable": "Bill data not available",
+    "saveReceipt": "Save Receipt",
+    "closeReceipt": "Close Receipt",
+    "sessionId": "Session ID",
+    "for": "For",
+    "date": "Date",
+    "completed": "Completed",
+    "receipt": "Receipt",
+    "skipped": "Skipped",
+    "subTotal": "Sub Total",
+    "total": "TOTAL",
+    "itemsInOrder": "Items in this order: {{count}}",
+    "itemsPurchased": "Items purchased",
+    "totalParticipants": "Total participants",
+    "shoppingCompleted": "Shopping completed",
+    "thankYou": "Thank You For Supporting\nLocal Neighborhoods!",
+    "from": "From",
+    "expiryNotice": "This bill link expires on {{date}}",
+    "billedTo": "Billed to"
   }
 }

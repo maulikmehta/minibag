@@ -1,171 +1,453 @@
-import React from 'react';
-import { ShoppingBag, CheckCircle, Users, Share2, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, CheckCircle, Users, Share2, ArrowRight, Lock, Zap, ChevronDown, List, Heart } from 'lucide-react';
 import { Logo } from '@localloops/ui-components';
 import { getProduct, PLATFORM } from '@localloops/ui-components/config';
+import MinibagIcon from './components/MinibagIcon.jsx';
+
+// Animated word shuffle component
+function ShuffleWord() {
+  const words = [
+    { text: 'neighbors', color: '#7c3aed' },  // purple-600
+    { text: 'elders', color: '#2563eb' },     // blue-600
+    { text: 'friends', color: '#ec4899' },    // pink-600
+    { text: 'relatives', color: '#dc2626' },  // red-600
+    { text: 'roommates', color: '#22c55e' }   // green-600
+  ];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loopCount, setLoopCount] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+
+  useEffect(() => {
+    // Stop after 2.5 full cycles (showing all words 2.5 times)
+    if (loopCount >= 2 && currentIndex >= words.length) {
+      setIsAnimating(false);
+      setCurrentIndex(words.length - 1); // Stay on last word
+      return;
+    }
+
+    if (!isAnimating) return;
+
+    const timer = setTimeout(() => {
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % words.length;
+        if (next === 0) {
+          setLoopCount((c) => c + 1);
+        }
+        return next;
+      });
+    }, 3000); // 3 seconds per word
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, loopCount, isAnimating]);
+
+  const currentWord = words[currentIndex];
+
+  return (
+    <span
+      className="inline-block relative"
+      style={{
+        width: '10.5em',
+        height: '1.2em',
+        verticalAlign: 'baseline',
+        textAlign: 'left',
+        overflow: 'visible'
+      }}
+    >
+      <span
+        key={currentIndex}
+        className="inline-block"
+        style={{
+          color: currentWord.color,
+          animation: isAnimating ? 'wordShuffle 3s ease-in-out' : 'none'
+        }}
+      >
+        {currentWord.text}
+      </span>
+    </span>
+  );
+}
 
 export default function LandingPage({ onGetStarted }) {
   const minibag = getProduct('minibag');
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const toggleFaq = (index) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="max-w-6xl mx-auto px-6 py-6">
-        <Logo
-          icon={ShoppingBag}
-          name={minibag.name}
-          variant="compact"
-          iconColor="bg-green-600"
-        />
+      <header className="max-w-6xl mx-auto px-6 py-4">
+        <div className="flex items-center gap-2">
+          <MinibagIcon size={32} />
+          <span className="text-xl font-semibold text-gray-900">{minibag.name}</span>
+        </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="max-w-6xl mx-auto px-6 pt-12 pb-20 md:pt-20 md:pb-32">
-        <div className="text-center max-w-3xl mx-auto">
-          {/* Tagline */}
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
-            Track your shopping,
-            <br />
-            <span className="text-green-600">split with neighbors</span>
-          </h1>
+      {/* Hero Section - Above the Fold */}
+      <main className="max-w-6xl mx-auto px-6">
+        <div className="py-12 md:py-20">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* Left: Copy */}
+            <div>
+              <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                Track shopping,
+                <br />
+                split with <ShuffleWord />
+              </h1>
 
-          <p className="text-lg md:text-xl text-gray-600 mb-4">
-            Simple shopping lists that work alone or together.
-          </p>
+              <p className="text-xl text-gray-600 mb-8">
+                Simple shopping lists for your daily staples—solo or with neighbors.
+              </p>
 
-          <p className="text-base text-gray-500 mb-10">
-            No app download. No signup required. Start in 10 seconds.
-          </p>
+              {/* CTA */}
+              <button
+                onClick={onGetStarted}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+              >
+                Get Started Free
+                <ArrowRight size={20} strokeWidth={2.5} />
+              </button>
 
-          {/* CTA Button */}
-          <button
-            onClick={onGetStarted}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-          >
-            <ShoppingBag size={24} strokeWidth={2.5} />
-            Start Shopping
-            <ArrowRight size={20} strokeWidth={2.5} />
-          </button>
-
-          {/* Trust Signals */}
-          <div className="mt-8 flex items-center justify-center gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-green-600" strokeWidth={2.5} />
-              <span>Free forever</span>
+              {/* Trust Signals */}
+              <div className="mt-6 flex items-center gap-6 text-sm text-gray-500">
+                <span className="flex items-center gap-1">
+                  <CheckCircle size={16} className="text-green-600" />
+                  Free forever
+                </span>
+                <span className="flex items-center gap-1">
+                  <CheckCircle size={16} className="text-green-600" />
+                  No signup
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-green-600" strokeWidth={2.5} />
-              <span>No signup</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-green-600" strokeWidth={2.5} />
-              <span>Works offline</span>
+
+            {/* Right: Visual - App Preview Mockup */}
+            <div className="hidden md:block">
+              <div className="relative">
+                {/* Phone Frame */}
+                <div className="relative mx-auto w-80 h-[600px] bg-gray-900 rounded-[3rem] p-3 shadow-2xl">
+                  {/* Notch */}
+                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-7 bg-gray-900 rounded-b-3xl z-10"></div>
+
+                  {/* Screen */}
+                  <div className="relative w-full h-full bg-gradient-to-b from-green-50 to-white rounded-[2.5rem] overflow-hidden">
+                    {/* App Content Preview */}
+                    <div className="p-6 space-y-6">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MinibagIcon size={24} />
+                          <span className="font-bold text-gray-900">Minibag</span>
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">Shopping List</h3>
+                        <p className="text-sm text-gray-500">Today, 6:00 PM</p>
+                      </div>
+
+                      {/* List Items */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle size={20} className="text-green-600" strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">Tomatoes</div>
+                            <div className="text-xs text-gray-500">2 kg</div>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">₹80</div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle size={20} className="text-green-600" strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">Onions</div>
+                            <div className="text-xs text-gray-500">1 kg</div>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">₹40</div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle size={20} className="text-green-600" strokeWidth={2.5} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 text-sm">Potatoes</div>
+                            <div className="text-xs text-gray-500">3 kg</div>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">₹90</div>
+                        </div>
+                      </div>
+
+                      {/* Users */}
+                      <div className="flex items-center gap-2 mt-6">
+                        <Users size={16} className="text-gray-500" />
+                        <span className="text-sm text-gray-600">3 neighbors joined</span>
+                      </div>
+
+                      {/* CTA Button */}
+                      <button className="w-full bg-green-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
+                        Get Started Free
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floating Badge */}
+                <div className="absolute -right-4 top-20 bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle size={16} className="text-green-600" strokeWidth={2.5} />
+                    <span className="font-semibold text-gray-900">No signup</span>
+                  </div>
+                </div>
+
+                {/* Floating Badge 2 */}
+                <div className="absolute -left-4 bottom-32 bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Lock size={16} className="text-green-600" strokeWidth={2.5} />
+                    <span className="font-semibold text-gray-900">Private</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* How it Works */}
-        <div className="mt-24 md:mt-32">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-16">
+        {/* How It Works - Horizontal Compact */}
+        <div className="py-16 border-t border-gray-200">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
             How it works
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-            {/* Step 1 */}
+          <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-green-100 flex items-center justify-center">
-                <span className="text-4xl">📝</span>
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
+                <List size={28} className="text-green-600" strokeWidth={2.5} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                1. Create your list
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Create list
               </h3>
-              <p className="text-gray-600">
-                Add vegetables, staples, or dairy from our catalog. Set quantities in kg.
+              <p className="text-sm text-gray-600">
+                Add items in seconds
               </p>
             </div>
 
-            {/* Step 2 */}
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-green-100 flex items-center justify-center">
-                <span className="text-4xl">🛍️</span>
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
+                <ShoppingBag size={28} className="text-green-600" strokeWidth={2.5} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                2. Go shopping
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Go shopping
               </h3>
-              <p className="text-gray-600">
-                Track your payments as you buy. Support for UPI and cash.
+              <p className="text-sm text-gray-600">
+                Record payments as you shop
               </p>
             </div>
 
-            {/* Step 3 */}
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-green-100 flex items-center justify-center">
-                <span className="text-4xl">💰</span>
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-green-100 flex items-center justify-center">
+                <Share2 size={28} className="text-green-600" strokeWidth={2.5} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                3. Settle up
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Share bill
               </h3>
-              <p className="text-gray-600">
-                Share bills via WhatsApp. Automatic price-per-kg calculation.
+              <p className="text-sm text-gray-600">
+                Download bill summary
               </p>
             </div>
           </div>
         </div>
 
-        {/* Group Shopping Feature */}
-        <div className="mt-24 md:mt-32 bg-white rounded-3xl shadow-xl p-8 md:p-12 border border-gray-200">
-          <div className="max-w-2xl mx-auto text-center">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-green-600 flex items-center justify-center">
-              <Users size={32} className="text-white" strokeWidth={2.5} />
-            </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
-              Bonus: Shop with neighbors
+        {/* Features Grid - 2x3 Compact */}
+        <div className="py-16 bg-gray-50 -mx-6 px-6">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+              Built for Indian neighborhoods
             </h2>
-            <p className="text-lg text-gray-600 mb-6">
-              Share your session link. Neighbors can add their items.
-              Everyone shops together, splits costs automatically.
-            </p>
-            <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Share2 size={16} className="text-green-600" strokeWidth={2.5} />
-                <span>One link to share</span>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Feature 1 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <Users size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">Solo or group</h3>
+                <p className="text-sm text-gray-600">Shop alone or invite neighbors. Up to 4 people.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle size={16} className="text-green-600" strokeWidth={2.5} />
-                <span>Up to 4 people</span>
+
+              {/* Feature 2 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <Zap size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">No signup</h3>
+                <p className="text-sm text-gray-600">Just enter your name. Start in 10 seconds.</p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <Lock size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">Privacy by design</h3>
+                <p className="text-sm text-gray-600">Just first names. No tracking.</p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <Share2 size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">WhatsApp sharing</h3>
+                <p className="text-sm text-gray-600">Share lists and bills via WhatsApp.</p>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <CheckCircle size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">Skip items</h3>
+                <p className="text-sm text-gray-600">Skip unavailable items or mark poor quality.</p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <Zap size={24} className="text-green-600 mb-3" strokeWidth={2.5} />
+                <h3 className="font-semibold text-gray-900 mb-2">Fast checkout</h3>
+                <p className="text-sm text-gray-600">Record prices as you shop, settle up later.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* FAQ - Collapsible Accordion */}
+        <div className="py-16">
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+            Common questions
+          </h2>
+
+          <div className="max-w-3xl mx-auto space-y-3">
+            {/* FAQ Item 1 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleFaq(0)}
+                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-gray-900">Do I need to create an account?</span>
+                <ChevronDown
+                  size={20}
+                  className={`text-gray-400 transition-transform ${openFaq === 0 ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {openFaq === 0 && (
+                <div className="px-6 pb-4 text-gray-600">
+                  No! Just enter your first name. No password, email, or phone number needed for free version. Pro account will save your history and require Sign-up.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ Item 2 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleFaq(1)}
+                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-gray-900">Will my phone number be shared?</span>
+                <ChevronDown
+                  size={20}
+                  className={`text-gray-400 transition-transform ${openFaq === 1 ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {openFaq === 1 && (
+                <div className="px-6 pb-4 text-gray-600">
+                  <strong>Never.</strong> We don't collect phone numbers. Others only see your first name and a 3-letter nickname.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ Item 3 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleFaq(2)}
+                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-gray-900">Do I pay through the app?</span>
+                <ChevronDown
+                  size={20}
+                  className={`text-gray-400 transition-transform ${openFaq === 2 ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {openFaq === 2 && (
+                <div className="px-6 pb-4 text-gray-600">
+                  We don't want you to change how you pay. Just record what you pay for splitting bills!
+                </div>
+              )}
+            </div>
+
+            {/* FAQ Item 4 */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggleFaq(3)}
+                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-gray-900">Can I change my list after adding items?</span>
+                <ChevronDown
+                  size={20}
+                  className={`text-gray-400 transition-transform ${openFaq === 3 ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {openFaq === 3 && (
+                <div className="px-6 pb-4 text-gray-600">
+                  Yes! Add, remove, or change quantities anytime before shopping.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Privacy Note - Compact */}
+          <div className="max-w-3xl mx-auto mt-8 bg-green-50 rounded-xl p-6 border border-green-200">
+            <div className="flex items-start gap-3">
+              <Lock size={20} className="text-green-600 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Built for privacy, not profit</h3>
+                <p className="text-sm text-gray-700">
+                  We believe shopping lists shouldn't require your personal data. That's why Minibag works with just first names—no phone numbers, no emails, no tracking.
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Final CTA */}
-        <div className="mt-20 text-center">
+        <div className="py-16 text-center border-t border-gray-200">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            Ready to simplify your shopping?
+          </h2>
+          <p className="text-lg text-gray-600 mb-8">Start in 10 seconds. No signup required.</p>
           <button
             onClick={onGetStarted}
             className="inline-flex items-center gap-2 px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
           >
-            Try it now – it's free
+            Get Started Free
             <ArrowRight size={20} strokeWidth={2.5} />
           </button>
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - Compact */}
       <footer className="border-t border-gray-200 bg-gray-50">
         <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+            <div>
               <span className="font-semibold text-gray-900">{minibag.name}</span>
               {' · '}
               {minibag.description}
             </div>
-            <div className="flex items-center gap-6 text-sm text-gray-600">
-              <a href="#" className="hover:text-gray-900 transition-colors">About</a>
+            <div className="flex items-center gap-6">
               <a href="#" className="hover:text-gray-900 transition-colors">Privacy</a>
-              <a href="/" className="hover:text-gray-900 transition-colors">← {PLATFORM.name}</a>
+              <a href="/localloops-landing.html" className="hover:text-gray-900 transition-colors">← {PLATFORM.name}</a>
             </div>
           </div>
           <div className="mt-4 text-center text-sm text-gray-500">
-            Part of <a href="/" className="text-gray-700 hover:text-gray-900 font-medium">{PLATFORM.name}</a> ecosystem · © 2025
+            © 2025 {PLATFORM.name}
           </div>
         </div>
       </footer>

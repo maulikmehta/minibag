@@ -5,7 +5,8 @@
 
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+// Use empty string to connect to same origin (works with Vite proxy)
+const SOCKET_URL = import.meta.env.VITE_WS_URL || '';
 
 class SocketService {
   constructor() {
@@ -20,7 +21,6 @@ class SocketService {
    */
   connect() {
     if (this.socket?.connected) {
-      console.log('Socket already connected');
       return this.socket;
     }
 
@@ -32,17 +32,17 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket connected:', this.socket.id);
       this.connected = true;
 
-      // Rejoin session if we were in one
+      // Rejoin session if we were in one (wait for confirmation)
       if (this.currentSessionId) {
-        this.joinSessionRoom(this.currentSessionId);
+        this.joinSessionRoom(this.currentSessionId).catch(err => {
+          console.error('Failed to rejoin session room on reconnect:', err);
+        });
       }
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket disconnected:', reason);
       this.connected = false;
     });
 
@@ -68,17 +68,37 @@ class SocketService {
 
   /**
    * Join a session room for real-time updates
+   * Returns a Promise that resolves when the server confirms the join
    * @param {string} sessionId - Session ID to join
+   * @returns {Promise<{sessionId: string, participantCount: number}>}
    */
   joinSessionRoom(sessionId) {
     if (!this.socket || !sessionId) {
       console.error('Cannot join room: socket not connected or no sessionId');
-      return;
+      return Promise.reject(new Error('Socket not connected or no sessionId'));
     }
 
-    console.log(`🚪 Joining session room: ${sessionId}`);
     this.currentSessionId = sessionId;
-    this.socket.emit('join-session', { sessionId });
+
+    return new Promise((resolve, reject) => {
+      // Set a timeout in case server doesn't respond
+      const timeout = setTimeout(() => {
+        reject(new Error('Join session timeout - no confirmation received'));
+      }, 5000);
+
+      // Wait for confirmation from server
+      this.socket.once('joined-session', (data) => {
+        clearTimeout(timeout);
+        console.log('✅ Successfully joined session room', {
+          sessionId: data.sessionId,
+          participantCount: data.participantCount
+        });
+        resolve(data);
+      });
+
+      // Emit the join request
+      this.socket.emit('join-session', { sessionId });
+    });
   }
 
   /**
@@ -87,7 +107,6 @@ class SocketService {
   leaveSessionRoom() {
     if (!this.socket || !this.currentSessionId) return;
 
-    console.log(`🚪 Leaving session room: ${this.currentSessionId}`);
     this.socket.emit('leave-session', { sessionId: this.currentSessionId });
     this.currentSessionId = null;
   }
@@ -137,11 +156,19 @@ class SocketService {
   }
 
   /**
-   * Listen for session status changes
+   * Listen for session status changes (legacy)
    * @param {Function} callback - (status) => void
    */
   onSessionStatusChanged(callback) {
     this.on('session-status-changed', callback);
+  }
+
+  /**
+   * Listen for session status updates (active → shopping → completed)
+   * @param {Function} callback - (data) => void, data = { status }
+   */
+  onSessionStatusUpdated(callback) {
+    this.on('session-status-updated', callback);
   }
 
   /**
@@ -169,7 +196,30 @@ class SocketService {
    * @param {Object} participant - Participant data
    */
   emitParticipantJoined(participant) {
-    this.emit('participant-joined', participant);
+    if (!this.currentSessionId) {
+      console.error('Cannot emit participant-joined: no session');
+      return;
+    }
+    // emit() helper automatically adds sessionId and timestamp
+    this.emit('participant-joined', { participant });
+  }
+
+  /**
+   * Notify that participant items have been updated
+   * @param {string} participantId - Participant ID
+   * @param {Object} items - Updated items map
+   * @param {Object} metadata - Optional participant metadata (real_name, nickname, items_confirmed)
+   */
+  emitParticipantItemsUpdated(participantId, items, metadata = {}) {
+    if (!this.currentSessionId) {
+      console.error('Cannot emit participant-items-updated: no session');
+      return;
+    }
+    this.emit('participant-items-updated', {
+      participantId,
+      items,
+      ...metadata // Include real_name, nickname, items_confirmed for notifications
+    });
   }
 
   /**
@@ -197,11 +247,39 @@ class SocketService {
   }
 
   /**
-   * Notify session status change
+   * Notify session status change (legacy)
    * @param {string} status - New status
    */
   emitSessionStatusChange(status) {
     this.emit('session-status-changed', status);
+  }
+
+  /**
+   * Notify session status update (active → shopping → completed)
+   * @param {string} status - New status ('active', 'shopping', 'completed')
+   */
+  emitSessionStatusUpdate(status) {
+    if (!this.currentSessionId) {
+      console.warn('Cannot emit session-status-updated: session not joined yet');
+
+      // Queue the emit for when socket reconnects
+      const retryEmit = () => {
+        if (this.currentSessionId) {
+          this.emit('session-status-updated', { status });
+        }
+      };
+
+      // Retry once after 500ms (gives socket time to reconnect)
+      setTimeout(() => {
+        if (this.currentSessionId) {
+          retryEmit();
+        }
+      }, 500);
+
+      return;
+    }
+
+    this.emit('session-status-updated', { status });
   }
 
   /**
@@ -228,13 +306,23 @@ class SocketService {
       return;
     }
 
-    // Store listener reference for cleanup
+    // Wrap callback with logging for better debugging
+    const wrappedCallback = (...args) => {
+      console.log(`📥 [SocketService] Received event: "${event}"`, args);
+      callback(...args);
+    };
+
+    // Store BOTH original and wrapped versions for proper cleanup
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event).push(callback);
+    this.listeners.get(event).push({
+      original: callback,
+      wrapped: wrappedCallback
+    });
 
-    this.socket.on(event, callback);
+    // Register the wrapped version with socket.io
+    this.socket.on(event, wrappedCallback);
   }
 
   /**
@@ -245,15 +333,17 @@ class SocketService {
   off(event, callback) {
     if (!this.socket) return;
 
-    this.socket.off(event, callback);
+    // Find the listener object by comparing original callbacks
+    const eventListeners = this.listeners.get(event) || [];
+    const listener = eventListeners.find(l => l.original === callback);
 
-    // Remove from listeners map
-    if (this.listeners.has(event)) {
-      const callbacks = this.listeners.get(event);
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
+    if (listener) {
+      // Remove the WRAPPED version from socket.io (this is critical!)
+      this.socket.off(event, listener.wrapped);
+
+      // Remove from our listeners map
+      const index = eventListeners.indexOf(listener);
+      eventListeners.splice(index, 1);
     }
   }
 
@@ -281,9 +371,10 @@ class SocketService {
   removeAllListeners() {
     if (!this.socket) return;
 
-    this.listeners.forEach((callbacks, event) => {
-      callbacks.forEach(callback => {
-        this.socket.off(event, callback);
+    this.listeners.forEach((listeners, event) => {
+      listeners.forEach(listener => {
+        // Remove the WRAPPED callback from socket.io
+        this.socket.off(event, listener.wrapped);
       });
     });
 

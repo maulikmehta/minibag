@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, Minus } from 'lucide-react';
+import { QUANTITY_LIMITS, roundQuantity } from '../../../../../shared/constants/limits';
 
 /**
  * ItemCard - Optimized item display and quantity selector
@@ -23,24 +24,11 @@ const ItemCard = React.memo(({
         isSelected ? 'bg-gray-50' : ''
       }`}
     >
-      {/* Item Image/Icon */}
-      {item.thumbnail_url || item.img ? (
-        <img
-          src={item.thumbnail_url || item.img}
-          alt={item.name}
-          loading="lazy"
-          className="w-10 h-10 rounded-full object-cover bg-gray-100 flex-shrink-0"
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.nextElementSibling.style.display = 'flex';
-          }}
-        />
-      ) : null}
+      {/* Item Emoji Icon */}
       <div
         className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl"
-        style={{display: (item.thumbnail_url || item.img) ? 'none' : 'flex'}}
       >
-        🥬
+        {item.emoji || '🥬'}
       </div>
 
       {/* Item Info */}
@@ -62,17 +50,15 @@ const ItemCard = React.memo(({
             <input
               type="number"
               inputMode="decimal"
-              step="0.25"
-              min="0.25"
-              max="10"
+              step={QUANTITY_LIMITS.STEP_SIZE}
+              min={QUANTITY_LIMITS.MIN_QUANTITY}
+              max={QUANTITY_LIMITS.MAX_QUANTITY}
               value={quantity}
               onChange={onQuantityChange}
               onBlur={(e) => {
-                // Ensure valid value on blur
-                const val = parseFloat(e.target.value);
-                if (isNaN(val) || val <= 0) {
-                  onQuantityChange({ target: { value: '0.25' } });
-                }
+                // Use shared rounding logic for consistency
+                const rounded = roundQuantity(e.target.value);
+                onQuantityChange({ target: { value: rounded.toFixed(QUANTITY_LIMITS.DECIMAL_PLACES) } });
               }}
               className="w-14 h-9 text-center text-base border border-gray-300 rounded-lg focus:border-gray-900 focus:outline-none appearance-none"
             />

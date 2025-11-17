@@ -1,11 +1,14 @@
 /**
  * useSession Hook
- * Manages session state and real-time updates
+ * Manages session state and real-time updates with localStorage persistence
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createSession, getSession, joinSession, updateSessionStatus } from '../services/api.js';
 import socketService from '../services/socket.js';
+import logger from '../../../shared/utils/frontendLogger.js';
+
+const SESSION_STORAGE_KEY = 'minibag_active_session';
 
 /**
  * Hook to manage a shopping session
@@ -20,54 +23,144 @@ export function useSession(sessionId = null) {
   const [connected, setConnected] = useState(false);
 
   const socketConnectedRef = useRef(false);
+  const restoredRef = useRef(false);
 
-  // Initialize WebSocket connection
+  /**
+   * Persist session to localStorage
+   * NOTE: Host token no longer stored - now handled via httpOnly cookie
+   */
+  const persistSession = useCallback((sessionData, participantData, hostToken = null) => {
+    try {
+      const dataToStore = {
+        session: sessionData,
+        currentParticipant: participantData,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(dataToStore));
+
+      // Host token management removed - now using httpOnly cookies for security
+      // The server sets the cookie automatically, no client-side storage needed
+    } catch (err) {
+      logger.error('Failed to persist session', { error: err.message });
+    }
+  }, []);
+
+  /**
+   * Clear persisted session from localStorage
+   * NOTE: Host token cookie cleared by server or via expiration
+   */
+  const clearPersistedSession = useCallback(() => {
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      // Host token cookie is httpOnly and managed by server
+      // It will expire automatically or can be cleared via /api/logout endpoint
+    } catch (err) {
+      logger.error('Failed to clear persisted session', { error: err.message });
+    }
+  }, []);
+
+  /**
+   * Restore session from localStorage
+   */
+  const restoreSession = useCallback(async () => {
+    try {
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (!stored) return false;
+
+      const { session: storedSession, currentParticipant: storedParticipant, timestamp } = JSON.parse(stored);
+
+      // Check if session is still valid (less than 2 hours old)
+      const twoHours = 2 * 60 * 60 * 1000;
+      if (Date.now() - timestamp > twoHours) {
+        clearPersistedSession();
+        return false;
+      }
+
+      // Try to reload the session from the server to verify it's still active
+      const data = await getSession(storedSession.session_id);
+
+      if (data.session && data.session.status !== 'completed' && data.session.status !== 'cancelled') {
+        setSession(data.session);
+        setParticipants(data.participants || []);
+        setCurrentParticipant(storedParticipant);
+
+        // Join WebSocket room and wait for confirmation
+        await socketService.joinSessionRoom(storedSession.session_id);
+        setConnected(true);
+
+        return true;
+      } else {
+        // Session is no longer active
+        clearPersistedSession();
+        return false;
+      }
+    } catch (err) {
+      logger.error('Failed to restore session', { error: err.message });
+      clearPersistedSession();
+      return false;
+    }
+  }, [clearPersistedSession]);
+
+  // Initialize WebSocket connection and restore session
   useEffect(() => {
     if (!socketConnectedRef.current) {
       socketService.connect();
       socketConnectedRef.current = true;
     }
 
+    // Try to restore session on mount (only once)
+    if (!restoredRef.current && !sessionId) {
+      restoredRef.current = true;
+      restoreSession();
+    }
+
     return () => {
       // Cleanup on unmount
       socketService.leaveSessionRoom();
     };
-  }, []);
+  }, [restoreSession, sessionId]);
 
-  // Load session if sessionId is provided
-  useEffect(() => {
-    if (sessionId) {
-      loadSession(sessionId);
-    }
-  }, [sessionId]);
+  // Load session if sessionId is provided (moved below loadSession definition)
 
   /**
    * Load session data from API
    */
-  const loadSession = async (id) => {
+  const loadSession = useCallback(async (id) => {
     try {
+      logger.debug('loadSession called for session', { sessionId: id });
       setLoading(true);
       setError(null);
 
       const data = await getSession(id);
+      logger.info('getSession API response', {
+        sessionId: data.session?.session_id,
+        sessionStatus: data.session?.status,
+        participantsCount: data.participants?.length,
+        participantsWithItems: data.participants?.map(p => ({
+          id: p.id,
+          nickname: p.nickname,
+          is_creator: p.is_creator,
+          items_count: p.items?.length
+        }))
+      });
       setSession(data.session);
       setParticipants(data.participants || []);
 
-      // Join WebSocket room
-      socketService.joinSessionRoom(id);
+      // Join WebSocket room and wait for confirmation
+      await socketService.joinSessionRoom(id);
       setConnected(true);
     } catch (err) {
       setError(err.message);
-      console.error('Failed to load session:', err);
+      logger.error('Failed to load session', { sessionId: id, error: err.message });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Create a new session
    */
-  const create = async (sessionData) => {
+  const create = useCallback(async (sessionData) => {
     try {
       setLoading(true);
       setError(null);
@@ -78,57 +171,130 @@ export function useSession(sessionId = null) {
       setCurrentParticipant(result.participant);
       setParticipants([result.participant]);
 
-      // Join WebSocket room
-      socketService.joinSessionRoom(result.session.session_id);
-      setConnected(true);
+      // Persist session to localStorage (including host_token for creator)
+      persistSession(result.session, result.participant, result.host_token);
+
+      // Join WebSocket room asynchronously (non-blocking for faster response)
+      socketService.joinSessionRoom(result.session.session_id)
+        .then(() => {
+          setConnected(true);
+          logger.debug('WebSocket room joined successfully');
+        })
+        .catch(err => {
+          logger.error('Failed to join WebSocket room', { error: err.message });
+          // Still allow session creation to complete - offline mode
+          setConnected(false);
+        });
 
       return result;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to create session:', err);
+      logger.error('Failed to create session', { error: err.message });
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [persistSession]);
 
   /**
-   * Join an existing session
+   * Join an existing session with optimistic updates
    */
-  const join = async (id, items = [], nicknameData = {}) => {
+  const join = useCallback(async (id, items = [], nicknameData = {}) => {
+    // Create optimistic participant data
+    const optimisticParticipant = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      session_id: id,
+      nickname: nicknameData.selected_nickname || 'You',
+      real_name: nicknameData.real_name,
+      avatar_emoji: nicknameData.selected_avatar_emoji || '👤',
+      is_creator: false,
+      items: items,
+      joined_at: new Date().toISOString(),
+      marked_not_coming: nicknameData.marked_not_coming || false,
+      _optimistic: true // Mark as optimistic for UI feedback
+    };
+
+    // Store previous state for rollback
+    const previousSession = session;
+    const previousParticipants = participants;
+    const previousCurrentParticipant = currentParticipant;
+    const previousConnected = connected;
+
     try {
       setLoading(true);
       setError(null);
 
+      // OPTIMISTIC UPDATE: Immediately update UI before API call
+      setCurrentParticipant(optimisticParticipant);
+
+      // Add ALL participants to state (UI will filter for display)
+      // This includes declined participants for checkpoint calculation
+      setParticipants(prev => [...prev, optimisticParticipant]);
+
+      logger.info('Optimistic join - UI updated immediately', {
+        sessionId: id,
+        nickname: nicknameData.selected_nickname
+      });
+
+      // Make actual API call
       const result = await joinSession(id, items, nicknameData);
 
+      // API SUCCESS: Replace optimistic data with real data
       setSession(result.session);
       setCurrentParticipant(result.participant);
 
-      // Notify others via WebSocket
-      socketService.emitParticipantJoined(result.participant);
+      // Replace optimistic participant with real participant in list
+      setParticipants(prev => {
+        const withoutOptimistic = prev.filter(p => p.id !== optimisticParticipant.id);
+        // Add ALL participants (including declined) for checkpoint calculation
+        return [...withoutOptimistic, result.participant];
+      });
 
-      // Join WebSocket room
-      socketService.joinSessionRoom(id);
+      // Persist session to localStorage
+      persistSession(result.session, result.participant);
+
+      // Join WebSocket room first and wait for confirmation
+      await socketService.joinSessionRoom(id);
       setConnected(true);
 
-      // Reload full session data
-      await loadSession(id);
+      // Notify others via WebSocket (must be after room join is confirmed)
+      // Broadcast ALL participants (including declined) so other clients can update checkpoint
+      socketService.emitParticipantJoined(result.participant);
+
+      // Reload full session data to ensure consistency (non-blocking)
+      loadSession(id).catch(err =>
+        logger.error('Failed to reload session after join', { error: err.message })
+      );
+
+      logger.info('Join confirmed - real data received', {
+        participantId: result.participant.id
+      });
 
       return result;
     } catch (err) {
+      // ROLLBACK: Revert optimistic updates on failure
+      logger.error('Join failed - rolling back optimistic updates', {
+        sessionId: id,
+        error: err.message
+      });
+
+      setSession(previousSession);
+      setParticipants(previousParticipants);
+      setCurrentParticipant(previousCurrentParticipant);
+      setConnected(previousConnected);
+
       setError(err.message);
-      console.error('Failed to join session:', err);
+      logger.error('Failed to join session', { sessionId: id, error: err.message });
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [persistSession, loadSession]);
 
   /**
    * Update session status
    */
-  const updateStatus = async (newStatus) => {
+  const updateStatus = useCallback(async (newStatus) => {
     if (!session) return;
 
     try {
@@ -141,10 +307,10 @@ export function useSession(sessionId = null) {
       return result;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to update session status:', err);
+      logger.error('Failed to update session status', { sessionId: session?.session_id, newStatus, error: err.message });
       throw err;
     }
-  };
+  }, [session]);
 
   /**
    * Leave current session
@@ -155,42 +321,63 @@ export function useSession(sessionId = null) {
     setParticipants([]);
     setCurrentParticipant(null);
     setConnected(false);
-  }, []);
+    clearPersistedSession();
+  }, [clearPersistedSession]);
 
   // Set up real-time listeners
   useEffect(() => {
     if (!session) return;
 
-    // Listen for participant joins
-    socketService.onParticipantJoined((participant) => {
+    // Store listener references locally for proper cleanup
+    const handleParticipantJoined = (participant) => {
+      logger.info('participant-joined WebSocket event', {
+        participantId: participant.id,
+        sessionId: session?.session_id
+      });
       setParticipants(prev => {
         // Avoid duplicates
         if (prev.some(p => p.id === participant.id)) {
+          logger.warn('Duplicate participant, skipping', { participantId: participant.id });
           return prev;
         }
+        logger.debug('Adding new participant to state', { participantId: participant.id });
         return [...prev, participant];
       });
-    });
-
-    // Listen for participant leaving
-    socketService.onParticipantLeft((participantId) => {
-      setParticipants(prev => prev.filter(p => p.id !== participantId));
-    });
-
-    // Listen for session updates
-    socketService.onSessionUpdated((updatedSession) => {
-      setSession(prev => ({ ...prev, ...updatedSession }));
-    });
-
-    // Listen for status changes
-    socketService.onSessionStatusChanged((newStatus) => {
-      setSession(prev => ({ ...prev, status: newStatus }));
-    });
-
-    return () => {
-      socketService.removeAllListeners();
     };
-  }, [session]);
+
+    const handleParticipantLeft = (participantId) => {
+      setParticipants(prev => prev.filter(p => p && p.id !== participantId));
+    };
+
+    const handleSessionUpdated = (updatedSession) => {
+      setSession(prev => ({ ...prev, ...updatedSession }));
+    };
+
+    const handleSessionStatusUpdated = (data) => {
+      setSession(prev => ({ ...prev, status: data.status }));
+    };
+
+    // Register listeners
+    socketService.onParticipantJoined(handleParticipantJoined);
+    socketService.onParticipantLeft(handleParticipantLeft);
+    socketService.onSessionUpdated(handleSessionUpdated);
+    socketService.onSessionStatusUpdated(handleSessionStatusUpdated);
+
+    // Cleanup: remove ONLY these specific listeners
+    return () => {
+      socketService.off('participant-joined', handleParticipantJoined);
+      socketService.off('participant-left', handleParticipantLeft);
+      socketService.off('session-updated', handleSessionUpdated);
+      socketService.off('session-status-updated', handleSessionStatusUpdated);
+    };
+  }, [session?.session_id]); // Use stable dependency
+
+  // Load session if sessionId is provided
+  useEffect(() => {
+    if (sessionId) {
+      loadSession(sessionId);
+    }
+  }, [sessionId, loadSession]);
 
   return {
     session,
@@ -240,7 +427,7 @@ export function useParticipantItems(participantId) {
       return newItem;
     } catch (err) {
       setError(err.message);
-      console.error('Failed to add item:', err);
+      logger.error('Failed to add item', { error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -267,7 +454,7 @@ export function useParticipantItems(participantId) {
       socketService.emitItemUpdated({ id: itemId, ...updates });
     } catch (err) {
       setError(err.message);
-      console.error('Failed to update item:', err);
+      logger.error('Failed to update item', { itemId, error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -289,7 +476,7 @@ export function useParticipantItems(participantId) {
       socketService.emitItemRemoved(itemId);
     } catch (err) {
       setError(err.message);
-      console.error('Failed to remove item:', err);
+      logger.error('Failed to remove item', { itemId, error: err.message });
       throw err;
     } finally {
       setLoading(false);
@@ -298,26 +485,35 @@ export function useParticipantItems(participantId) {
 
   // Listen for real-time item updates
   useEffect(() => {
-    socketService.onItemAdded((item) => {
+    // Store listener references locally for proper cleanup
+    const handleItemAdded = (item) => {
       if (item.participant_id !== participantId) {
         setItems(prev => [...prev, item]);
       }
-    });
+    };
 
-    socketService.onItemUpdated((updatedItem) => {
+    const handleItemUpdated = (updatedItem) => {
       setItems(prev =>
         prev.map(item =>
           item.id === updatedItem.id ? { ...item, ...updatedItem } : item
         )
       );
-    });
+    };
 
-    socketService.onItemRemoved((itemId) => {
+    const handleItemRemoved = (itemId) => {
       setItems(prev => prev.filter(item => item.id !== itemId));
-    });
+    };
 
+    // Register listeners
+    socketService.onItemAdded(handleItemAdded);
+    socketService.onItemUpdated(handleItemUpdated);
+    socketService.onItemRemoved(handleItemRemoved);
+
+    // Cleanup: remove ONLY these specific listeners
     return () => {
-      socketService.removeAllListeners();
+      socketService.off('item-added', handleItemAdded);
+      socketService.off('item-updated', handleItemUpdated);
+      socketService.off('item-removed', handleItemRemoved);
     };
   }, [participantId]);
 
