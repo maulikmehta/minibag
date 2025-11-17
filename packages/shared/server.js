@@ -26,6 +26,14 @@ import * as participantsAPI from './api/participants.js';
 import * as billsAPI from './api/bills.js';
 import * as logsAPI from './api/logs.js';
 
+// Sessions SDK integration (Phase 2 Week 6)
+import { USE_SESSIONS_SDK, logFeatureFlags } from './config/features.js';
+import {
+  createSessionWithSDK,
+  joinSessionWithSDK,
+  getNicknameOptionsWithSDK
+} from './api/sessions-sdk.js';
+
 // Validation middleware imports
 import {
   validateSessionCreation,
@@ -311,13 +319,19 @@ app.get('/api/catalog/items', catalogAPI.getItems);
 app.get('/api/catalog/items/:item_id', catalogAPI.getItem);
 app.get('/api/catalog/popular', catalogAPI.getPopularItems);
 
-// Sessions API routes
-app.get('/api/sessions/nickname-options', sessionsAPI.getNicknameOptions);
-app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, sessionsAPI.createSession);
+// Sessions API routes (with SDK integration - Phase 2 Week 6)
+app.get('/api/sessions/nickname-options', (req, res) =>
+  getNicknameOptionsWithSDK(req, res, sessionsAPI.getNicknameOptions)
+);
+app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, (req, res) =>
+  createSessionWithSDK(req, res, sessionsAPI.createSession)
+);
 app.get('/api/sessions/:session_id', sessionsAPI.getSession);
 app.get('/api/sessions/:session_id/shopping-items', sessionsAPI.getShoppingItems); // Aggregated items for shopping screen
 app.get('/api/sessions/:session_id/bill-items', sessionsAPI.getBillItems); // Aggregated items with payments for bill screen
-app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, sessionsAPI.joinSession); // Rate limit joins (PIN brute force protection)
+app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, (req, res) =>
+  joinSessionWithSDK(req, res, sessionsAPI.joinSession)
+); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
 app.get('/api/sessions/:session_id/invites', sessionsAPI.getSessionInvites);
@@ -393,6 +407,9 @@ server.listen(PORT, () => {
   logger.info('  ✓ API server');
   logger.info('  ✓ WebSocket server');
   logger.info('  ✓ Structured logging (Pino)');
+
+  // Log feature flags (Phase 2 Week 6)
+  logFeatureFlags();
   logger.info('  ✓ Rate limiting');
   logger.info('  ✓ Security headers (Helmet)');
   logger.info('  ✓ Request ID tracking');
