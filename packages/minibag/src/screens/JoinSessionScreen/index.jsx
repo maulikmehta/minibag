@@ -48,11 +48,22 @@ export default function JoinSessionScreen({
   const [showJoinModal, setShowJoinModal] = useState(false); // Modal for collecting user info
   const [modalStep, setModalStep] = useState(1); // 1: Name, 2: Language, 3: Nickname
   const [showBigCheck, setShowBigCheck] = useState(null); // Track which avatar shows big checkmark
+  const [availableSlots, setAvailableSlots] = useState(null); // Real-time available slots
 
   // PIN authentication state (for protected sessions)
   const [sessionPin, setSessionPin] = useState('');
   const [pinDigits, setPinDigits] = useState(['', '', '', '']);
   const pinInputRefs = useRef([null, null, null, null]);
+
+  // Calculate available slots in real-time (Option 1 + 3 combined)
+  useEffect(() => {
+    if (session && participants) {
+      const maxParticipants = session.max_participants || 4;
+      const currentCount = participants.filter(p => !p.left_at).length;
+      const available = Math.max(0, maxParticipants - currentCount);
+      setAvailableSlots(available);
+    }
+  }, [session, participants]);
 
   // Extract invite token from URL query parameter (Issue #14)
   useEffect(() => {
@@ -160,9 +171,9 @@ export default function JoinSessionScreen({
 
   // Handle joining a session - now shows modal first
   const handleJoinClick = () => {
-    // Check if session is full (max 4 people: 1 host + 3 participants)
-    if (participants.length >= 3) {
-      notify.error('This shopping list is full! Only 4 people can shop together at once.');
+    // Check if session is full using real-time slot count
+    if (availableSlots !== null && availableSlots <= 0) {
+      notify.error('😊 This group is full right now. The host can shop with up to 3 friends at once.');
       return;
     }
 
@@ -228,13 +239,20 @@ export default function JoinSessionScreen({
       onJoinSuccess();
     } catch (error) {
       console.error('❌ Failed to join session:', error);
-      // Check error type
-      if (error.message && error.message.includes('full')) {
-        notify.error('This shopping list is full! Only 4 people can shop together at once.');
-      } else if (error.message && error.message.includes('expired')) {
-        notify.error('This invite link expired after 20 minutes. Please ask the person who invited you for a new link.');
+
+      // Handle different error types with friendly messages
+      const errorMsg = error.message?.toLowerCase() || '';
+
+      if (errorMsg.includes('full') || errorMsg.includes('limit') || errorMsg.includes('maximum')) {
+        notify.error('😊 This group is full right now. The host can shop with up to 3 friends at once.');
+      } else if (errorMsg.includes('expired') || errorMsg.includes('no longer active')) {
+        notify.error('⏰ This shopping session has ended. Ask your friend to start a new one!');
+      } else if (errorMsg.includes('not found') || errorMsg.includes('invalid')) {
+        notify.error('🤔 This link seems off. Double-check it or ask your friend to send a new one!');
+      } else if (errorMsg.includes('pin') || errorMsg.includes('incorrect')) {
+        notify.error('🔐 That PIN doesn\'t match. Try again or ask your friend for the correct one!');
       } else {
-        notify.error(error.userMessage || 'Unable to join this shopping list. Please check the link and try again.');
+        notify.error('😕 Couldn\'t join right now. Check your internet and try again!');
       }
     } finally {
       setJoiningSession(false);
@@ -405,9 +423,29 @@ export default function JoinSessionScreen({
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             {hostDisplayName} has invited you!
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mb-2">
             Join their shopping list
           </p>
+
+          {/* Real-time Available Slots Indicator (Option 1 + 3) */}
+          {availableSlots !== null && (
+            <div className="mt-3">
+              {availableSlots > 0 ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full">
+                  <span className="text-sm font-medium text-green-700">
+                    {availableSlots} {availableSlots === 1 ? 'spot' : 'spots'} available
+                  </span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full">
+                  <AlertCircle size={16} className="text-red-600" />
+                  <span className="text-sm font-medium text-red-700">
+                    Group is full
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Items Preview Section - Now shown first! */}
@@ -475,11 +513,11 @@ export default function JoinSessionScreen({
           </button>
           <button
             onClick={handleJoinClick}
-            disabled={joiningSession || !isPinValid}
+            disabled={joiningSession || !isPinValid || (availableSlots !== null && availableSlots <= 0)}
             className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
           >
             <Check size={18} strokeWidth={2.5} />
-            Join List
+            {availableSlots !== null && availableSlots <= 0 ? 'Group Full' : 'Join List'}
           </button>
         </div>
 

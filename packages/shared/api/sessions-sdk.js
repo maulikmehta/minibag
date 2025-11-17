@@ -41,6 +41,7 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
       selected_nickname,
       selected_avatar_emoji,
       session_pin = null,
+      generate_pin = false, // Auto-generate PIN if true
     } = req.body;
 
     // Validation
@@ -72,6 +73,7 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
       selected_nickname,
       selected_avatar_emoji,
       session_pin,
+      generate_pin, // Pass through to SDK
     });
 
     // DUAL-WRITE MODE: Also write to legacy system for comparison
@@ -94,6 +96,7 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
         session: result.session,
         participant: result.participant,
         session_url: result.session_url,
+        session_pin: result.session_pin, // Return PIN for sharing with participants
         // Include SDK-specific fields
         constant_invite_token: result.session.constantInviteToken,
         mode: result.session.mode,
@@ -126,7 +129,7 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
   }
 
   try {
-    logger.info('[SDK] Joining session via Sessions SDK');
+    logger.info('[SDK] Joining session via Sessions SDK (atomic flow only)');
 
     const { session_id } = req.params;
     const {
@@ -135,6 +138,7 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
       selected_nickname,
       selected_avatar_emoji,
       session_pin = null,
+      invite_token, // Constant invite token - REQUIRED for SDK flow
     } = req.body;
 
     // Validation
@@ -145,9 +149,20 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
       });
     }
 
-    // Join session via adapter
-    const result = await sessionsAdapter.joinShoppingSession({
+    // Invite token is REQUIRED for SDK atomic flow
+    if (!invite_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'invite_token is required for joining sessions',
+        error_code: 'INVITE_TOKEN_REQUIRED'
+      });
+    }
+
+    // Use ONLY atomic slot claiming (prevents race conditions)
+    logger.info('[SDK] Using atomic slot claiming via constant invite link');
+    const result = await sessionsAdapter.claimSlotViaConstantLink({
       sessionId: session_id,
+      constantToken: invite_token,
       nicknameId: selected_nickname_id,
       nickname: selected_nickname,
       avatarEmoji: selected_avatar_emoji,
@@ -160,9 +175,10 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
       success: true,
       data: {
         participant: result.participant,
+        slot_number: result.slotNumber,
         sdk_version: 'v1',
       },
-      message: 'Joined session successfully (via Sessions SDK)'
+      message: 'Joined session successfully (via Sessions SDK atomic flow)'
     });
 
   } catch (error) {

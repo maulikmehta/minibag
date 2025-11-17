@@ -9,7 +9,6 @@
 
 import {
   createSession as sdkCreateSession,
-  joinSession as sdkJoinSession,
   leaveSession as sdkLeaveSession,
   updateSession as sdkUpdateSession,
   getTwoNicknameOptions,
@@ -37,6 +36,7 @@ export class MinibagSessionsAdapter {
    * @param {string} options.selected_nickname - Nickname text
    * @param {string} options.selected_avatar_emoji - Avatar emoji
    * @param {string} options.session_pin - Optional PIN
+   * @param {boolean} options.generate_pin - Auto-generate 4-digit PIN
    * @param {string} options.title - Session title
    * @param {string} options.description - Session description
    * @returns {Promise<Object>} Created session with shopping data
@@ -55,15 +55,20 @@ export class MinibagSessionsAdapter {
       selected_nickname,
       selected_avatar_emoji,
       session_pin = null,
+      generate_pin = false,
     } = options;
 
     try {
       // Determine session mode based on expected participants
-      // For backward compatibility: null or 0 = solo, 1+ = group
-      const mode = !expected_participants || expected_participants === 0 ? 'solo' : 'group';
-      const maxParticipants = expected_participants
-        ? Math.min(expected_participants + 1, 10) // +1 for host, cap at 10 for free tier
-        : 1; // Solo mode
+      // null = mode not chosen yet (default to group with reasonable limit)
+      // 0 = explicitly solo
+      // 1+ = group mode with that many expected
+      const mode = expected_participants === 0 ? 'solo' : 'group';
+      const maxParticipants = expected_participants === 0
+        ? 1 // Solo mode: only host
+        : expected_participants && expected_participants > 0
+          ? Math.min(expected_participants + 1, 4) // Group with expected count: host + N invited, cap at 4 (free tier)
+          : 4; // Group mode not yet chosen: default to 4 participants max (free tier)
 
       // Step 1: Create session via Sessions SDK
       const sdkResult = await sdkCreateSession({
@@ -75,13 +80,14 @@ export class MinibagSessionsAdapter {
         nicknameId: selected_nickname_id,
         expiresInHours: 2, // Standard 2-hour expiry
         sessionPin: session_pin,
+        generatePin: generate_pin, // Auto-generate PIN if requested
       });
 
       if (sdkResult.error) {
         throw sdkResult.error;
       }
 
-      const { session, participant, authToken, constantInviteToken } = sdkResult.data;
+      const { session, participant, authToken, constantInviteToken, sessionPin } = sdkResult.data;
 
       // Step 2: Store minibag-specific data in sessions table
       // We'll keep using Supabase for shopping metadata (location, schedule, etc.)
@@ -99,7 +105,7 @@ export class MinibagSessionsAdapter {
           creator_avatar_emoji: selected_avatar_emoji,
           creator_real_name: real_name,
           host_token: session.hostToken,
-          session_pin: session_pin,
+          session_pin: sessionPin || session_pin, // Use SDK-generated PIN or original value
           expected_participants,
           status: session.status,
           expires_at: session.expiresAt,
@@ -138,70 +144,10 @@ export class MinibagSessionsAdapter {
         },
         authToken, // For WebSocket auth
         session_url: `/session/${session.sessionId}`,
+        session_pin: sessionPin || session_pin, // Return PIN for sharing
       };
     } catch (error) {
       logger.error({ err: error }, 'SessionsAdapter.createShoppingSession failed');
-      throw error;
-    }
-  }
-
-  /**
-   * Join a shopping session using Sessions SDK
-   *
-   * @param {Object} options - Join options
-   * @param {string} options.sessionId - Short session ID (abc123)
-   * @param {string} options.nicknameId - Nickname ID from pool
-   * @param {string} options.nickname - Selected nickname
-   * @param {string} options.avatarEmoji - Selected avatar
-   * @param {string} options.realName - Real name (optional)
-   * @param {string} options.sessionPin - Session PIN (if required)
-   * @returns {Promise<Object>} Joined participant data
-   */
-  async joinShoppingSession(options) {
-    const {
-      sessionId,
-      nicknameId,
-      nickname,
-      avatarEmoji,
-      realName,
-      sessionPin,
-    } = options;
-
-    try {
-      // Step 1: Join via Sessions SDK
-      const sdkResult = await sdkJoinSession({
-        sessionId,
-        nicknameId,
-        nickname,
-        avatarEmoji,
-        realName,
-        sessionPin,
-      });
-
-      if (sdkResult.error) {
-        throw sdkResult.error;
-      }
-
-      const { participant, authToken } = sdkResult.data;
-
-      // Step 2: Participant items start empty (they'll add items in shopping screen)
-      // No need to store anything in participant_items yet
-
-      // Step 3: Return participant data
-      return {
-        participant: {
-          id: participant.id,
-          session_id: participant.sessionId,
-          nickname: participant.nickname,
-          avatar_emoji: participant.avatarEmoji,
-          real_name: participant.realName,
-          is_creator: participant.isCreator,
-          items_confirmed: participant.itemsConfirmed,
-        },
-        authToken,
-      };
-    } catch (error) {
-      logger.error({ err: error, sessionId }, 'SessionsAdapter.joinShoppingSession failed');
       throw error;
     }
   }
@@ -265,6 +211,7 @@ export class MinibagSessionsAdapter {
    * @param {string} options.nickname - Nickname
    * @param {string} options.avatarEmoji - Avatar
    * @param {string} options.realName - Real name (optional)
+   * @param {string} options.sessionPin - Session PIN (if required)
    * @returns {Promise<Object>} Claimed slot data
    */
   async claimSlotViaConstantLink(options) {
@@ -275,6 +222,7 @@ export class MinibagSessionsAdapter {
       nickname,
       avatarEmoji,
       realName,
+      sessionPin,
     } = options;
 
     try {
@@ -284,7 +232,8 @@ export class MinibagSessionsAdapter {
         nicknameId,
         nickname,
         avatarEmoji,
-        realName
+        realName,
+        sessionPin // Pass PIN for validation
       );
 
       if (sdkResult.error) {

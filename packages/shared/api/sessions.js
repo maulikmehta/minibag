@@ -10,6 +10,12 @@ import logger from '../utils/logger.js';
 import { SESSION_LIMITS, VALIDATION_LIMITS, NICKNAME_LIMITS } from '../constants/limits.js';
 import { ERROR_MESSAGES } from '../constants/errorMessages.js';
 import { buildPaymentMaps, buildCatalogMap } from '../utils/billCalculations.js';
+import {
+  getProductConfig,
+  getMaxInvited,
+  getMaxAbsolute,
+  validateParticipantCount
+} from '../constants/productTiers.js';
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)
@@ -94,11 +100,12 @@ function generateInviteToken() {
  * Create or regenerate invites for a session
  * Deletes existing invites and creates new ones
  * @param {string} sessionId - UUID of the session
- * @param {number} count - Number of invites to create (1-3)
+ * @param {number} count - Number of invites to create (configurable per product/tier)
  */
 async function regenerateInvites(sessionId, count) {
-  if (count < 1 || count > 3) {
-    throw new Error('Invite count must be between 1 and 3');
+  // Validate count is positive (upper limit enforced by product tier configuration)
+  if (count < 1) {
+    throw new Error('Invite count must be at least 1');
   }
 
   // Delete existing invites for this session
@@ -758,8 +765,14 @@ export async function createSession(req, res) {
     const expiresAt = new Date(scheduled_time);
     expiresAt.setHours(expiresAt.getHours() + 2);
 
+    // Determine tier and calculate max_participants based on product configuration
+    const product = 'minibag';
+    const tier = (expected_participants === null || expected_participants === 0) ? 'solo' : 'group';
+    const tierConfig = getProductConfig(product, tier);
+    const max_participants = tierConfig.max_absolute;
+
     // Transaction-like behavior with rollback capability
-    // Step 1: Create session with host_token and optional PIN
+    // Step 1: Create session with host_token, optional PIN, and max_participants
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
@@ -777,7 +790,8 @@ export async function createSession(req, res) {
         expected_participants, // Number of participants expected (for checkpoint)
         checkpoint_complete: expected_participants === 0, // Auto-complete if no participants expected
         host_token, // Store host token for creator authentication
-        session_pin: finalPin // Store PIN for participant authentication (null if no PIN)
+        session_pin: finalPin, // Store PIN for participant authentication (null if no PIN)
+        max_participants // Dynamic limit based on product tier configuration
       })
       .select()
       .single();
@@ -1503,7 +1517,7 @@ export async function joinSession(req, res) {
       }
     }
 
-    // Check participant limit (max 20 participants)
+    // Check participant limit against session's configured max (not hardcoded limit)
     const { data: participants, error: countError } = await supabase
       .from('participants')
       .select('id')
@@ -1511,10 +1525,12 @@ export async function joinSession(req, res) {
 
     if (countError) throw countError;
 
-    if (participants && participants.length >= SESSION_LIMITS.MAX_PARTICIPANTS) {
+    // Use session's max_participants (from SessionsAdapter) instead of hardcoded constant
+    const maxAllowed = session.max_participants || SESSION_LIMITS.MAX_PARTICIPANTS;
+    if (participants && participants.length >= maxAllowed) {
       return res.status(403).json({
         success: false,
-        error: ERROR_MESSAGES.SESSION_FULL
+        error: `This group is full (maximum ${maxAllowed} participants)`
       });
     }
 
@@ -1818,13 +1834,28 @@ export async function updateExpectedParticipants(req, res) {
     const { session_id } = req.params;
     const { expected_participants, start_timeout = true } = req.body;
 
-    // Validation - allow null, or number between 0 and 3
+    // Validation - allow null, or non-negative number (max determined by product tier)
     if (expected_participants !== null &&
-        (typeof expected_participants !== 'number' || expected_participants < 0 || expected_participants > 3)) {
+        (typeof expected_participants !== 'number' || expected_participants < 0)) {
       return res.status(400).json({
         success: false,
-        error: 'expected_participants must be null or a number between 0 and 3'
+        error: 'expected_participants must be null or a non-negative number'
       });
+    }
+
+    // Validate against product tier limits
+    if (expected_participants !== null && expected_participants > 0) {
+      const product = 'minibag';
+      const tier = 'group';
+      const tierConfig = getProductConfig(product, tier);
+      const maxInvited = tierConfig.max_invited;
+
+      if (maxInvited !== null && expected_participants > maxInvited) {
+        return res.status(400).json({
+          success: false,
+          error: `${tierConfig.ui_label} mode allows maximum ${maxInvited} invited participants`
+        });
+      }
     }
 
     // Get current session to preserve existing timestamp if needed
@@ -1837,10 +1868,10 @@ export async function updateExpectedParticipants(req, res) {
     if (fetchError) throw fetchError;
 
     // Determine expected_participants_set_at timestamp
-    // Timer starts when host sets to 1-3 AND start_timeout is true
+    // Timer starts when host sets to 1+ (group mode) AND start_timeout is true
     // If start_timeout is false, preserve existing timestamp
     let expected_participants_set_at;
-    if (expected_participants >= 1 && expected_participants <= 3) {
+    if (expected_participants >= 1) {
       if (start_timeout) {
         // Start or restart the timer
         expected_participants_set_at = new Date().toISOString();
@@ -1876,8 +1907,8 @@ export async function updateExpectedParticipants(req, res) {
 
     // Generate/delete invites based on expected_participants
     let invites = [];
-    if (expected_participants >= 1 && expected_participants <= 3) {
-      // Generate individual invite links
+    if (expected_participants >= 1) {
+      // Generate invite links for group mode (any positive number)
       invites = await regenerateInvites(session.id, expected_participants);
     } else {
       // Delete all invites when switching to solo (0) or null
