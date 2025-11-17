@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@sessions/core": "file:../../../sessions/packages/core",
     "@supabase/supabase-js": "^2.39.0",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.7",
