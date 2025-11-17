@@ -46,7 +46,10 @@
       "Bash(./cloudflared:*)",
       "Bash(timeout 5 ./start-tunnel-production.sh:*)",
       "Bash(npm run dev:*)",
-      "Bash(node test-db.js:*)"
+      "Bash(node test-db.js:*)",
+      "Bash(pip3 install:*)",
+      "Bash(git fetch:*)",
+      "Bash(git gc:*)"
     ],
     "deny": [],
     "ask": []
