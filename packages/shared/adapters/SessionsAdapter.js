@@ -1,0 +1,338 @@
+/**
+ * Sessions SDK Adapter for Minibag
+ * Bridges Sessions SDK (coordination) with Minibag logic (shopping)
+ *
+ * Responsibilities:
+ * - SDK handles: session lifecycle, participants, invites, WebSocket coordination
+ * - Minibag handles: shopping items, bills, payments, catalog
+ */
+
+import {
+  createSession as sdkCreateSession,
+  joinSession as sdkJoinSession,
+  leaveSession as sdkLeaveSession,
+  updateSession as sdkUpdateSession,
+  getTwoNicknameOptions,
+  claimNextAvailableSlot,
+  declineInvite,
+} from '@sessions/core';
+import { supabase } from '../db/supabase.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Minibag Sessions Adapter
+ * Maps shopping session concepts to Sessions SDK
+ */
+export class MinibagSessionsAdapter {
+  /**
+   * Create a shopping session using Sessions SDK
+   *
+   * @param {Object} options - Session creation options
+   * @param {string} options.location_text - Shopping location
+   * @param {string} options.scheduled_time - When to shop
+   * @param {Array} options.items - Shopping items [{item_id, quantity, unit}]
+   * @param {number} options.expected_participants - Expected participant count
+   * @param {string} options.real_name - Creator's real name
+   * @param {string} options.selected_nickname_id - Nickname ID from pool
+   * @param {string} options.selected_nickname - Nickname text
+   * @param {string} options.selected_avatar_emoji - Avatar emoji
+   * @param {string} options.session_pin - Optional PIN
+   * @param {string} options.title - Session title
+   * @param {string} options.description - Session description
+   * @returns {Promise<Object>} Created session with shopping data
+   */
+  async createShoppingSession(options) {
+    const {
+      location_text,
+      neighborhood,
+      scheduled_time,
+      title,
+      description,
+      items = [],
+      expected_participants = null,
+      real_name,
+      selected_nickname_id,
+      selected_nickname,
+      selected_avatar_emoji,
+      session_pin = null,
+    } = options;
+
+    try {
+      // Determine session mode based on expected participants
+      // For backward compatibility: null or 0 = solo, 1+ = group
+      const mode = !expected_participants || expected_participants === 0 ? 'solo' : 'group';
+      const maxParticipants = expected_participants
+        ? Math.min(expected_participants + 1, 10) // +1 for host, cap at 10 for free tier
+        : 1; // Solo mode
+
+      // Step 1: Create session via Sessions SDK
+      const sdkResult = await sdkCreateSession({
+        mode,
+        maxParticipants,
+        creatorNickname: selected_nickname,
+        creatorAvatarEmoji: selected_avatar_emoji,
+        creatorRealName: real_name,
+        nicknameId: selected_nickname_id,
+        expiresInHours: 2, // Standard 2-hour expiry
+        sessionPin: session_pin,
+      });
+
+      if (sdkResult.error) {
+        throw sdkResult.error;
+      }
+
+      const { session, participant, authToken, constantInviteToken } = sdkResult.data;
+
+      // Step 2: Store minibag-specific data in sessions table
+      // We'll keep using Supabase for shopping metadata (location, schedule, etc.)
+      const { data: minibagSession, error: minibagError } = await supabase
+        .from('sessions')
+        .insert({
+          id: session.id, // Use same UUID from SDK
+          session_id: session.sessionId, // Short ID (abc123)
+          location_text,
+          neighborhood,
+          scheduled_time,
+          title,
+          description,
+          creator_nickname: selected_nickname,
+          creator_avatar_emoji: selected_avatar_emoji,
+          creator_real_name: real_name,
+          host_token: session.hostToken,
+          session_pin: session_pin,
+          expected_participants,
+          status: session.status,
+          expires_at: session.expiresAt,
+          created_at: session.createdAt,
+          // NEW: Store SDK mode for tracking
+          mode: session.mode,
+          max_participants: session.maxParticipants,
+          constant_invite_token: constantInviteToken,
+        })
+        .select()
+        .single();
+
+      if (minibagError) {
+        logger.error({ err: minibagError }, 'Failed to store minibag session data');
+        throw new Error('Failed to create shopping session');
+      }
+
+      // Step 3: Store creator's shopping items (if any)
+      if (items && items.length > 0) {
+        await this.storeParticipantItems(participant.id, items);
+      }
+
+      // Step 4: Return combined response
+      return {
+        session: {
+          ...minibagSession,
+          // Include SDK fields for frontend
+          constantInviteToken: mode === 'group' ? constantInviteToken : null,
+        },
+        participant: {
+          id: participant.id,
+          nickname: participant.nickname,
+          avatar_emoji: participant.avatarEmoji,
+          real_name: participant.realName,
+          is_creator: participant.isCreator,
+        },
+        authToken, // For WebSocket auth
+        session_url: `/session/${session.sessionId}`,
+      };
+    } catch (error) {
+      logger.error({ err: error }, 'SessionsAdapter.createShoppingSession failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Join a shopping session using Sessions SDK
+   *
+   * @param {Object} options - Join options
+   * @param {string} options.sessionId - Short session ID (abc123)
+   * @param {string} options.nicknameId - Nickname ID from pool
+   * @param {string} options.nickname - Selected nickname
+   * @param {string} options.avatarEmoji - Selected avatar
+   * @param {string} options.realName - Real name (optional)
+   * @param {string} options.sessionPin - Session PIN (if required)
+   * @returns {Promise<Object>} Joined participant data
+   */
+  async joinShoppingSession(options) {
+    const {
+      sessionId,
+      nicknameId,
+      nickname,
+      avatarEmoji,
+      realName,
+      sessionPin,
+    } = options;
+
+    try {
+      // Step 1: Join via Sessions SDK
+      const sdkResult = await sdkJoinSession({
+        sessionId,
+        nicknameId,
+        nickname,
+        avatarEmoji,
+        realName,
+        sessionPin,
+      });
+
+      if (sdkResult.error) {
+        throw sdkResult.error;
+      }
+
+      const { participant, authToken } = sdkResult.data;
+
+      // Step 2: Participant items start empty (they'll add items in shopping screen)
+      // No need to store anything in participant_items yet
+
+      // Step 3: Return participant data
+      return {
+        participant: {
+          id: participant.id,
+          session_id: participant.sessionId,
+          nickname: participant.nickname,
+          avatar_emoji: participant.avatarEmoji,
+          real_name: participant.realName,
+          is_creator: participant.isCreator,
+          items_confirmed: participant.itemsConfirmed,
+        },
+        authToken,
+      };
+    } catch (error) {
+      logger.error({ err: error, sessionId }, 'SessionsAdapter.joinShoppingSession failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Store shopping items for a participant
+   * This is minibag-specific (not handled by Sessions SDK)
+   *
+   * @param {string} participantId - Participant UUID
+   * @param {Array} items - Shopping items [{item_id, quantity, unit}]
+   */
+  async storeParticipantItems(participantId, items) {
+    if (!items || items.length === 0) return;
+
+    try {
+      const itemsToInsert = items.map(item => ({
+        participant_id: participantId,
+        item_id: item.item_id,
+        quantity: item.quantity,
+        unit: item.unit,
+      }));
+
+      const { error } = await supabase
+        .from('participant_items')
+        .insert(itemsToInsert);
+
+      if (error) {
+        logger.error({ err: error, participantId }, 'Failed to store participant items');
+        throw error;
+      }
+    } catch (error) {
+      logger.error({ err: error, participantId }, 'SessionsAdapter.storeParticipantItems failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Get nickname options (pass-through to SDK)
+   *
+   * @param {string} firstLetter - First letter of user's name
+   * @param {string} sessionUuid - Session UUID for reservation
+   * @returns {Promise<Array>} Two nickname options
+   */
+  async getNicknameOptions(firstLetter = null, sessionUuid = null) {
+    try {
+      const options = await getTwoNicknameOptions(firstLetter, sessionUuid);
+      return options;
+    } catch (error) {
+      logger.error({ err: error }, 'SessionsAdapter.getNicknameOptions failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Claim slot via constant invite (group mode)
+   *
+   * @param {Object} options - Claim options
+   * @param {string} options.sessionId - Short session ID
+   * @param {string} options.constantToken - Constant invite token
+   * @param {string} options.nicknameId - Nickname ID
+   * @param {string} options.nickname - Nickname
+   * @param {string} options.avatarEmoji - Avatar
+   * @param {string} options.realName - Real name (optional)
+   * @returns {Promise<Object>} Claimed slot data
+   */
+  async claimSlotViaConstantLink(options) {
+    const {
+      sessionId,
+      constantToken,
+      nicknameId,
+      nickname,
+      avatarEmoji,
+      realName,
+    } = options;
+
+    try {
+      const sdkResult = await claimNextAvailableSlot(
+        sessionId,
+        constantToken,
+        nicknameId,
+        nickname,
+        avatarEmoji,
+        realName
+      );
+
+      if (sdkResult.error) {
+        throw sdkResult.error;
+      }
+
+      const { slotNumber, participant, authToken } = sdkResult.data;
+
+      return {
+        slotNumber,
+        participant: {
+          id: participant.id,
+          session_id: participant.sessionId,
+          nickname: participant.nickname,
+          avatar_emoji: participant.avatarEmoji,
+          real_name: participant.realName,
+        },
+        authToken,
+      };
+    } catch (error) {
+      logger.error({ err: error, sessionId }, 'SessionsAdapter.claimSlotViaConstantLink failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Decline invitation
+   *
+   * @param {string} sessionId - Short session ID
+   * @param {string} constantToken - Constant invite token
+   * @param {string} reason - Decline reason
+   * @returns {Promise<Object>} Success status
+   */
+  async declineInvitation(sessionId, constantToken, reason = null) {
+    try {
+      const sdkResult = await declineInvite(sessionId, constantToken, reason);
+
+      if (sdkResult.error) {
+        throw sdkResult.error;
+      }
+
+      return sdkResult.data;
+    } catch (error) {
+      logger.error({ err: error, sessionId }, 'SessionsAdapter.declineInvitation failed');
+      throw error;
+    }
+  }
+}
+
+// Export singleton instance
+export const sessionsAdapter = new MinibagSessionsAdapter();
