@@ -48,18 +48,19 @@ export const PRODUCT_TIERS = {
       }
     },
 
-    // Group mode: Shop with friends (dynamic participant count)
+    // Group mode: Shop with friends (free tier - up to 4 total)
     group: {
-      max_invited: null,        // Unlimited invited participants
-      max_total: null,          // Unlimited total
-      max_absolute: 20,         // Hard cap for performance (can be adjusted)
+      max_invited: 3,           // Up to 3 invited participants
+      max_total: 4,             // Host + 3 invited = 4 total (free tier limit)
+      max_absolute: 4,          // Hard cap for free tier
       ui_label: 'Group',
-      ui_description: 'Shop with friends - share one link',
+      ui_description: 'Shop with friends - up to 4 people (free tier)',
       features: {
         show_invites: true,
         allow_participants: true,
         dynamic_invites: true,  // One link, multiple people can join
-        show_invite_count: true
+        show_invite_count: true,
+        show_upgrade_prompt: false  // Can be enabled when paid tiers are added
       }
     }
   },
@@ -136,9 +137,9 @@ export const PRODUCT_TIERS = {
 export const DEFAULT_CONFIG = {
   max_invited: 3,
   max_total: 4,
-  max_absolute: 20,
+  max_absolute: 4,          // Match free tier limit
   ui_label: 'Default',
-  ui_description: 'Standard session',
+  ui_description: 'Standard session (up to 4 people)',
   features: {
     show_invites: true,
     allow_participants: true
