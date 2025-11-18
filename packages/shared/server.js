@@ -340,6 +340,7 @@ app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, (re
 ); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
+app.patch('/api/sessions/:session_id/participant-limit', sessionsAPI.updateParticipantLimit);
 app.get('/api/sessions/:session_id/invites', sessionsAPI.getSessionInvites);
 
 // Participants API routes

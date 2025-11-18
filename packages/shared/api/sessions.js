@@ -1884,13 +1884,21 @@ export async function updateExpectedParticipants(req, res) {
       expected_participants_set_at = null;
     }
 
-    // Update session
+    // Recalculate max_participants based on new tier
+    // SDK Enhancement: Update participant limit when tier changes (solo ↔ group)
+    const product = 'minibag';
+    const newTier = (expected_participants === null || expected_participants === 0) ? 'solo' : 'group';
+    const tierConfig = getProductConfig(product, newTier);
+    const max_participants = tierConfig.max_absolute;
+
+    // Update session with BOTH expected_participants AND max_participants
     const { data: session, error: updateError } = await supabase
       .from('sessions')
       .update({
         expected_participants,
         expected_participants_set_at,
-        checkpoint_complete: expected_participants === 0
+        checkpoint_complete: expected_participants === 0,
+        max_participants  // Update limit when tier changes
       })
       .eq('session_id', session_id)
       .select()
@@ -1927,6 +1935,57 @@ export async function updateExpectedParticipants(req, res) {
     });
   } catch (error) {
     logger.error({ err: error, sessionId: req.params.session_id }, 'Error updating expected participants');
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * PATCH /api/sessions/:session_id/participant-limit
+ * Update participant limit (host-only, product-driven)
+ * This endpoint allows products to dynamically adjust the max_participants
+ * based on tier changes or business logic
+ */
+export async function updateParticipantLimit(req, res) {
+  try {
+    const { session_id } = req.params;
+    const { max_participants } = req.body;
+
+    // Validation - must be a positive integer
+    if (typeof max_participants !== 'number' || max_participants < 1 || !Number.isInteger(max_participants)) {
+      return res.status(400).json({
+        success: false,
+        error: 'max_participants must be a positive integer'
+      });
+    }
+
+    // Update session
+    const { data: session, error: updateError } = await supabase
+      .from('sessions')
+      .update({ max_participants })
+      .eq('session_id', session_id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+
+    logger.info({ sessionId: session_id, max_participants }, 'Updated participant limit');
+
+    res.json({
+      success: true,
+      data: session
+    });
+  } catch (error) {
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error updating participant limit');
     res.status(500).json({
       success: false,
       error: error.message
