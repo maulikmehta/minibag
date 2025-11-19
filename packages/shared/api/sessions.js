@@ -326,19 +326,15 @@ async function performSessionCleanup(session, status) {
 }
 
 /**
- * 3-letter names for participant fallback (if pool is empty)
+ * 4-letter names for participant fallback (if pool is empty)
  */
 const FALLBACK_NAMES = [
-  // Hindi/Indian - Male
-  'Raj', 'Avi', 'Tej', 'Ved', 'Jai', 'Adi', 'Dev', 'Sam', 'Sid', 'Vik',
-  'Om', 'Yug', 'Nav', 'Arv', 'Mir',
-  // Hindi/Indian - Female
-  'Ria', 'Anu', 'Sia', 'Ira', 'Pia', 'Mia', 'Iva', 'Uma', 'Niv', 'Dia',
-  'Eva', 'Ruh', 'Ara', 'Diy', 'Jia',
-  // Gujarati - Male
-  'Jay', 'Het', 'Mit', 'Vir', 'Nay', 'Ruj', 'Pax',
-  // Gujarati - Female
-  'Rit', 'Neh', 'Sar', 'Tia'
+  // 4-Letter Names - Male (15 total)
+  'Aadi', 'Ajay', 'Amar', 'Amit', 'Anil', 'Ansh', 'Arun', 'Arya',
+  'Ashu', 'Atul', 'Ravi', 'Veer', 'Yash', 'Neel', 'Manu',
+  // 4-Letter Names - Female (15 total)
+  'Adya', 'Anvi', 'Anya', 'Arti', 'Asha', 'Diya', 'Maya', 'Neha',
+  'Riya', 'Sara', 'Tara', 'Usha', 'Vani', 'Zara', 'Isha'
 ];
 
 const AVATAR_EMOJIS = ['👨', '👩', '🧑', '👨‍🦱', '👩‍🦱', '👨‍🦰', '👩‍🦰', '👨‍🦲', '👩‍🦲'];
