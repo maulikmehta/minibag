@@ -696,12 +696,34 @@ export default function SessionCreateScreen({
 
               {onboardingStep < 3 ? (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     // Validate current step before proceeding
                     if (onboardingStep === 1 && !hostName.trim()) {
                       notify.warning('Please enter your name');
                       return;
                     }
+
+                    // Refetch nicknames when advancing from Step 1 to Step 2
+                    // This ensures fresh nicknames if user navigated back and changed their name
+                    if (onboardingStep === 1) {
+                      setLoadingHostNicknames(true);
+                      try {
+                        const firstLetter = hostName.trim().charAt(0).toUpperCase();
+                        const url = `/api/sessions/nickname-options?firstLetter=${firstLetter}`;
+                        const response = await fetch(url);
+                        const data = await response.json();
+
+                        if (data.success && data.data && data.data.length > 0) {
+                          setHostNicknameOptions(data.data);
+                          setSelectedHostNickname(data.data[0]);
+                        }
+                      } catch (err) {
+                        console.error('Failed to refetch nicknames:', err);
+                      } finally {
+                        setLoadingHostNicknames(false);
+                      }
+                    }
+
                     setOnboardingStep(onboardingStep + 1);
                   }}
                   disabled={onboardingStep === 1 && (!hostName.trim() || !!nameError)}
