@@ -199,7 +199,7 @@ export default function ParticipantTrackingScreen({
                 return (
                   <ItemRow
                     key={itemId}
-                    emoji={item?.emoji || '🥬'}
+                    emoji={'🥬'}
                     name={getItemName(item)}
                     subtitle={`${qty}kg`}
                   />

@@ -156,7 +156,7 @@ function PaymentSplitScreen({
             qty: item.quantity,
             pricePerKg: item.price_per_kg,
             cost: item.item_cost,
-            emoji: item.emoji || '🥬'
+            emoji: '🥬'
           }))
         };
       });
@@ -308,7 +308,7 @@ function PaymentSplitScreen({
                 {hostItemsData.map((item) => (
                   <div key={item.item_id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                     <div>
-                      <p className="text-base text-gray-900">{item.emoji} {item.name}</p>
+                      <p className="text-base text-gray-900">{'🥬'} {item.name}</p>
                       <p className="text-sm text-gray-700">{item.quantity}{item.unit} × ₹{item.price_per_kg}/{item.unit}</p>
                     </div>
                     <p className="text-base text-gray-900 font-medium">₹{item.item_cost}</p>
@@ -370,7 +370,7 @@ function PaymentSplitScreen({
                     <div className="p-3 bg-white space-y-2">
                       {costData.items.map(item => (
                         <div key={item.id} className="flex items-center gap-3 text-sm">
-                          <span className="text-lg">{item.emoji}</span>
+                          <span className="text-lg">{'🥬'}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-gray-900 truncate">{item.name}</p>
                             <p className="text-sm text-gray-700">{item.qty}kg × ₹{item.pricePerKg.toFixed(0)}/kg</p>

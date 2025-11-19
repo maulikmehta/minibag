@@ -345,7 +345,7 @@ export default function SessionCreateScreen({
                   </span>
                 )}
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
-                  {veg.emoji || '🥬'}
+                  {'🥬'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base text-gray-900">{getItemName(veg)}</p>

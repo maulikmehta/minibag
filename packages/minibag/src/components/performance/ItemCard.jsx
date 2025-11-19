@@ -28,7 +28,7 @@ const ItemCard = React.memo(({
       <div
         className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl"
       >
-        {item.emoji || '🥬'}
+        {'🥬'}
       </div>
 
       {/* Item Info */}

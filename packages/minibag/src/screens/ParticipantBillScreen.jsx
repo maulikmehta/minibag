@@ -118,7 +118,7 @@ function ParticipantBillScreen({
             qty: item.quantity,
             pricePerKg: item.price_per_kg,
             itemCost: item.item_cost,
-            emoji: item.emoji || '🥬'
+            emoji: '🥬'
           }))
         };
       }
@@ -183,7 +183,7 @@ function ParticipantBillScreen({
           <div className="space-y-2">
             {billItems.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <span className="text-xl">{item.emoji}</span>
+                <span className="text-xl">{'🥬'}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-900 font-medium truncate">{item.name}</p>
                   <p className="text-xs text-gray-500">{item.qty}kg × ₹{item.pricePerKg}/kg</p>

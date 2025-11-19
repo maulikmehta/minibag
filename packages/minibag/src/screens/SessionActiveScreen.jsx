@@ -347,7 +347,7 @@ export default function SessionActiveScreen({
                       }`}
                     >
                       <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-xl">
-                        {veg.emoji || '🥬'}
+                        {'🥬'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-base text-gray-900">{getItemName(veg)}</p>
@@ -585,7 +585,7 @@ export default function SessionActiveScreen({
               return (
                 <ItemRow
                   key={itemId}
-                  emoji={veg?.emoji || '🥬'}
+                  emoji={'🥬'}
                   name={getItemName(veg)}
                   subtitle={`${qty}kg`}
                   layout="horizontal"
