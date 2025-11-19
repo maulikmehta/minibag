@@ -390,7 +390,7 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
   if (firstLetter) {
     const upperLetter = firstLetter.toUpperCase();
 
-    // Try to get male nickname starting with letter (not reserved or expired reservation)
+    // Try to get male nickname starting with letter
     // Note: We fetch multiple candidates and filter by length in JS (Supabase doesn't support length() in query)
     const { data: matchedMales } = await supabase
       .from('nicknames_pool')
@@ -398,7 +398,6 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
       .eq('is_available', true)
       .eq('gender', 'male')
       .ilike('nickname', `${upperLetter}%`)
-      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(10); // Fetch multiple to filter by length
 
     // Filter for 4-letter names only
@@ -412,14 +411,13 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
       maleOption = matchedMale;
     }
 
-    // Try to get female nickname starting with letter (not reserved or expired reservation)
+    // Try to get female nickname starting with letter
     const { data: matchedFemales } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
       .ilike('nickname', `${upperLetter}%`)
-      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(10); // Fetch multiple to filter by length
 
     // Filter for 4-letter names only
@@ -441,7 +439,6 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'male')
-      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(10); // Fetch multiple to filter by length
 
     // Filter for 4-letter names only
@@ -462,7 +459,6 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
-      .or(`reserved_until.is.null,reserved_until.lt.${now}`)
       .limit(10); // Fetch multiple to filter by length
 
     // Filter for 4-letter names only
