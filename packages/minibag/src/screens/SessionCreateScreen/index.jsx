@@ -216,6 +216,9 @@ export default function SessionCreateScreen({
     try {
       setCreatingSession(true);
       setShowHostNicknameModal(false);
+      // Clear cached nickname options for next time
+      setHostNicknameOptions([]);
+      setSelectedHostNickname(null);
 
       // Format items for API
       const formattedItems = Object.entries(hostItems).map(([itemId, quantity]) => ({
@@ -501,7 +504,11 @@ export default function SessionCreateScreen({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6 animate-fade-in">
           <div className="bg-white rounded-modal max-w-sm w-full p-4 relative animate-modal-enter shadow-2xl">
             <button
-              onClick={() => setShowHostNicknameModal(false)}
+              onClick={() => {
+                setShowHostNicknameModal(false);
+                setHostNicknameOptions([]); // Clear cached options when closing
+                setSelectedHostNickname(null); // Clear selection
+              }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
             >
               <X size={24} />
