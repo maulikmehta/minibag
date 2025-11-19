@@ -26,73 +26,93 @@ async function resetDatabase() {
   try {
     // 1. Delete all payments
     console.log('1️⃣  Deleting all payments...');
-    const { error: paymentsError, count: paymentsCount } = await supabase
-      .from('payments')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-    if (paymentsError) {
-      console.error('  ✗ Error:', paymentsError.message);
-    } else {
-      console.log(`  ✓ Deleted ${paymentsCount || 0} payment records`);
+    const { data: allPayments } = await supabase.from('payments').select('id');
+    let paymentsCount = 0;
+    if (allPayments && allPayments.length > 0) {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .in('id', allPayments.map(p => p.id));
+      if (error) {
+        console.error('  ✗ Error:', error.message);
+      } else {
+        paymentsCount = allPayments.length;
+      }
     }
+    console.log(`  ✓ Deleted ${paymentsCount} payment records`);
 
     // 2. Delete all participant items
     console.log('\n2️⃣  Deleting all participant items...');
-    const { error: itemsError, count: itemsCount } = await supabase
-      .from('participant_items')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-    if (itemsError) {
-      console.error('  ✗ Error:', itemsError.message);
-    } else {
-      console.log(`  ✓ Deleted ${itemsCount || 0} item records`);
+    const { data: allItems } = await supabase.from('participant_items').select('id');
+    let itemsCount = 0;
+    if (allItems && allItems.length > 0) {
+      const { error } = await supabase
+        .from('participant_items')
+        .delete()
+        .in('id', allItems.map(i => i.id));
+      if (error) {
+        console.error('  ✗ Error:', error.message);
+      } else {
+        itemsCount = allItems.length;
+      }
     }
+    console.log(`  ✓ Deleted ${itemsCount} item records`);
 
     // 3. Delete all participants
     console.log('\n3️⃣  Deleting all participants...');
-    const { error: participantsError, count: participantsCount } = await supabase
-      .from('participants')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-    if (participantsError) {
-      console.error('  ✗ Error:', participantsError.message);
-    } else {
-      console.log(`  ✓ Deleted ${participantsCount || 0} participant records`);
+    const { data: allParticipants } = await supabase.from('participants').select('id');
+    let participantsCount = 0;
+    if (allParticipants && allParticipants.length > 0) {
+      const { error } = await supabase
+        .from('participants')
+        .delete()
+        .in('id', allParticipants.map(p => p.id));
+      if (error) {
+        console.error('  ✗ Error:', error.message);
+      } else {
+        participantsCount = allParticipants.length;
+      }
     }
+    console.log(`  ✓ Deleted ${participantsCount} participant records`);
 
     // 4. Delete all sessions
     console.log('\n4️⃣  Deleting all sessions...');
-    const { error: sessionsError, count: sessionsCount } = await supabase
-      .from('sessions')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-    if (sessionsError) {
-      console.error('  ✗ Error:', sessionsError.message);
-    } else {
-      console.log(`  ✓ Deleted ${sessionsCount || 0} session records`);
+    const { data: allSessions } = await supabase.from('sessions').select('id');
+    let sessionsCount = 0;
+    if (allSessions && allSessions.length > 0) {
+      const { error } = await supabase
+        .from('sessions')
+        .delete()
+        .in('id', allSessions.map(s => s.id));
+      if (error) {
+        console.error('  ✗ Error:', error.message);
+      } else {
+        sessionsCount = allSessions.length;
+      }
     }
+    console.log(`  ✓ Deleted ${sessionsCount} session records`);
 
     // 5. Reset all nicknames to available and clear reservations
     console.log('\n5️⃣  Resetting all nicknames to available...');
-    const { error: nicknamesError, count: nicknamesCount } = await supabase
-      .from('nicknames_pool')
-      .update({
-        is_available: true,
-        currently_used_in: null,
-        times_used: 0,
-        last_used: null
-      })
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all
-
-    if (nicknamesError) {
-      console.error('  ✗ Error:', nicknamesError.message);
-    } else {
-      console.log(`  ✓ Reset ${nicknamesCount || 0} nicknames to available`);
+    const { data: allNicknames } = await supabase.from('nicknames_pool').select('id');
+    let nicknamesCount = 0;
+    if (allNicknames && allNicknames.length > 0) {
+      const { error } = await supabase
+        .from('nicknames_pool')
+        .update({
+          is_available: true,
+          currently_used_in: null,
+          times_used: 0,
+          last_used: null
+        })
+        .in('id', allNicknames.map(n => n.id));
+      if (error) {
+        console.error('  ✗ Error:', error.message);
+      } else {
+        nicknamesCount = allNicknames.length;
+      }
     }
+    console.log(`  ✓ Reset ${nicknamesCount} nicknames to available`);
 
     // 6. Verify final state
     console.log('\n📊 Final database state:');
