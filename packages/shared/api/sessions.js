@@ -16,6 +16,24 @@ import {
   getMaxAbsolute,
   validateParticipantCount
 } from '../constants/productTiers.js';
+import {
+  checkPinAttempt,
+  recordFailedPinAttempt,
+  clearPinAttempts,
+  getPinAttemptCount,
+  startPinRateLimiterCleanup
+} from '../utils/pinRateLimiter.js';
+import { sanitizeText, escapeHtml } from '../utils/sanitize.js';
+import { CLEANUP_INTERVALS } from '../config/cleanup.js';
+
+// Export for server initialization
+export { startPinRateLimiterCleanup };
+
+// SECURITY FIX: Singleton pattern for cleanup jobs to prevent memory leaks
+// Track cleanup job state to prevent multiple intervals
+let nicknameCleanupRunning = false;
+let reservationCleanupInterval = null;
+let sessionCleanupInterval = null;
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)
@@ -28,14 +46,50 @@ function generateSessionId() {
 }
 
 /**
- * Generate unique session ID
+ * Generate unique session ID with collision detection
  * With 281 trillion possible combinations (2^48), collision probability is negligible:
  * - At 10,000 sessions: P(collision) ≈ 0.0000017%
  * - At 1,000,000 sessions: P(collision) ≈ 0.0017%
- * Database UNIQUE constraint will catch the extremely rare collision case
+ * SECURITY FIX: Now includes retry logic to handle the rare collision case
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @returns {Promise<string>} - Unique session ID
  */
-function generateUniqueSessionId() {
-  return generateSessionId();
+async function generateUniqueSessionId(maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const sessionId = generateSessionId();
+
+    // Check if this ID already exists in the database
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('session_id')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    if (error) {
+      logger.error({ err: error, sessionId, attempt }, 'Error checking session ID uniqueness');
+      // On database error, continue to next attempt
+      if (attempt < maxRetries) continue;
+      throw new Error('Failed to verify session ID uniqueness after database errors');
+    }
+
+    // If no existing session found, this ID is unique!
+    if (!data) {
+      if (attempt > 1) {
+        logger.warn({ sessionId, attempt }, 'Session ID collision detected and resolved');
+      }
+      return sessionId;
+    }
+
+    // Collision detected - log and retry
+    logger.warn({
+      sessionId,
+      attempt,
+      maxRetries
+    }, 'Session ID collision detected - generating new ID');
+  }
+
+  // If we exhausted all retries, throw error
+  throw new Error(`Failed to generate unique session ID after ${maxRetries} attempts`);
 }
 
 /**
@@ -78,6 +132,32 @@ function isValidPinFormat(pin) {
 function isValidUUID(uuid) {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
+}
+
+/**
+ * Validate session ID format (12-char hex string)
+ * @param {string} sessionId - Session ID to validate
+ * @returns {boolean}
+ */
+function isValidSessionId(sessionId) {
+  return /^[a-f0-9]{12}$/i.test(sessionId);
+}
+
+/**
+ * Sanitize and validate UUID for safe query usage
+ * Throws error if UUID is invalid to prevent SQL injection
+ * @param {string} uuid - UUID to validate
+ * @param {string} paramName - Parameter name for error messages
+ * @returns {string} - Validated UUID
+ */
+function validateUUID(uuid, paramName = 'uuid') {
+  if (!uuid || typeof uuid !== 'string') {
+    throw new Error(`${paramName} is required and must be a string`);
+  }
+  if (!isValidUUID(uuid)) {
+    throw new Error(`Invalid ${paramName} format`);
+  }
+  return uuid;
 }
 
 /**
@@ -307,20 +387,26 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
   const tempSessionId = sessionUuid || `temp-${Date.now()}`;
   const now = new Date().toISOString();
 
+  // FILTER: Only use 4-letter nicknames (better recognition, consistent length)
+  const NICKNAME_LENGTH = 4;
+
   // If firstLetter provided, try to find matching nicknames
   if (firstLetter) {
     const upperLetter = firstLetter.toUpperCase();
 
     // Try to get male nickname starting with letter (not reserved or expired reservation)
-    const { data: matchedMale } = await supabase
+    // Note: We fetch multiple candidates and filter by length in JS (Supabase doesn't support length() in query)
+    const { data: matchedMales } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'male')
       .ilike('nickname', `${upperLetter}%`)
       .or(`reserved_until.is.null,reserved_until.lt.${now}`)
-      .limit(1)
-      .single();
+      .limit(10); // Fetch multiple to filter by length
+
+    // Filter for 4-letter names only
+    const matchedMale = matchedMales?.find(n => n.nickname.length === NICKNAME_LENGTH);
 
     // Immediately reserve if found
     if (matchedMale && sessionUuid) {
@@ -331,15 +417,17 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
     }
 
     // Try to get female nickname starting with letter (not reserved or expired reservation)
-    const { data: matchedFemale } = await supabase
+    const { data: matchedFemales } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
       .ilike('nickname', `${upperLetter}%`)
       .or(`reserved_until.is.null,reserved_until.lt.${now}`)
-      .limit(1)
-      .single();
+      .limit(10); // Fetch multiple to filter by length
+
+    // Filter for 4-letter names only
+    const matchedFemale = matchedFemales?.find(n => n.nickname.length === NICKNAME_LENGTH);
 
     // Immediately reserve if found
     if (matchedFemale && sessionUuid) {
@@ -352,14 +440,16 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
 
   // Fallback: If we don't have both genders with matching letter, get any available
   if (!maleOption) {
-    const { data: anyMale } = await supabase
+    const { data: anyMales } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'male')
       .or(`reserved_until.is.null,reserved_until.lt.${now}`)
-      .limit(1)
-      .single();
+      .limit(10); // Fetch multiple to filter by length
+
+    // Filter for 4-letter names only
+    const anyMale = anyMales?.find(n => n.nickname.length === NICKNAME_LENGTH);
 
     // Immediately reserve if found
     if (anyMale && sessionUuid) {
@@ -371,14 +461,16 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
   }
 
   if (!femaleOption) {
-    const { data: anyFemale } = await supabase
+    const { data: anyFemales } = await supabase
       .from('nicknames_pool')
       .select('*')
       .eq('is_available', true)
       .eq('gender', 'female')
       .or(`reserved_until.is.null,reserved_until.lt.${now}`)
-      .limit(1)
-      .single();
+      .limit(10); // Fetch multiple to filter by length
+
+    // Filter for 4-letter names only
+    const anyFemale = anyFemales?.find(n => n.nickname.length === NICKNAME_LENGTH);
 
     // Immediately reserve if found
     if (anyFemale && sessionUuid) {
@@ -438,7 +530,8 @@ async function getTwoNicknameOptions(firstLetter = null, sessionUuid = null) {
 }
 
 /**
- * Mark nickname as used in the pool
+ * Mark nickname as used in the pool using atomic database function
+ * CRITICAL FIX: Uses PostgreSQL advisory locks to prevent race conditions
  * @param {string} nicknameId - UUID of the nickname to claim
  * @param {string} sessionId - Session ID claiming the nickname
  * @returns {Object} {data, error} - Updated nickname data or error
@@ -447,64 +540,44 @@ async function markNicknameAsUsed(nicknameId, sessionId) {
   if (!nicknameId) return { data: null, error: null }; // Return proper structure
 
   try {
-    // Fetch current nickname data to get times_used value and verify reservation
-    const { data: nickname, error: fetchError } = await supabase
-      .from('nicknames_pool')
-      .select('times_used, reserved_by_session, reserved_until')
-      .eq('id', nicknameId)
-      .single();
-
-    if (fetchError) {
-      return { data: null, error: fetchError };
-    }
-
-    // CRITICAL: Verify reservation belongs to this session (or is expired/null)
-    // This prevents another session from claiming a reserved nickname
-    const reservedByOtherSession = nickname.reserved_by_session &&
-                                   nickname.reserved_by_session !== sessionId &&
-                                   nickname.reserved_until &&
-                                   new Date(nickname.reserved_until) > new Date();
-
-    if (reservedByOtherSession) {
-      return {
-        data: null,
-        error: new Error('Nickname is reserved by another session')
-      };
-    }
-
-    // Convert reservation to permanent assignment
-    // ATOMIC CHECK: Ensure nickname is either unreserved, reserved by this session, or reservation expired
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('nicknames_pool')
-      .update({
-        is_available: false,
-        currently_used_in: sessionId,
-        times_used: (nickname?.times_used || 0) + 1,
-        last_used: now,
-        // Clear reservation fields
-        reserved_until: null,
-        reserved_by_session: null
-      })
-      .eq('id', nicknameId)
-      .eq('is_available', true) // Extra safety: only mark if still available
-      .or(`reserved_by_session.is.null,reserved_by_session.eq.${sessionId},reserved_until.lt.${now}`) // CRITICAL: Atomic reservation check
-      .select(); // CRITICAL: Return updated data
+    // CRITICAL FIX: Use atomic PostgreSQL function with advisory locks
+    // This prevents TOCTOU (Time-Of-Check-Time-Of-Use) race conditions
+    const { data: result, error } = await supabase
+      .rpc('claim_nickname_atomic', {
+        p_nickname_id: nicknameId,
+        p_session_id: sessionId
+      });
 
     if (error) {
+      logger.error({ err: error, nicknameId, sessionId }, 'Failed to call claim_nickname_atomic');
       return { data: null, error };
     }
 
-    // If no rows were updated, nickname was already taken or reserved by another session
-    if (!data || (Array.isArray(data) && data.length === 0)) {
+    // Check if the function returned results
+    if (!result || result.length === 0) {
       return {
         data: null,
-        error: new Error('Nickname is no longer available or reserved by another session')
+        error: new Error('Unexpected response from claim_nickname_atomic')
       };
     }
 
-    return { data, error };
+    const claimResult = Array.isArray(result) ? result[0] : result;
+
+    // Check if claim was successful
+    if (!claimResult.success) {
+      return {
+        data: null,
+        error: new Error(claimResult.error_message || 'Nickname is no longer available')
+      };
+    }
+
+    // Return the claimed nickname data
+    return {
+      data: [claimResult.nickname_data], // Wrap in array for consistency with original format
+      error: null
+    };
   } catch (err) {
+    logger.error({ err, nicknameId, sessionId }, 'Exception in markNicknameAsUsed');
     return { data: null, error: err };
   }
 }
@@ -626,25 +699,61 @@ export async function releaseExpiredNicknames() {
  * Start nickname cleanup jobs
  * - Reservation cleanup: Runs every 5 minutes (releases expired reservations)
  * - Session cleanup: Runs every hour (releases nicknames from expired sessions)
+ *
+ * SECURITY FIX: Implements singleton pattern to prevent memory leaks
+ * If called multiple times, clears existing intervals before starting new ones
  */
 export function startNicknameCleanup() {
+  // SECURITY FIX: If cleanup is already running, clear existing intervals first
+  if (nicknameCleanupRunning) {
+    logger.warn('Nickname cleanup jobs already running - restarting...');
+    if (reservationCleanupInterval) {
+      clearInterval(reservationCleanupInterval);
+      reservationCleanupInterval = null;
+    }
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+    }
+  }
+
   logger.info('🔄 Starting nickname cleanup jobs...');
+  nicknameCleanupRunning = true;
 
   // Run immediately on startup
   releaseExpiredReservations();
   releaseExpiredNicknames();
 
-  // Run reservation cleanup every 5 minutes (300000 milliseconds)
-  const reservationCleanupInterval = setInterval(releaseExpiredReservations, 5 * 60 * 1000);
+  // IMPROVEMENT: Use configurable intervals from config/cleanup.js
+  // Can be overridden via environment variables for different deployment environments
+  reservationCleanupInterval = setInterval(
+    releaseExpiredReservations,
+    CLEANUP_INTERVALS.RESERVATION_CLEANUP_MS
+  );
 
-  // Run session cleanup every hour (3600000 milliseconds)
-  const sessionCleanupInterval = setInterval(releaseExpiredNicknames, 60 * 60 * 1000);
+  sessionCleanupInterval = setInterval(
+    releaseExpiredNicknames,
+    CLEANUP_INTERVALS.SESSION_CLEANUP_MS
+  );
+
+  logger.info('✅ Nickname cleanup jobs started successfully', {
+    reservationCleanupInterval: `${CLEANUP_INTERVALS.RESERVATION_CLEANUP_MS / 1000 / 60} minutes`,
+    sessionCleanupInterval: `${CLEANUP_INTERVALS.SESSION_CLEANUP_MS / 1000 / 60} minutes`
+  });
 
   // Return cleanup function for graceful shutdown
   return () => {
     logger.info('Stopping nickname cleanup jobs...');
-    clearInterval(reservationCleanupInterval);
-    clearInterval(sessionCleanupInterval);
+    if (reservationCleanupInterval) {
+      clearInterval(reservationCleanupInterval);
+      reservationCleanupInterval = null;
+    }
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+    }
+    nicknameCleanupRunning = false;
+    logger.info('✅ Nickname cleanup jobs stopped');
   };
 }
 
@@ -730,8 +839,8 @@ export async function createSession(req, res) {
           })()
         : Promise.resolve(null),
 
-      // Generate unique session ID (no collision check needed)
-      Promise.resolve(generateUniqueSessionId())
+      // Generate unique session ID with collision detection
+      generateUniqueSessionId()
     ]);
 
     // Early return if duplicate session found
@@ -748,12 +857,17 @@ export async function createSession(req, res) {
     // Generate secure host token (fast operation, no need to parallelize)
     const host_token = generateHostToken();
 
+    // SECURITY FIX: Sanitize user inputs to prevent XSS attacks
+    // Sanitize real name (if provided)
+    const sanitizedRealName = real_name ? sanitizeText(real_name, 100) : null;
+
     // Get nickname - either from user selection or auto-assign
     let nickname, avatar_emoji;
     if (selected_nickname && selected_avatar_emoji) {
       // User selected a nickname from the options
-      nickname = selected_nickname;
-      avatar_emoji = selected_avatar_emoji;
+      // SECURITY: Sanitize nickname and emoji (already validated with regex above)
+      nickname = escapeHtml(selected_nickname);
+      avatar_emoji = escapeHtml(selected_avatar_emoji);
     } else {
       // Fallback to old auto-assign flow (for backward compatibility)
       const nicknameData = await getAvailableNickname(session_id);
@@ -779,7 +893,7 @@ export async function createSession(req, res) {
         session_id,
         session_type: 'minibag',
         creator_nickname: nickname,
-        creator_real_name: real_name,
+        creator_real_name: sanitizedRealName, // SECURITY: Use sanitized real name
         location_text,
         neighborhood,
         scheduled_time,
@@ -819,7 +933,7 @@ export async function createSession(req, res) {
         session_id: session.id,
         nickname,
         avatar_emoji,
-        real_name, // Store real name if provided
+        real_name: sanitizedRealName, // SECURITY: Use sanitized real name
         is_creator: true,
         items_confirmed: true // Host confirms when clicking "Start List"
       })
@@ -827,32 +941,78 @@ export async function createSession(req, res) {
       .single();
 
     if (participantError) {
-      logger.error({ err: participantError, sessionId: session.id }, 'Participant creation failed - initiating rollback');
+      logger.error({ err: participantError, sessionId: session.id }, 'Participant creation failed - initiating comprehensive rollback');
 
-      // Rollback session creation
-      try {
-        await supabase.from('sessions').delete().eq('id', session.id);
-        logger.info({ sessionId: session.id }, 'Session rollback successful');
-      } catch (rollbackError) {
-        logger.error({ err: rollbackError, sessionId: session.id }, 'CRITICAL: Session rollback failed - manual cleanup may be needed');
+      // SECURITY FIX: Comprehensive rollback with retry logic
+      const rollbackResults = {
+        session: { attempted: false, success: false, error: null },
+        nickname: { attempted: false, success: false, error: null }
+      };
+
+      // Rollback Step 1: Delete session (with retry)
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        rollbackResults.session.attempted = true;
+        const { error: deleteError } = await supabase
+          .from('sessions')
+          .delete()
+          .eq('id', session.id);
+
+        if (!deleteError) {
+          rollbackResults.session.success = true;
+          logger.info({ sessionId: session.id, attempt }, 'Session rollback successful');
+          break;
+        }
+
+        rollbackResults.session.error = deleteError.message;
+        logger.warn({ sessionId: session.id, attempt, error: deleteError.message },
+          'Session rollback attempt failed, retrying...');
+
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+        }
       }
 
-      // Rollback nickname reservation
-      if (selected_nickname_id) {
-        try {
-          await supabase
+      // Rollback Step 2: Release nickname (if it was from pool)
+      if (selected_nickname_id && !selected_nickname_id.startsWith('fallback-')) {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          rollbackResults.nickname.attempted = true;
+          const { error: releaseError } = await supabase
             .from('nicknames_pool')
             .update({
               is_available: true,
               reserved_until: null,
-              reserved_by_session: null
+              reserved_by_session: null,
+              currently_used_in: null
               // Don't decrement times_used - keep for audit trail
             })
             .eq('id', selected_nickname_id);
-          logger.info({ nicknameId: selected_nickname_id }, 'Nickname rollback successful');
-        } catch (rollbackError) {
-          logger.error({ err: rollbackError, nicknameId: selected_nickname_id }, 'CRITICAL: Nickname rollback failed - manual cleanup needed');
+
+          if (!releaseError) {
+            rollbackResults.nickname.success = true;
+            logger.info({ nicknameId: selected_nickname_id, attempt }, 'Nickname rollback successful');
+            break;
+          }
+
+          rollbackResults.nickname.error = releaseError.message;
+          logger.warn({ nicknameId: selected_nickname_id, attempt, error: releaseError.message },
+            'Nickname rollback attempt failed, retrying...');
+
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+          }
         }
+      }
+
+      // Log final rollback status
+      if (!rollbackResults.session.success ||
+          (rollbackResults.nickname.attempted && !rollbackResults.nickname.success)) {
+        logger.error({
+          sessionId: session.id,
+          nicknameId: selected_nickname_id,
+          rollbackResults
+        }, 'CRITICAL: Rollback incomplete - manual cleanup required');
+      } else {
+        logger.info({ sessionId: session.id, rollbackResults }, 'Rollback completed successfully');
       }
 
       throw participantError;
@@ -1079,6 +1239,11 @@ export async function getShoppingItems(req, res) {
     const aggregatedItems = {};
     const participantItemCounts = {};
 
+    // PERFORMANCE NOTE: In-memory aggregation with O(N*M) complexity
+    // For large sessions (50+ participants, 100+ items), consider using session_item_totals view (migration 036)
+    // Or create a PostgreSQL function for server-side aggregation
+    // TODO: Optimize with database-level aggregation if performance becomes an issue
+    //
     // Initialize participant item counts
     allParticipants.forEach(p => {
       participantItemCounts[p.id] = 0;
@@ -1189,8 +1354,8 @@ export async function getBillItems(req, res) {
       });
     }
 
-    // Get all participant items with catalog data and participant info
-    // Note: participant_items doesn't have session_id, need to filter through participant
+    // PERFORMANCE FIX: Fetch participant items and extract unique participants from results
+    // Eliminates redundant query by reusing participant data from items query
     const { data: participantItems, error: itemsError } = await supabase
       .from('participant_items')
       .select(`
@@ -1202,13 +1367,17 @@ export async function getBillItems(req, res) {
 
     if (itemsError) throw itemsError;
 
-    // Get all participants (including those without items)
-    const { data: allParticipants, error: participantsError } = await supabase
-      .from('participants')
-      .select('id, nickname, avatar_emoji, real_name, items_confirmed, is_creator')
-      .eq('session_id', session.id);
+    // PERFORMANCE FIX: Extract unique participants from items query result
+    // This avoids a second database round trip
+    const participantMap = new Map();
+    participantItems.forEach(item => {
+      if (item.participant && !participantMap.has(item.participant.id)) {
+        const { session_id, ...participantData } = item.participant; // Remove session_id from response
+        participantMap.set(item.participant.id, participantData);
+      }
+    });
 
-    if (participantsError) throw participantsError;
+    const allParticipants = Array.from(participantMap.values());
 
     // Get all payments for this session
     const { data: payments, error: paymentsError } = await supabase
@@ -1222,6 +1391,9 @@ export async function getBillItems(req, res) {
     // NOTE: payments.item_id contains TEXT item_id (e.g., "v001"), NOT catalog UUID
     const { paymentMap, skippedItems } = buildPaymentMaps(payments);
 
+    // PERFORMANCE NOTE: This aggregation happens in Node.js for flexibility
+    // For large sessions (>100 participants), consider creating a PostgreSQL view or function
+    // TODO: Optimize with database-level aggregation if performance becomes an issue
     // Aggregate items by item_id and calculate quantities
     const itemTotals = {};
     const participantItemsMap = {}; // participantId -> { itemId -> quantity }
@@ -1468,6 +1640,29 @@ export async function joinSession(req, res) {
     // **CRITICAL SECURITY CHECK: Validate PIN if session is PIN-protected**
     // BUT skip PIN validation if user is declining (marked_not_coming)
     if (session.session_pin && !marked_not_coming) {
+      // SECURITY FIX: Check rate limiting before validating PIN
+      const rateLimit = checkPinAttempt(session_id);
+
+      if (!rateLimit.allowed) {
+        const errorMessages = {
+          rate_limited: `Too many incorrect PIN attempts. Please wait ${rateLimit.retryAfter} seconds before trying again.`,
+          too_many_attempts: `This session has been temporarily locked due to too many failed PIN attempts. Please try again in ${Math.ceil(rateLimit.retryAfter / 60)} minutes.`
+        };
+
+        logger.warn({
+          sessionId: session_id,
+          reason: rateLimit.reason,
+          retryAfter: rateLimit.retryAfter
+        }, 'PIN attempt blocked by rate limiter');
+
+        return res.status(429).json({
+          success: false,
+          error: errorMessages[rateLimit.reason] || 'Please wait before trying again',
+          error_code: 'PIN_RATE_LIMITED',
+          retry_after: rateLimit.retryAfter
+        });
+      }
+
       // Session requires PIN for joining (not for declining)
       if (!session_pin) {
         return res.status(401).json({
@@ -1479,12 +1674,28 @@ export async function joinSession(req, res) {
 
       // Validate PIN matches
       if (session_pin !== session.session_pin) {
+        // SECURITY FIX: Record failed attempt for rate limiting
+        recordFailedPinAttempt(session_id, session_pin);
+
+        logger.warn({
+          sessionId: session_id,
+          attemptedPin: '***', // Don't log actual PIN
+          attemptsCount: getPinAttemptCount(session_id)
+        }, 'Incorrect PIN attempt');
+
         return res.status(403).json({
           success: false,
           error: 'Incorrect PIN. Please check the PIN and try again.',
           error_code: 'INCORRECT_PIN'
         });
       }
+
+      // PIN correct - clear any failed attempts
+      clearPinAttempts(session_id);
+
+      logger.info({
+        sessionId: session_id
+      }, 'Correct PIN provided - access granted');
     }
 
     // Check if session has expired (2 hours after scheduled time)
@@ -1570,12 +1781,17 @@ export async function joinSession(req, res) {
       }
     }
 
+    // SECURITY FIX: Sanitize user inputs to prevent XSS attacks
+    // Sanitize real name (if provided)
+    const sanitizedRealName = real_name ? sanitizeText(real_name, 100) : null;
+
     // Get nickname - either from user selection or auto-assign
     let nickname, avatar_emoji;
     if (selected_nickname && selected_avatar_emoji) {
       // User selected a nickname from the options
-      nickname = selected_nickname;
-      avatar_emoji = selected_avatar_emoji;
+      // SECURITY: Sanitize nickname and emoji (already validated with regex above)
+      nickname = escapeHtml(selected_nickname);
+      avatar_emoji = escapeHtml(selected_avatar_emoji);
     } else {
       // Fallback to old auto-assign flow (for backward compatibility)
       const nicknameData = await getAvailableNickname(session.id);
@@ -1609,7 +1825,7 @@ export async function joinSession(req, res) {
         session_id: session.id,
         nickname,
         avatar_emoji,
-        real_name, // Store real name if provided
+        real_name: sanitizedRealName, // SECURITY: Use sanitized real name
         is_creator: false,
         marked_not_coming, // If participant is declining the invitation
         marked_not_coming_at: marked_not_coming ? new Date().toISOString() : null,
@@ -1634,44 +1850,84 @@ export async function joinSession(req, res) {
         .eq('id', invite.id);
 
       if (inviteUpdateError) {
-        logger.error('Invite claim failed - rolling back', {
+        logger.error('Invite claim failed - initiating comprehensive rollback', {
           participantId: participant.id,
           inviteId: invite.id,
+          sessionId: session.id,
+          nicknameId: selected_nickname_id,
           error: inviteUpdateError.message
         });
 
-        // Rollback Step 1: Delete participant
-        const { error: deleteError } = await supabase
-          .from('participants')
-          .delete()
-          .eq('id', participant.id);
+        // SECURITY FIX: Comprehensive rollback with retry logic
+        const rollbackResults = {
+          participant: { attempted: false, success: false, error: null },
+          nickname: { attempted: false, success: false, error: null }
+        };
 
-        if (deleteError) {
-          logger.error('CRITICAL: Failed to rollback participant creation', {
-            participantId: participant.id,
-            error: deleteError.message
-          });
+        // Rollback Step 1: Delete participant (with retry)
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          rollbackResults.participant.attempted = true;
+          const { error: deleteError } = await supabase
+            .from('participants')
+            .delete()
+            .eq('id', participant.id);
+
+          if (!deleteError) {
+            rollbackResults.participant.success = true;
+            logger.info({ participantId: participant.id, attempt }, 'Participant rollback successful');
+            break;
+          }
+
+          rollbackResults.participant.error = deleteError.message;
+          logger.warn({ participantId: participant.id, attempt, error: deleteError.message },
+            'Participant rollback attempt failed, retrying...');
+
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 100 * attempt)); // Exponential backoff
+          }
         }
 
         // Rollback Step 2: Release nickname (if it was from pool and not marked_not_coming)
-        if (selected_nickname_id && !marked_not_coming) {
-          const { error: releaseError } = await supabase
-            .from('nicknames_pool')
-            .update({
-              is_available: true,
-              currently_used_in: null,
-              reserved_until: null,
-              reserved_by_session: null
-              // Don't decrement times_used - keep audit trail
-            })
-            .eq('id', selected_nickname_id);
+        if (selected_nickname_id && !marked_not_coming && !selected_nickname_id.startsWith('fallback-')) {
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            rollbackResults.nickname.attempted = true;
+            const { error: releaseError } = await supabase
+              .from('nicknames_pool')
+              .update({
+                is_available: true,
+                currently_used_in: null,
+                reserved_until: null,
+                reserved_by_session: null
+                // Don't decrement times_used - keep audit trail
+              })
+              .eq('id', selected_nickname_id);
 
-          if (releaseError) {
-            logger.error('CRITICAL: Failed to rollback nickname allocation', {
-              nicknameId: selected_nickname_id,
-              error: releaseError.message
-            });
+            if (!releaseError) {
+              rollbackResults.nickname.success = true;
+              logger.info({ nicknameId: selected_nickname_id, attempt }, 'Nickname rollback successful');
+              break;
+            }
+
+            rollbackResults.nickname.error = releaseError.message;
+            logger.warn({ nicknameId: selected_nickname_id, attempt, error: releaseError.message },
+              'Nickname rollback attempt failed, retrying...');
+
+            if (attempt < 3) {
+              await new Promise(resolve => setTimeout(resolve, 100 * attempt)); // Exponential backoff
+            }
           }
+        }
+
+        // Log final rollback status
+        if (!rollbackResults.participant.success ||
+            (rollbackResults.nickname.attempted && !rollbackResults.nickname.success)) {
+          logger.error({
+            participantId: participant.id,
+            nicknameId: selected_nickname_id,
+            rollbackResults
+          }, 'CRITICAL: Rollback incomplete - manual cleanup required');
+        } else {
+          logger.info({ participantId: participant.id, rollbackResults }, 'Rollback completed successfully');
         }
 
         return res.status(500).json({
