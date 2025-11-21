@@ -33,7 +33,8 @@ export default function CheckpointStatus({
   onStartShopping,
   disabled = false,
   isLoading = false,
-  disabledReason = null
+  disabledReason = null,
+  isConstantLinkMode = false // When true, suppress status message (banner shows instead)
 }) {
   const [internalLoading, setInternalLoading] = useState(false);
 
@@ -50,6 +51,14 @@ export default function CheckpointStatus({
   };
 
   const showLoading = isLoading || internalLoading;
+
+  // Calculate remaining time for invite link (for constant invite mode)
+  const getRemainingTime = () => {
+    if (isInviteExpired || expectedCount !== 1) return null;
+
+    // This will be calculated in the parent component if needed
+    return null;
+  };
 
   // Determine status message to show
   const getStatusMessage = () => {
@@ -71,6 +80,10 @@ export default function CheckpointStatus({
 
     // Show checkpoint completion status
     if (checkpointComplete && participantCount > 0) {
+      // In constant link mode with all confirmed, suppress message (banner shows instead)
+      if (isConstantLinkMode && allJoinedParticipantsConfirmed) {
+        return null;
+      }
       if (isInviteExpired && autoTimedOutCount > 0) {
         return `Invite timeout: ${autoTimedOutCount} ${autoTimedOutCount === 1 ? 'slot' : 'slots'} unfilled after 20 minutes`;
       }

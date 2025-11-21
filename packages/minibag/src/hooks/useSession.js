@@ -144,7 +144,48 @@ export function useSession(sessionId = null) {
         }))
       });
       setSession(data.session);
-      setParticipants(data.participants || []);
+
+      // CRITICAL FIX: Merge API data with existing state to preserve WebSocket updates
+      // This prevents race conditions where API response overwrites real-time updates
+      setParticipants(prevParticipants => {
+        const apiParticipants = data.participants || [];
+
+        // If no existing participants, just use API data
+        if (!prevParticipants || prevParticipants.length === 0) {
+          return apiParticipants;
+        }
+
+        // Merge: prefer existing state for real-time fields (items, items_confirmed)
+        // but use API data for new participants
+        const merged = apiParticipants.map(apiP => {
+          const existing = prevParticipants.find(p => p.id === apiP.id);
+          if (existing) {
+            // Merge: API data as base, but preserve real-time updates from WebSocket
+            // For items_confirmed: once true, always true (prefer truthy value)
+            const mergedItemsConfirmed = existing.items_confirmed === true || apiP.items_confirmed === true
+              ? true
+              : (existing.items_confirmed ?? apiP.items_confirmed);
+
+            return {
+              ...apiP,
+              // Preserve WebSocket-updated fields if they have meaningful values
+              items: (existing.items && Object.keys(existing.items).length > 0)
+                ? existing.items
+                : apiP.items,
+              items_confirmed: mergedItemsConfirmed,
+            };
+          }
+          return apiP; // New participant from API
+        });
+
+        logger.debug('Merged participants', {
+          apiCount: apiParticipants.length,
+          existingCount: prevParticipants.length,
+          mergedCount: merged.length
+        });
+
+        return merged;
+      });
 
       // Join WebSocket room and wait for confirmation
       await socketService.joinSessionRoom(id);

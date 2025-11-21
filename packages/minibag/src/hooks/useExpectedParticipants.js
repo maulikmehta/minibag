@@ -11,7 +11,7 @@ import logger from '../../../shared/utils/frontendLogger.js';
  */
 export function useExpectedParticipants(session, participants) {
   // Local state for expected participants (for optimistic UI updates)
-  // null = not set (button disabled), 0 = go solo (no wait), 1-3 = wait for N participants
+  // null = not set (button disabled), 0 = go solo (no wait), 1 = constant link mode (unlimited joins up to max_participants)
   const [localExpectedCount, setLocalExpectedCount] = useState(
     session?.expected_participants !== undefined && session?.expected_participants !== null
       ? session.expected_participants
@@ -60,21 +60,48 @@ export function useExpectedParticipants(session, participants) {
   const notComingCount = participants.filter(p => p.marked_not_coming).length;
   const expectedCount = localExpectedCount; // Use local state for instant checkpoint updates
 
+  // Check if constant invite link mode (group mode with unlimited joins)
+  const isConstantLinkMode = expectedCount === 1 && session?.constant_invite_token;
+
   // Calculate auto-timed-out slots (unfilled expected slots after 20 minutes)
   const autoTimedOutCount = isInviteExpired && expectedCount > 0
     ? Math.max(0, expectedCount - joinedCount - notComingCount)
     : 0;
 
-  // Three states: null (not set, disabled), 0 (solo mode, enabled), 1-3 (wait for N people)
-  // After timeout, unfilled slots count as "timed out" to complete checkpoint
-  const checkpointComplete = expectedCount === null
-    ? false // Not set yet - button disabled
-    : expectedCount === 0
-      ? true // Go solo - button enabled immediately
-      : (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount; // Wait for expected count or timeout
+  // Three states: null (not set, disabled), 0 (solo mode, enabled), 1 (constant link mode)
+  // CONSTANT INVITE MODE LOGIC:
+  // - Before timeout: Wait for ALL joined participants to confirm
+  // - After timeout: Enable if ≥1 participant confirmed (unconfirmed are auto-excluded)
+  let checkpointComplete;
 
-  const waitingCount = expectedCount !== null && expectedCount > 0 && !isInviteExpired
-    ? expectedCount - joinedCount - notComingCount
+  if (expectedCount === null) {
+    checkpointComplete = false; // Not set yet - button disabled
+  } else if (expectedCount === 0) {
+    checkpointComplete = true; // Go solo - button enabled immediately
+  } else if (isConstantLinkMode) {
+    // CONSTANT LINK MODE: Enable when ALL joined participants confirm (any time)
+    // Host decides when to proceed - notification informs them the link is still open
+    const confirmedCount = participants.filter(p =>
+      !p.marked_not_coming && p.items_confirmed
+    ).length;
+
+    checkpointComplete = joinedCount > 0 && joinedCount === confirmedCount;
+
+    logger.debug('[Checkpoint] Constant link mode:', {
+      joinedCount,
+      confirmedCount,
+      isInviteExpired,
+      checkpointComplete,
+      hint: 'Host can proceed when all joined participants confirm (notification shows link status)'
+    });
+  } else {
+    // NUMBERED INVITE MODE (legacy): After timeout, unfilled slots count as "timed out"
+    checkpointComplete = (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount;
+  }
+
+  // Calculate waiting count (skip for constant link mode - it allows unlimited joins)
+  const waitingCount = expectedCount !== null && expectedCount > 0 && !isInviteExpired && !isConstantLinkMode
+    ? Math.max(0, expectedCount - joinedCount - notComingCount) // Ensure never negative
     : 0;
 
   // ENHANCED VALIDATION: Debounced checkpoint validation with better error detection
@@ -91,7 +118,12 @@ export function useExpectedParticipants(session, participants) {
       const totalResponses = joinedCount + notComingCount;
 
       // Critical error: More responses than expected
-      if (totalResponses > expectedCount) {
+      // Skip for constant link mode (group mode) - allows unlimited joins up to max_participants
+      // In constant link mode, expectedCount = 1 means "1 invite link", not "1 person expected"
+      // Use the same constant link detection as checkpoint logic
+      const isConstantLinkValidation = expectedCount === 1 && session?.constant_invite_token;
+
+      if (totalResponses > expectedCount && !isConstantLinkValidation) {
         logger.error('Checkpoint: More participants responded than expected', {
           expectedCount,
           joinedCount,

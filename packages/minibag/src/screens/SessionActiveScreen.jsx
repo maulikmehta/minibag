@@ -216,11 +216,20 @@ export default function SessionActiveScreen({
   // Check if ALL JOINED participants (not host, not declined) have confirmed their lists
   // Host already confirmed when clicking "Start List" button
   // participants array already excludes host (is_creator is filtered out in sessionTransformers.js)
-  const joinedParticipants = activeParticipants; // Same as activeParticipants
-  const allJoinedParticipantsConfirmed = useMemo(
-    () => joinedParticipants.length === 0 || joinedParticipants.every(p => p.items_confirmed),
-    [joinedParticipants]
-  );
+  const allJoinedParticipantsConfirmed = useMemo(() => {
+    console.log('🔍 [Checkpoint] Checking confirmation status:', {
+      activeParticipantsCount: activeParticipants.length,
+      activeParticipants: activeParticipants.map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        items_confirmed: p.items_confirmed,
+        items: p.items,
+        itemsCount: Object.keys(p.items || {}).length
+      })),
+      allConfirmed: activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed)
+    });
+    return activeParticipants.length === 0 || activeParticipants.every(p => p.items_confirmed);
+  }, [activeParticipants]);
 
   // Get the actual host's nickname (for display in Host avatar slot)
   // If current user is host, show their nickname; otherwise show "Host" placeholder
@@ -255,13 +264,14 @@ export default function SessionActiveScreen({
   );
 
   // Handle item quantity changes for participants (memoized callback)
-  const updateMyItemQuantity = useCallback((itemId, newQuantity) => {
+  const updateMyItemQuantity = useCallback(async (itemId, newQuantity) => {
     if (!myParticipantData) return;
 
-    const updatedParticipants = participants.map(p => {
+    // Optimistic update - update UI immediately
+    const updatedParticipants = (participants || []).map(p => {
       if (p.id === currentParticipant?.id) {
         const newItems = { ...p.items };
-        if (newQuantity === 0) {
+        if (newQuantity === 0 || newQuantity === '') {
           delete newItems[itemId];
         } else {
           newItems[itemId] = newQuantity;
@@ -271,7 +281,55 @@ export default function SessionActiveScreen({
       return p;
     });
     onUpdateParticipants(updatedParticipants);
-  }, [myParticipantData, participants, currentParticipant?.id, onUpdateParticipants]);
+
+    // Persist to backend and broadcast via WebSocket (debounced to avoid too many API calls)
+    // Only persist numeric values (skip empty string during editing)
+    if (newQuantity !== '') {
+      try {
+        // Import API and socket service
+        const { updateParticipantItems } = await import('../services/api.js');
+        const socketService = (await import('../services/socket.js')).default;
+
+        // Get updated items for this participant
+        const updatedParticipant = updatedParticipants.find(p => p.id === currentParticipant?.id);
+        const itemsToSave = updatedParticipant?.items || {};
+
+        console.log('💾 [PERSIST] Saving participant items:', {
+          participantId: currentParticipant.id,
+          participantNickname: currentParticipant.nickname,
+          items: itemsToSave,
+          itemCount: Object.keys(itemsToSave).length
+        });
+
+        // Persist to database
+        await updateParticipantItems(currentParticipant.id, itemsToSave);
+
+        console.log('✅ [PERSIST] Items saved successfully');
+
+        // Broadcast to host via WebSocket (so they see real-time updates)
+        socketService.emitParticipantItemsUpdated(
+          currentParticipant.id,
+          itemsToSave,
+          {
+            real_name: currentParticipant.real_name,
+            nickname: currentParticipant.nickname,
+            items_confirmed: false // Not confirmed yet, just updating items
+          }
+        );
+
+        console.log('📡 [PERSIST] WebSocket broadcast sent');
+      } catch (error) {
+        console.error('❌ [PERSIST] Failed to persist participant items:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          participantId: currentParticipant?.id
+        });
+        // Optimistic update already happened, so UI shows the change
+        // If persistence fails, items will revert on page reload
+      }
+    }
+  }, [myParticipantData, participants, currentParticipant?.id, currentParticipant?.real_name, currentParticipant?.nickname, onUpdateParticipants]);
 
   // PARTICIPANT VIEW - Simplified, locked to their own items
   if (!isHost) {
@@ -629,6 +687,29 @@ export default function SessionActiveScreen({
         {/* Test button removed for field testing */}
       </div>
 
+      {/* Invite Link Status Banner - Show above Start Shopping button in constant invite mode */}
+      {isHost && expectedCount === 1 && session?.constant_invite_token && checkpointComplete && (
+        <div className="fixed bottom-32 left-0 right-0 max-w-md mx-auto px-6 z-40">
+          <div className={`rounded-lg p-3 text-sm ${
+            isInviteExpired
+              ? 'bg-gray-100 border border-gray-300 text-gray-700'
+              : 'bg-blue-50 border border-blue-200 text-blue-800'
+          }`}>
+            {isInviteExpired ? (
+              <div className="flex items-center gap-2">
+                <span>⏰</span>
+                <span>20 minutes of joining are up! Let's go shopping</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span>🔗</span>
+                <span>Invite link is open. More friends can still join.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <CheckpointStatus
         checkpointComplete={checkpointComplete}
         waitingCount={waitingCount}
@@ -650,6 +731,7 @@ export default function SessionActiveScreen({
                 ? 'waiting_confirmations'
                 : null
         }
+        isConstantLinkMode={expectedCount === 1 && !!session?.constant_invite_token}
       />
     </div>
   );

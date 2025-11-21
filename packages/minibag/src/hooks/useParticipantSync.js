@@ -34,19 +34,9 @@ export function useParticipantSync({
 
         // Check if they declined
         if (participant.marked_not_coming) {
-          // If they have an invite, show which invite was declined
-          if (participant.invite?.invite_number) {
-            onShowNotification(`Invite ${participant.invite.invite_number} declined`, 6000, 'high');
-          } else {
-            onShowNotification(`${displayName} declined the invitation`, 6000, 'high');
-          }
+          onShowNotification(`${displayName} declined the invitation`, 6000, 'high');
         } else {
-          // They joined - show which invite if available
-          if (participant.invite?.invite_number) {
-            onShowNotification(`Invite ${participant.invite.invite_number}: ${displayName} joined`, 6000, 'high');
-          } else {
-            onShowNotification(`${displayName} joined the session`, 6000, 'high');
-          }
+          onShowNotification(`${displayName} joined the session`, 6000, 'high');
         }
       } else {
         // Participants see generic message (privacy)
@@ -108,14 +98,16 @@ export function useParticipantSync({
     const handleParticipantItemsUpdate = (data) => {
       const { participantId, items, real_name, nickname, items_confirmed } = data;
 
-      console.log('🔔 WebSocket: participant-items-updated received:', {
+      console.log('🔔 [WebSocket] participant-items-updated received:', {
         participantId,
         items,
         itemsType: typeof items,
         itemsKeys: items ? Object.keys(items) : 'null',
         items_confirmed,
+        items_confirmed_type: typeof items_confirmed,
         real_name,
-        nickname
+        nickname,
+        timestamp: new Date().toISOString()
       });
 
       // Update local participant state with new items using functional setState to avoid stale closure
@@ -128,13 +120,20 @@ export function useParticipantSync({
 
         const updated = prevParticipants.map(p => {
           if (p.id === participantId) {
-            return {
+            const updatedParticipant = {
               ...p,
               items,
               ...(items_confirmed !== undefined && { items_confirmed }),
               ...(real_name && { real_name }),
               ...(nickname && { nickname })
             };
+            console.log('✅ [WebSocket] Updated participant:', {
+              id: updatedParticipant.id,
+              nickname: updatedParticipant.nickname,
+              items_confirmed: updatedParticipant.items_confirmed,
+              itemsCount: Object.keys(updatedParticipant.items || {}).length
+            });
+            return updatedParticipant;
           }
           return p;
         });
@@ -142,6 +141,7 @@ export function useParticipantSync({
         console.log('✅ Participants after update:', updated.map(p => ({
           id: p.id,
           name: p.name,
+          items_confirmed: p.items_confirmed,
           itemsAfter: p.items
         })));
 

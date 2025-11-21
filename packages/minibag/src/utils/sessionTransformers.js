@@ -234,6 +234,7 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
       avatar_emoji: apiParticipant.avatar_emoji || '👤',
       is_creator: apiParticipant.is_creator || false,
       items: apiParticipant.items || {},
+      items_confirmed: apiParticipant.items_confirmed || false, // CRITICAL: Preserve items_confirmed for checkpoint logic
       marked_not_coming: apiParticipant.marked_not_coming || false
     };
   }
@@ -301,6 +302,7 @@ export function transformParticipant(apiParticipant, catalogItems = []) {
       avatar_emoji: validatedInput.avatar_emoji,
       is_creator: validatedInput.is_creator || false,
       items: transformParticipantItems(validatedInput.items || [], catalogItems),
+      items_confirmed: validatedInput.items_confirmed || false, // CRITICAL: Preserve items_confirmed for checkpoint logic
       marked_not_coming: validatedInput.marked_not_coming || false
     };
 

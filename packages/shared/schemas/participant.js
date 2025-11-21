@@ -46,11 +46,12 @@ export const ParticipantSchema = z.object({
     }).optional().nullable()
   })).optional().default([]),
   // Joined invite data (null if participant joined without invite link)
+  // Supports both numbered invites (8 char token) and constant invites (16 char token)
   invite: z.object({
     id: z.string().uuid(),
-    invite_number: z.number().int().min(1).max(3),
-    invite_token: z.string().length(8),
-    status: z.enum(['pending', 'claimed', 'declined', 'expired'])
+    invite_number: z.number().int().min(1).optional().nullable(), // Optional for constant invites
+    invite_token: z.string().min(8).max(16), // 8 chars for numbered, 16 for constant
+    status: z.enum(['pending', 'claimed', 'declined', 'expired', 'active']) // 'active' for constant invites
   }).optional().nullable()
 });
 
@@ -80,6 +81,7 @@ export const FrontendParticipantSchema = z.object({
   avatar_emoji: z.string().optional().nullable(),
   is_creator: z.boolean(),
   items: z.record(z.string(), z.number().positive()), // Map of item_id to quantity
+  items_confirmed: z.boolean(), // Whether participant has confirmed their list
   marked_not_coming: z.boolean()
 });
 
