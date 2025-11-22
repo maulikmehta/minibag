@@ -33,6 +33,7 @@ import {
   joinSessionWithSDK,
   getNicknameOptionsWithSDK
 } from './api/sessions-sdk.js';
+import { mountDashboard } from '@sessions/core';
 
 // Validation middleware imports
 import {
@@ -301,6 +302,11 @@ app.get('/metrics', (req, res) => {
   });
 });
 
+// Serve sessions dashboard logo
+app.get('/sessions-logo.png', (req, res) => {
+  res.sendFile(resolve(__dirname, '../minibag/public/sessions-logo.png'));
+});
+
 // Apply general rate limiting to all API routes
 app.use('/api/', apiLimiter);
 
@@ -396,36 +402,62 @@ app.use((err, req, res, next) => {
 // Start servers
 const PORT = process.env.API_PORT || 3000;
 
-server.listen(PORT, () => {
-  logger.info({
-    port: PORT,
-    environment: process.env.NODE_ENV || 'development',
-    nodeVersion: process.version,
-  }, 'LocalLoops API Server started');
+async function startServer() {
+  // Mount Sessions SDK Dashboard (development only, no auth)
+  try {
+    if (USE_SESSIONS_SDK) {
+      await mountDashboard(app, {
+        path: '/sessions-monitor',
+        branding: {
+          productName: 'Minibag Sessions',
+          primaryColor: '#00B87C'
+        }
+      });
+    }
+  } catch (error) {
+    logger.error('Failed to mount Sessions SDK dashboard:', error);
+    logger.warn('Continuing without dashboard...');
+  }
 
-  logger.info('Server features:');
-  logger.info('  ✓ API server');
-  logger.info('  ✓ WebSocket server');
-  logger.info('  ✓ Structured logging (Pino)');
+  server.listen(PORT, () => {
+    logger.info({
+      port: PORT,
+      environment: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version,
+    }, 'LocalLoops API Server started');
 
-  // Log feature flags (Phase 2 Week 6)
-  logFeatureFlags();
-  logger.info('  ✓ Rate limiting');
-  logger.info('  ✓ Security headers (Helmet)');
-  logger.info('  ✓ Request ID tracking');
-  logger.info('  ✓ Nickname cleanup job (runs hourly)');
+    logger.info('Server features:');
+    logger.info('  ✓ API server');
+    logger.info('  ✓ WebSocket server');
+    logger.info('  ✓ Structured logging (Pino)');
 
-  // Start nickname cleanup job (runs every hour to prevent pool depletion)
-  const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
+    // Log feature flags (Phase 2 Week 6)
+    logFeatureFlags();
+    logger.info('  ✓ Rate limiting');
+    logger.info('  ✓ Security headers (Helmet)');
+    logger.info('  ✓ Request ID tracking');
+    logger.info('  ✓ Nickname cleanup job (runs hourly)');
+    if (USE_SESSIONS_SDK) {
+      logger.info('  ✓ Sessions SDK dashboard (/sessions-monitor)');
+    }
 
-  // Graceful shutdown handler
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM signal received: closing HTTP server');
-    stopNicknameCleanup();
-    server.close(() => {
-      logger.info('HTTP server closed');
+    // Start nickname cleanup job (runs every hour to prevent pool depletion)
+    const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
+
+    // Graceful shutdown handler
+    process.on('SIGTERM', () => {
+      logger.info('SIGTERM signal received: closing HTTP server');
+      stopNicknameCleanup();
+      server.close(() => {
+        logger.info('HTTP server closed');
+      });
     });
   });
+}
+
+startServer().catch(error => {
+  logger.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 export { app, io };
