@@ -448,6 +448,12 @@ export default function LandingPage({ onGetStarted }) {
           </div>
           <div className="mt-4 text-center text-sm text-gray-500">
             © 2025 {PLATFORM.name}
+            {' · '}
+            <a href="/sessions-landing.html" className="hover:text-gray-900 transition-colors inline-flex items-center gap-1">
+              Powered by
+              <img src="/sessions-logo.png" alt="Sessions SDK" className="w-3 h-3 inline-block" style={{width: '12px', height: '12px', objectFit: 'contain'}} />
+              Sessions SDK
+            </a>
           </div>
         </div>
       </footer>
