@@ -179,8 +179,11 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
     });
 
     if (session && apiParticipants) {
+      // Filter out any undefined participants (defensive check)
+      const validParticipants = apiParticipants.filter(p => p != null);
+
       // DEBUG: Log API participants with their items BEFORE transformation
-      console.log('📥 API Participants BEFORE transform:', apiParticipants.map(p => ({
+      console.log('📥 API Participants BEFORE transform:', validParticipants.map(p => ({
         id: p.id,
         nickname: p.nickname,
         is_creator: p.is_creator,
@@ -190,7 +193,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
 
       // Transform API data to frontend format using centralized transformers
       const { hostItems: transformedHostItems, participants: transformedParticipants } =
-        transformSessionData(session, apiParticipants, items);
+        transformSessionData(session, validParticipants, items);
 
       // DEBUG: Log transformed data
       console.log('🔍 Transformed Data AFTER transform:', {

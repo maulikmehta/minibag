@@ -234,7 +234,7 @@ const BillScreen = () => {
           {/* Receipt - Clean centered layout */}
           <div
             ref={billRef}
-            className="bg-white max-w-[350px] mx-auto"
+            className="bg-white mx-auto"
             style={{ padding: '32px 24px' }}
           >
             {/* Header with Logo */}

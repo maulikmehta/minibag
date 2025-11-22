@@ -123,12 +123,48 @@ export class MinibagSessionsAdapter {
         throw new Error('Failed to create shopping session');
       }
 
-      // Step 3: Store creator's shopping items (if any)
-      if (items && items.length > 0) {
-        await this.storeParticipantItems(participant.id, items);
+      // Step 3: Create participant record in Supabase (for minibag frontend)
+      // The SDK creates participant in Postgres, but minibag frontend queries Supabase
+      const { data: minibagParticipant, error: participantError } = await supabase
+        .from('participants')
+        .insert({
+          id: participant.id, // Use same UUID from SDK
+          session_id: session.id, // Session UUID
+          nickname: participant.nickname,
+          avatar_emoji: participant.avatarEmoji,
+          real_name: participant.realName,
+          is_creator: participant.isCreator,
+          items_confirmed: true, // Host confirms when creating session
+          joined_at: participant.joinedAt,
+        })
+        .select()
+        .single();
+
+      if (participantError) {
+        logger.error({ err: participantError, participantId: participant.id }, 'Failed to create participant in Supabase');
+        throw new Error('Failed to create participant record');
       }
 
-      // Step 4: Return combined response
+      // Step 4: Store creator's shopping items (if any)
+      let participantItems = [];
+      if (items && items.length > 0) {
+        await this.storeParticipantItems(participant.id, items);
+
+        // Fetch the stored items with catalog data for response
+        const { data: storedItems, error: itemsError } = await supabase
+          .from('participant_items')
+          .select(`
+            *,
+            catalog_item:catalog_items(*)
+          `)
+          .eq('participant_id', participant.id);
+
+        if (!itemsError && storedItems) {
+          participantItems = storedItems;
+        }
+      }
+
+      // Step 5: Return combined response with items
       return {
         session: {
           ...minibagSession,
@@ -141,6 +177,7 @@ export class MinibagSessionsAdapter {
           avatar_emoji: participant.avatarEmoji,
           real_name: participant.realName,
           is_creator: participant.isCreator,
+          items: participantItems, // Include items in response
         },
         authToken, // For WebSocket auth
         session_url: `/session/${session.sessionId}`,
@@ -163,9 +200,33 @@ export class MinibagSessionsAdapter {
     if (!items || items.length === 0) return;
 
     try {
+      // First, get the UUID for each item_id (participant_items.item_id is a UUID FK to catalog_items.id)
+      const itemIds = items.map(item => item.item_id);
+      const { data: catalogItems, error: catalogError } = await supabase
+        .from('catalog_items')
+        .select('id, item_id')
+        .in('item_id', itemIds);
+
+      if (catalogError) {
+        logger.error({ err: catalogError, participantId }, 'Failed to lookup catalog items');
+        throw catalogError;
+      }
+
+      // Create a map of item_id (text) -> UUID
+      const itemIdMap = new Map(
+        catalogItems.map(item => [item.item_id, item.id])
+      );
+
+      // Validate all items exist in catalog
+      const missingIds = itemIds.filter(id => !itemIdMap.has(id));
+      if (missingIds.length > 0) {
+        throw new Error(`Invalid item IDs: ${missingIds.join(', ')}`);
+      }
+
+      // Convert to database format with UUIDs
       const itemsToInsert = items.map(item => ({
         participant_id: participantId,
-        item_id: item.item_id,
+        item_id: itemIdMap.get(item.item_id), // Use UUID instead of text
         quantity: item.quantity,
         unit: item.unit,
       }));
