@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: minibag-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: cd packages/shared && npm install
+    startCommand: cd packages/shared && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: SMS_API_KEY
+        sync: false
+      - key: SMS_API_URL
+        sync: false
+      - key: WEBSOCKET_PORT
+        value: 3001
+      - key: API_PORT
+        value: 3000
+      - key: USE_SESSIONS_SDK
+        value: false
+      - key: DUAL_WRITE_MODE
+        value: false
+      - key: ENABLE_GROUP_MODE
+        value: true
+      - key: FRONTEND_URL
+        value: https://minibag.cc
+    healthCheckPath: /health
