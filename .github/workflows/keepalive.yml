@@ -1,0 +1,41 @@
+name: Keep Services Alive
+
+on:
+  schedule:
+    # Run every 10 minutes (prevents 15-min Render spin-down)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Backend Health Check
+        run: |
+          echo "Pinging backend at $(date)"
+
+          # Ping /health/ready endpoint (queries Supabase)
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "User-Agent: GitHub-Actions-KeepAlive/1.0" \
+            --max-time 30 \
+            https://minibag.onrender.com/health/ready)
+
+          echo "Response code: $response"
+
+          if [ "$response" = "200" ]; then
+            echo "✓ Backend healthy"
+          else
+            echo "⚠ Backend returned $response"
+            exit 1
+          fi
+
+      - name: Ping Basic Health
+        if: always()
+        run: |
+          # Also ping basic /health as backup
+          curl -s -f \
+            -H "User-Agent: GitHub-Actions-KeepAlive/1.0" \
+            --max-time 30 \
+            https://minibag.onrender.com/health || echo "⚠ Basic health check failed"

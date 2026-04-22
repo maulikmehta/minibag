@@ -45,4 +45,4 @@ services:
         value: true
       - key: FRONTEND_URL
         value: https://minibag.cc
-    healthCheckPath: /health
+    healthCheckPath: /health/ready
