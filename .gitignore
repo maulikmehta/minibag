@@ -38,3 +38,5 @@ firebase-debug.log
 
 # Temporary files
 temp/
+.planning/
+.env.backup
