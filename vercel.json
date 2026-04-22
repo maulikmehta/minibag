@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "installCommand": "npm install",
+  "installCommand": "npm install && npm install -w packages/minibag",
   "buildCommand": "npm run build -w packages/minibag",
   "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
