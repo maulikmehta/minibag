@@ -4,7 +4,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: cd packages/shared && npm install --production
+    buildCommand: cd packages/sessions-core && npm install && npm run build && cd ../shared && npm install
     startCommand: cd packages/shared && npm start
     envVars:
       - key: NODE_ENV
