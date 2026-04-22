@@ -46,9 +46,7 @@ export default function InviteTabsSelector({
 
   const tabs = [
     { value: 0, label: 'Solo', icon: Users },
-    { value: 1, label: '1 Friend', icon: Users },
-    { value: 2, label: '2 Friends', icon: Users },
-    { value: 3, label: '3 Friends', icon: Users }
+    { value: 1, label: 'Group', icon: Users }
   ];
 
   const handleTabClick = async (value) => {
@@ -172,20 +170,28 @@ export default function InviteTabsSelector({
             <p className="text-sm text-gray-600">You can start shopping immediately</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {Array.from({ length: activeTab }, (_, i) => {
-              const invite = invites.find(inv => inv.invite_number === i + 1);
-              return (
-                <InviteCard
-                  key={i}
-                  invite={invite}
-                  inviteNumber={i + 1}
-                  onShare={handleShare}
-                  onCopy={handleCopy}
-                  copiedIndex={copiedIndex}
-                />
-              );
-            })}
+          <div className="space-y-3">
+            <div className="text-center py-2">
+              <p className="text-sm text-gray-600 mb-3">Share this link with friends</p>
+            </div>
+            {/* Single constant invite link for group mode */}
+            {invites.length > 0 && invites[0] ? (
+              <InviteCard
+                invite={invites[0]}
+                inviteNumber={1}
+                onShare={handleShare}
+                onCopy={handleCopy}
+                copiedIndex={copiedIndex}
+              />
+            ) : loadingInvites ? (
+              <div className="text-center py-4 text-gray-500">
+                <div className="animate-pulse">Generating invite link...</div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <p className="text-sm">Click OK to generate invite link</p>
+              </div>
+            )}
           </div>
         )}
       </div>

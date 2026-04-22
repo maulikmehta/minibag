@@ -129,7 +129,7 @@ export default function SessionActiveScreen({
     notify.success(
       selectedMode === 0
         ? 'Ready to shop solo!'
-        : `Invited ${selectedMode} ${selectedMode === 1 ? 'friend' : 'friends'} to join`
+        : 'Group mode ready - share link with friends!'
     );
   }, [notify, t]);
 
