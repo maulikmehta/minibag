@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "cd packages/minibag && npm install",
-  "buildCommand": "cd packages/minibag && npm run build",
+  "installCommand": "npm install --prefix packages/minibag",
+  "buildCommand": "npm run build --prefix packages/minibag",
   "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
   "rewrites": [
