@@ -9,7 +9,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../shared')
-    }
+    },
+    // Enable resolution from workspace root for monorepo
+    preserveSymlinks: true,
+    // Look for dependencies in workspace root
+    dedupe: ['zod', 'html2canvas']
   },
   plugins: [
     react(),
