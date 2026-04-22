@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "installCommand": "npm install --prefix packages/minibag",
-  "buildCommand": "npm run build --prefix packages/minibag",
-  "outputDirectory": "packages/minibag/dist",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": "vite",
+  "rootDirectory": "packages/minibag",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
