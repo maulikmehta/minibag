@@ -3,7 +3,7 @@
  * Extracted from LocalLoops with security improvements
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 /**
  * Generate a short, unique session ID (12 chars for strong collision resistance)

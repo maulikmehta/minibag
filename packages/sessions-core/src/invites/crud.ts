@@ -4,7 +4,7 @@
  * Extracted from LocalLoops
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { getDatabaseClient } from '../database/client.js';
 import { SessionError, SessionErrorCode } from '../sessions/types.js';
 import type { Invite } from '@prisma/client';
