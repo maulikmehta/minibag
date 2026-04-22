@@ -28,12 +28,15 @@ import * as logsAPI from './api/logs.js';
 
 // Sessions SDK integration (Phase 2 Week 6)
 import { USE_SESSIONS_SDK, logFeatureFlags } from './config/features.js';
-import {
-  createSessionWithSDK,
-  joinSessionWithSDK,
-  getNicknameOptionsWithSDK
-} from './api/sessions-sdk.js';
-import { mountDashboard } from '@sessions/core';
+
+// Dynamic import for SDK to avoid loading @sessions/core when disabled
+let createSessionWithSDK, joinSessionWithSDK, getNicknameOptionsWithSDK;
+if (USE_SESSIONS_SDK) {
+  const sdk = await import('./api/sessions-sdk.js');
+  createSessionWithSDK = sdk.createSessionWithSDK;
+  joinSessionWithSDK = sdk.joinSessionWithSDK;
+  getNicknameOptionsWithSDK = sdk.getNicknameOptionsWithSDK;
+}
 
 // Validation middleware imports
 import {
@@ -327,16 +330,22 @@ app.get('/api/catalog/popular', catalogAPI.getPopularItems);
 
 // Sessions API routes (with SDK integration - Phase 2 Week 6)
 app.get('/api/sessions/nickname-options', (req, res) =>
-  getNicknameOptionsWithSDK(req, res, sessionsAPI.getNicknameOptions)
+  getNicknameOptionsWithSDK
+    ? getNicknameOptionsWithSDK(req, res, sessionsAPI.getNicknameOptions)
+    : sessionsAPI.getNicknameOptions(req, res)
 );
 app.post('/api/sessions/create', createSessionLimiter, validateSessionCreation, (req, res) =>
-  createSessionWithSDK(req, res, sessionsAPI.createSession)
+  createSessionWithSDK
+    ? createSessionWithSDK(req, res, sessionsAPI.createSession)
+    : sessionsAPI.createSession(req, res)
 );
 app.get('/api/sessions/:session_id', sessionsAPI.getSession);
 app.get('/api/sessions/:session_id/shopping-items', sessionsAPI.getShoppingItems); // Aggregated items for shopping screen
 app.get('/api/sessions/:session_id/bill-items', sessionsAPI.getBillItems); // Aggregated items with payments for bill screen
 app.post('/api/sessions/:session_id/join', authLimiter, validateJoinSession, (req, res) =>
-  joinSessionWithSDK(req, res, sessionsAPI.joinSession)
+  joinSessionWithSDK
+    ? joinSessionWithSDK(req, res, sessionsAPI.joinSession)
+    : sessionsAPI.joinSession(req, res)
 ); // Rate limit joins (PIN brute force protection)
 app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.updateSessionStatus);
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
@@ -407,6 +416,7 @@ async function startServer() {
   // Mount Sessions SDK Dashboard (development only, no auth)
   try {
     if (USE_SESSIONS_SDK) {
+      const { mountDashboard } = await import('@sessions/core');
       await mountDashboard(app, {
         path: '/sessions-monitor',
         branding: {
