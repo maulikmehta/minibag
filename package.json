@@ -11,6 +11,7 @@
     "dev:backend": "cd packages/shared && npm run dev",
     "dev:frontend": "cd packages/minibag && npm run dev",
     "build": "npm run build --workspaces",
+    "build:frontend": "cd packages/minibag && npm install && npm run build",
     "test": "npm run test --workspaces",
     "lint": "eslint packages/*/src",
     "format": "prettier --write 'packages/*/src/**/*.{js,jsx,ts,tsx,json,css,md}'"

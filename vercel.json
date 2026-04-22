@@ -1,9 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "npm run build:frontend",
+  "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
-  "rootDirectory": "packages/minibag",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
