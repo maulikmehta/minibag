@@ -4,7 +4,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: cd packages/sessions-core && npm install --include=dev && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate && npm run build && cd ../shared && npm install --production
+    buildCommand: cd packages/sessions-core && npm install --include=dev && DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npm run build && cd ../shared && npm install --production
     startCommand: cd packages/shared && npm start
     envVars:
       - key: NODE_ENV
