@@ -37,8 +37,10 @@ services:
         value: 3001
       - key: API_PORT
         value: 3000
+      - key: DATABASE_URL
+        sync: false
       - key: USE_SESSIONS_SDK
-        value: false
+        value: true
       - key: DUAL_WRITE_MODE
         value: false
       - key: ENABLE_GROUP_MODE

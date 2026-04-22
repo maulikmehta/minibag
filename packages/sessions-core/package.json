@@ -1,0 +1,52 @@
+{
+  "name": "@sessions/core",
+  "version": "0.1.0-alpha.0",
+  "description": "Sessions SDK - Core session management with anonymous participation",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Maulik",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "sessions",
+    "real-time",
+    "coordination",
+    "websocket",
+    "anonymous",
+    "group-coordination"
+  ],
+  "author": "LocalLoops",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@prisma/client": "^5.7.1",
+    "nanoid": "^5.0.4",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "prisma": "^5.7.1",
+    "tsup": "^7.2.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.3.3",
+    "vitest": "^0.34.6"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sessions Dashboard - Sessions SDK</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #1a1a1a;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 12px 20px;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+
+    /* Main layout */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      background: white;
+      border-right: 1px solid #e5e7eb;
+      padding: 20px 0;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-item {
+      padding: 10px 20px;
+      color: #6b7280;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .sidebar-item:hover {
+      background: #f9fafb;
+      color: #1a1a1a;
+    }
+
+    .sidebar-item.active {
+      background: #fef3f2;
+      color: #f97316;
+      border-right: 3px solid #f97316;
+    }
+
+    .sidebar-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Content area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      background: #f5f5f5;
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .header-badge {
+      background: #fff7ed;
+      color: #ea580c;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-link {
+      color: #6b7280;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .header-link:hover {
+      color: #f97316;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      width: 100%;
+    }
+
+    /* Metrics Bar */
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .metric-card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .metric-card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    .metric-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .metric {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      color: #666;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metric-value {
+      font-weight: 600;
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .status-dot.green { background: #10b981; }
+    .status-dot.red { background: #ef4444; }
+    .status-dot.yellow { background: #f59e0b; }
+
+    /* Sessions Table */
+    .sessions-table-container {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-weight: 500;
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: #fafafa;
+    }
+
+    /* Milestone dots - 5-6px clean design */
+    .milestone {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .milestone-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .milestone-dot.created { background: #3b82f6; }
+    .milestone-dot.gathering { background: #f97316; }
+    .milestone-dot.checkpoint { background: #eab308; }
+    .milestone-dot.active { background: #10b981; }
+    .milestone-dot.completed { background: #22c55e; }
+    .milestone-dot.expired { background: #ef4444; }
+    .milestone-dot.cancelled { background: #9ca3af; }
+
+    .milestone-label {
+      font-size: 13px;
+      text-transform: capitalize;
+    }
+
+    /* Session type badge */
+    .session-type {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .session-type.group {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .session-type.solo {
+      background: #e0e7ff;
+      color: #4338ca;
+    }
+
+    /* Participants column */
+    .participants {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      color: #374151;
+    }
+
+    .participants .declined {
+      color: #ef4444;
+    }
+
+    .participants .timed-out {
+      color: #f59e0b;
+    }
+
+    /* Age column */
+    .age {
+      color: #6b7280;
+      font-size: 12px;
+    }
+
+    .age.warning {
+      color: #f59e0b;
+      font-weight: 500;
+    }
+
+    .age.critical {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    /* Status badges */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .status-badge.done { background: #d1fae5; color: #065f46; }
+    .status-badge.running { background: #d1fae5; color: #047857; }
+    .status-badge.ready { background: #fef3c7; color: #92400e; }
+    .status-badge.waiting { background: #dbeafe; color: #1e40af; }
+    .status-badge.partial { background: #fed7aa; color: #9a3412; }
+    .status-badge.timeout { background: #fee2e2; color: #991b1b; }
+    .status-badge.cancelled { background: #e5e7eb; color: #374151; }
+
+    /* Loading state */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #9ca3af;
+    }
+
+    /* Last updated */
+    .last-updated {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 11px;
+      padding: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    /* Footer */
+    .footer {
+      background: #1f2937;
+      color: #9ca3af;
+      padding: 16px 20px;
+      margin-top: 20px;
+    }
+
+    .footer-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .footer-logo {
+      width: 16px;
+      height: 16px;
+    }
+
+    .footer-link {
+      color: #f97316;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover {
+      color: #fb923c;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="header-left">
+        <img src="/sessions-logo.png" alt="Sessions SDK" class="logo" onerror="this.style.display='none'">
+        <span class="header-title">Sessions SDK</span>
+        <span class="header-badge">Dashboard</span>
+      </div>
+      <a href="http://localhost:5173/sessions-landing.html" class="header-link" title="Back to Sessions SDK">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-item active">
+          <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Monitor
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <div class="container">
+    <!-- Metrics Bar -->
+    <div class="metrics-bar">
+      <!-- System Status Card -->
+      <div class="metric-card">
+        <div class="metric-card-title">System Health</div>
+        <div class="metric-group">
+          <div class="metric">
+            <span class="metric-label">Monitoring</span>
+            <span class="metric-value" id="product-name" style="font-size: 12px; font-weight: 600;">Sessions SDK</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">
+              <span class="status-dot green" id="sdk-status"></span>
+              Sessions SDK
+            </span>
+            <span class="metric-value">Running</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">
+              <span class="status-dot green" id="db-status"></span>
+              Database
+            </span>
+            <span class="metric-value">Connected</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">
+              <span class="status-dot green" id="ws-status"></span>
+              WebSocket
+            </span>
+            <span class="metric-value">Active</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Metrics Card -->
+      <div class="metric-card">
+        <div class="metric-card-title">Session Metrics</div>
+        <div class="metric-group">
+          <div class="metric">
+            <span class="metric-label">Active</span>
+            <span class="metric-value" id="active-count">-</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Completed Today</span>
+            <span class="metric-value" id="completed-count">-</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Completion Rate</span>
+            <span class="metric-value" id="completion-rate">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nickname Pool Card -->
+      <div class="metric-card">
+        <div class="metric-card-title">Nickname Pool</div>
+        <div class="metric-group">
+          <div class="metric">
+            <span class="metric-label">Available</span>
+            <span class="metric-value" id="available-nicknames">-</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Reserved</span>
+            <span class="metric-value" id="reserved-nicknames">-</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">In Use</span>
+            <span class="metric-value" id="used-nicknames">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions Table -->
+    <div class="sessions-table-container">
+      <div class="table-header">Sessions Monitor</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Session ID</th>
+            <th>Type</th>
+            <th>Milestone</th>
+            <th>Participants</th>
+            <th>Age</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody">
+          <tr>
+            <td colspan="6" class="loading">Loading sessions...</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="last-updated">
+        Last updated: <span id="last-updated-time">-</span>
+      </div>
+    </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <img src="/sessions-logo.png" alt="Sessions SDK" class="footer-logo" onerror="this.style.display='none'">
+        <span>Sessions SDK - Open Source Multi-Participant Coordination</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const API_ENDPOINT = '/api/dashboard/monitor';
+    const REFRESH_INTERVAL = 5000; // 5 seconds
+
+    // Format participant counts
+    function formatParticipants(session) {
+      if (session.is_solo) {
+        return 'Solo (1/1)';
+      }
+
+      let result = `${session.expected_participants} exp, ${session.max_participants} max, ${session.joined_count} joined`;
+
+      if (session.declined_count > 0) {
+        result += `, <span class="declined">${session.declined_count}D</span>`;
+      }
+      if (session.timed_out_count > 0) {
+        result += `, <span class="timed-out">${session.timed_out_count}T</span>`;
+      }
+
+      return result;
+    }
+
+    // Format age with warning colors
+    function formatAge(ageMinutes) {
+      const hours = Math.floor(ageMinutes / 60);
+      const mins = Math.floor(ageMinutes % 60);
+
+      let ageClass = '';
+      if (ageMinutes > 110) ageClass = 'critical';
+      else if (ageMinutes > 90) ageClass = 'warning';
+
+      let text = '';
+      if (hours > 0) text = `${hours}h ${mins}m`;
+      else text = `${mins}m`;
+
+      return `<span class="age ${ageClass}">${text}</span>`;
+    }
+
+    // Update metrics bar
+    function updateMetrics(data) {
+      // Product name
+      if (data.branding && data.branding.productName) {
+        document.getElementById('product-name').textContent = data.branding.productName;
+      }
+
+      // System status
+      document.getElementById('sdk-status').className = `status-dot ${data.status.sdk_running ? 'green' : 'red'}`;
+      document.getElementById('db-status').className = `status-dot ${data.status.database_connected ? 'green' : 'red'}`;
+      document.getElementById('ws-status').className = `status-dot ${data.status.websocket_connected ? 'green' : 'red'}`;
+
+      // Session metrics
+      document.getElementById('active-count').textContent = data.sessions.active_count;
+      document.getElementById('completed-count').textContent = data.sessions.completed_today;
+      document.getElementById('completion-rate').textContent = data.sessions.completion_rate + '%';
+
+      // Nickname pool
+      document.getElementById('available-nicknames').textContent = data.nickname_pool.available.toLocaleString();
+      document.getElementById('reserved-nicknames').textContent = data.nickname_pool.reserved;
+      document.getElementById('used-nicknames').textContent = data.nickname_pool.in_use;
+    }
+
+    // Update sessions table
+    function updateSessionsTable(sessions) {
+      const tbody = document.getElementById('sessions-tbody');
+
+      if (sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No sessions in last 24 hours</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sessions.map(session => {
+        const createdTime = new Date(session.created_at).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+
+        return `
+          <tr>
+            <td><code>${session.session_id}</code></td>
+            <td><span class="session-type ${session.is_solo ? 'solo' : 'group'}">${session.is_solo ? 'Solo' : 'Group'}</span></td>
+            <td>
+              <div class="milestone">
+                <span class="milestone-dot ${session.milestone}"></span>
+                <span class="milestone-label">${session.milestone}</span>
+              </div>
+            </td>
+            <td><span class="participants">${formatParticipants(session)}</span></td>
+            <td>${formatAge(session.age_minutes)}</td>
+            <td><span class="status-badge ${session.status}">${session.status}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Fetch and update dashboard
+    async function refreshDashboard() {
+      try {
+        const response = await fetch(API_ENDPOINT);
+        const data = await response.json();
+
+        updateMetrics(data);
+        updateSessionsTable(data.sessions_list);
+
+        // Update last updated time
+        const now = new Date().toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        document.getElementById('last-updated-time').textContent = now;
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      }
+    }
+
+    // Initial load
+    refreshDashboard();
+
+    // Auto-refresh every 5 seconds
+    setInterval(refreshDashboard, REFRESH_INTERVAL);
+  </script>
+</body>
+</html>

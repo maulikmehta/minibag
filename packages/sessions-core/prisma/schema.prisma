@@ -1,0 +1,161 @@
+// This is your Prisma schema file for Sessions SDK
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Nickname pool for anonymous participation
+model NicknamesPool {
+  id          String    @id @default(uuid()) @db.Uuid
+  nickname    String    @unique
+  avatarEmoji String    @map("avatar_emoji")
+
+  // Availability tracking
+  isAvailable      Boolean   @default(true) @map("is_available")
+  currentlyUsedIn  String?   @map("currently_used_in") @db.Uuid
+
+  // Reservation system (prevents race conditions)
+  reservedUntil    DateTime? @map("reserved_until") @db.Timestamptz(6)
+  reservedBySession String?  @map("reserved_by_session") @db.Uuid
+
+  // Usage statistics
+  timesUsed Int      @default(0) @map("times_used")
+  lastUsed  DateTime? @map("last_used") @db.Timestamptz(6)
+
+  // Categorization
+  gender         String?
+  languageOrigin String? @map("language_origin")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("nicknames_pool")
+  @@index([isAvailable])
+  @@index([reservedUntil])
+  @@index([gender])
+}
+
+// Sessions - Core coordination entity
+model Session {
+  id          String    @id @default(uuid()) @db.Uuid
+  sessionId   String    @unique @map("session_id") // Short readable ID (abc123)
+
+  // Creator info
+  creatorNickname String  @map("creator_nickname")
+  creatorRealName String? @map("creator_real_name")
+
+  // Status tracking
+  status String @default("open") // open, active, completed, cancelled, expired
+
+  // Authentication
+  hostToken   String @map("host_token") // Host authentication token
+  sessionPin  String? @map("session_pin") // Optional PIN for participant authentication
+
+  // Session mode (NEW: Phase 2 Week 6)
+  mode                String? @map("mode") // 'solo' | 'group' (nullable for backward compat)
+  maxParticipants     Int?    @map("max_participants") // Tier-based limit (4 for free, 10+ for pro)
+  constantInviteToken String? @unique @map("constant_invite_token") // Single shareable token for group mode
+
+  // Coordination metadata
+  expectedParticipants     Int?      @map("expected_participants")
+  expectedParticipantsSetAt DateTime? @map("expected_participants_set_at") @db.Timestamptz(6)
+  checkpointComplete       Boolean   @default(false) @map("checkpoint_complete")
+
+  // Timestamps
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  // Relations
+  participants Participant[]
+  invites      Invite[]
+
+  @@map("sessions")
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([mode])
+  @@index([constantInviteToken])
+}
+
+// Participants - Session members with anonymous nicknames
+model Participant {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Session relation
+  sessionId String  @map("session_id") @db.Uuid
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Identity (nickname-based)
+  nickname    String
+  avatarEmoji String @map("avatar_emoji")
+  realName    String? @map("real_name")
+
+  // Role
+  isCreator Boolean @default(false) @map("is_creator")
+
+  // Authentication (CRITICAL-1 fix: token-based auth for WebSocket)
+  authToken String? @map("auth_token") // Token for WebSocket authentication
+
+  // Invite tracking (optional)
+  claimedInviteId String? @map("claimed_invite_id") @db.Uuid
+  claimedInvite   Invite? @relation(fields: [claimedInviteId], references: [id])
+
+  // Workflow state
+  itemsConfirmed     Boolean   @default(false) @map("items_confirmed")
+  markedNotComing    Boolean   @default(false) @map("marked_not_coming")
+  markedNotComingAt  DateTime? @map("marked_not_coming_at") @db.Timestamptz(6)
+
+  // Soft deletion (preserves history)
+  joinedAt DateTime  @default(now()) @map("joined_at") @db.Timestamptz(6)
+  leftAt   DateTime? @map("left_at") @db.Timestamptz(6)
+
+  @@map("participants")
+  @@index([sessionId])
+  @@index([authToken])
+  @@index([leftAt]) // For filtering active participants
+  @@index([claimedInviteId])
+}
+
+// Invites - Session invitation system
+model Invite {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Session relation
+  sessionId String  @map("session_id") @db.Uuid
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Invite details
+  inviteToken  String @map("invite_token") // Token (8-char for named, 16-char for constant)
+  inviteNumber Int?   @map("invite_number") // 1, 2, or 3 (nullable for constant invites)
+  status       String @default("pending") // pending, claimed, expired, active
+
+  // Invite type (NEW: Phase 2 Week 6)
+  inviteType     String  @default("named") @map("invite_type") // 'constant' | 'named'
+  isConstantLink Boolean @default(false) @map("is_constant_link")
+
+  // Dynamic slot tracking (NEW: Phase 2 Week 6)
+  slotAssignments Json? @map("slot_assignments") // [{ slotNumber, participantId, nickname, claimedAt }]
+  declinedBy      Json? @map("declined_by") // [{ declinedAt, reason }]
+
+  // Claim tracking
+  claimedBy   Participant[] // Participants who claimed this invite
+  claimedAt   DateTime?     @map("claimed_at") @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  @@map("invites")
+  @@unique([sessionId, inviteNumber]) // Only one invite per number per session
+  @@unique([sessionId, inviteToken]) // Tokens unique within session
+  @@index([inviteToken])
+  @@index([status])
+  @@index([inviteType])
+  @@index([isConstantLink])
+}
