@@ -29,8 +29,5 @@
   "devDependencies": {
     "nodemon": "^3.0.3",
     "vitest": "^1.2.1"
-  },
-  "optionalDependencies": {
-    "@sessions/core": "file:../../../sessions/packages/core"
   }
 }
