@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "cd ../shared && npm install && cd ../minibag && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
