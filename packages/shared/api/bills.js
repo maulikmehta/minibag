@@ -7,29 +7,69 @@ import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
 import logger from '../utils/logger.js';
 import { buildPaymentMaps, buildCatalogMap, calculateItemTotals } from '../utils/billCalculations.js';
+import { getHostToken } from '../utils/cookies.js';
 
 /**
  * POST /api/sessions/:session_id/bill-token
  * Generate a time-limited access token for viewing a bill
  * Body: { participant_id?: string } - Optional for group mode, null for solo/host
+ *
+ * SECURITY: Requires host token when participant_id is null (host/solo bill)
  */
 export async function generateBillToken(req, res) {
   try {
     const { session_id } = req.params;
     const { participant_id = null } = req.body;
 
-    // Verify session exists
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id, session_id, session_type, created_at')
-      .eq('session_id', session_id)
-      .single();
+    let session;
 
-    if (sessionError || !session) {
-      return res.status(404).json({
-        success: false,
-        error: 'Session not found'
-      });
+    // SECURITY: Host token validation for host/solo bills
+    if (participant_id === null) {
+      // This is a host/solo bill request - verify host token
+      const host_token = getHostToken(req);
+
+      if (!host_token) {
+        return res.status(401).json({
+          success: false,
+          error: 'Host token required for this action. Please log in as session host.',
+          error_code: 'HOST_TOKEN_REQUIRED'
+        });
+      }
+
+      // Verify token matches session and fetch session in one query
+      const { data: sessionData, error: authError } = await supabase
+        .from('sessions')
+        .select('id, session_id, session_type, created_at, host_token')
+        .eq('session_id', session_id)
+        .eq('host_token', host_token)
+        .single();
+
+      if (authError || !sessionData) {
+        logger.error({ err: authError, sessionId: session_id }, 'Invalid host token or session not found');
+        return res.status(403).json({
+          success: false,
+          error: 'Invalid host token or session not found',
+          error_code: 'INVALID_HOST_TOKEN'
+        });
+      }
+
+      session = sessionData;
+    } else {
+      // Participant bill - verify session exists (no host token needed)
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('sessions')
+        .select('id, session_id, session_type, created_at')
+        .eq('session_id', session_id)
+        .single();
+
+      if (sessionError || !sessionData) {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        });
+      }
+
+      session = sessionData;
     }
 
     // If participant_id provided, verify participant exists
