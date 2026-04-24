@@ -15,6 +15,7 @@ import { useNotification } from '../hooks/useNotification.js';
 import { useParticipantSync } from '../hooks/useParticipantSync.js';
 import { useExpectedParticipants } from '../hooks/useExpectedParticipants.js';
 import { aggregateAllItems } from '../utils/calculateItems';
+import { API_BASE_URL } from '../services/api.js';
 
 export default function SessionActiveScreen({
   session,
@@ -164,13 +165,22 @@ export default function SessionActiveScreen({
     if (!session?.session_id || !isHost) return;
 
     try {
-      const response = await fetch(`/api/sessions/${session.session_id}/invites`);
+      const response = await fetch(`${API_BASE_URL}/api/sessions/${session.session_id}/invites`);
+
+      // Gracefully handle 404/500 errors (invites table may not exist in Phase 0)
+      if (!response.ok) {
+        console.warn('Invites endpoint not available (Phase 0 - Solo mode only)');
+        setInvites([]);
+        return;
+      }
+
       const data = await response.json();
       if (data.success) {
         setInvites(data.data);
       }
     } catch (error) {
       console.error('Failed to fetch invites:', error);
+      setInvites([]); // Set empty array on error to prevent blocking
     }
   }, [session?.session_id, isHost]);
 

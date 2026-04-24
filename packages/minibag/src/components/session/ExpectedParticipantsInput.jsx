@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, Minus, Users } from 'lucide-react';
+import { API_BASE_URL } from '../../services/api.js';
 
 /**
  * Component for setting expected participants count
@@ -23,7 +24,7 @@ export default function ExpectedParticipantsInput({
 
     if (sessionId) {
       try {
-        await fetch(`/api/sessions/${sessionId}/expected`, {
+        await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/expected`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ expected_participants: newValue })
@@ -43,7 +44,7 @@ export default function ExpectedParticipantsInput({
 
     if (sessionId) {
       try {
-        await fetch(`/api/sessions/${sessionId}/expected`, {
+        await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/expected`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ expected_participants: newValue })
@@ -62,7 +63,7 @@ export default function ExpectedParticipantsInput({
 
       if (sessionId) {
         try {
-          await fetch(`/api/sessions/${sessionId}/expected`, {
+          await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/expected`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ expected_participants: value })

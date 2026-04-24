@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useNotification } from '../../hooks/useNotification.js';
 import InviteCard from './InviteCard.jsx';
 import { buildInviteUrl, copyInviteToClipboard, shareInvite } from '../../utils/inviteHelpers.js';
+import { API_BASE_URL } from '../../services/api.js';
 
 /**
  * Tabbed interface for selecting participant mode and managing invite links
@@ -72,7 +73,7 @@ export default function InviteTabsSelector({
 
     // Call API to update expected_participants and get invite links
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/expected`, {
+      const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/expected`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
