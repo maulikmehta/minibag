@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npx vite build",
-  "outputDirectory": "dist",
+  "buildCommand": "cd packages/minibag && npm install && npm run build",
+  "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
@@ -17,7 +17,9 @@
       ]
     }
   ],
-  "env": {
-    "NODE_ENV": "production"
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
   }
 }
