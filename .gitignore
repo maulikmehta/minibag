@@ -40,3 +40,4 @@ firebase-debug.log
 temp/
 .planning/
 .env.backup
+.env.production
