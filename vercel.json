@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm run build --workspace=@localloops/minibag",
+  "buildCommand": "npm run build --workspace=@localloops/minibag",
   "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
+  "installCommand": "npm ci",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
