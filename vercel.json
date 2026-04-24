@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install --workspaces",
-  "buildCommand": "cd packages/minibag && npx vite build",
+  "installCommand": "npm install",
+  "buildCommand": "cd packages/minibag && npm install && npx vite build",
   "outputDirectory": "packages/minibag/dist",
   "framework": null,
   "rewrites": [
