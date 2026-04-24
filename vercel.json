@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npx vite build",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "installCommand": "echo 'Skipping auto-install, handled in buildCommand'",
+  "buildCommand": "npm install --prefix packages/minibag && cd packages/minibag && npx vite build",
+  "outputDirectory": "packages/minibag/dist",
+  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
