@@ -1067,6 +1067,7 @@ export async function createSession(req, res) {
     }
 
     // Set host token as httpOnly cookie (secure authentication)
+    // Set cookie (works for same-domain) and return token (for cross-domain)
     setHostTokenCookie(res, host_token, session.id);
 
     res.json({
@@ -1075,9 +1076,9 @@ export async function createSession(req, res) {
         session: session,
         participant: participantWithItems || participant,
         session_url: `/session/${session_id}`,
-        // host_token removed - now stored in httpOnly cookie
+        host_token: host_token, // Return for cross-domain deployments (Vercel → Render)
         session_pin: finalPin, // Return PIN for host to share with participants (null if no PIN)
-        auth_method: 'cookie' // Indicate that authentication is via cookie
+        auth_method: 'cookie_and_token' // Support both cookie (same-domain) and header (cross-domain)
       }
     });
   } catch (error) {

@@ -61,13 +61,18 @@ function getUserFriendlyMessage(statusCode, defaultMessage) {
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
+  // Get host token from localStorage for cross-domain auth
+  const hostToken = typeof window !== 'undefined' ? localStorage.getItem('minibag_host_token') : null;
+
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
+      'Pragma': 'no-cache',
+      // Send host token in Authorization header (cross-domain fallback)
+      ...(hostToken ? { 'Authorization': `Bearer ${hostToken}` } : {})
     },
-    credentials: 'include', // IMPORTANT: Send cookies for httpOnly authentication
+    credentials: 'include', // IMPORTANT: Send cookies for httpOnly authentication (same-domain)
   };
 
   // Properly merge options while preserving both default and custom headers

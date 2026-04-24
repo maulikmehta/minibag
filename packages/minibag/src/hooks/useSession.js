@@ -27,7 +27,7 @@ export function useSession(sessionId = null) {
 
   /**
    * Persist session to localStorage
-   * NOTE: Host token no longer stored - now handled via httpOnly cookie
+   * Store host_token for cross-domain auth (Vercel frontend → Render backend)
    */
   const persistSession = useCallback((sessionData, participantData, hostToken = null) => {
     try {
@@ -38,8 +38,11 @@ export function useSession(sessionId = null) {
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(dataToStore));
 
-      // Host token management removed - now using httpOnly cookies for security
-      // The server sets the cookie automatically, no client-side storage needed
+      // Store host token separately for authenticated requests
+      // Needed for cross-domain deployments where cookies don't work
+      if (hostToken) {
+        localStorage.setItem('minibag_host_token', hostToken);
+      }
     } catch (err) {
       logger.error('Failed to persist session', { error: err.message });
     }
@@ -47,13 +50,12 @@ export function useSession(sessionId = null) {
 
   /**
    * Clear persisted session from localStorage
-   * NOTE: Host token cookie cleared by server or via expiration
+   * Also clear host_token
    */
   const clearPersistedSession = useCallback(() => {
     try {
       localStorage.removeItem(SESSION_STORAGE_KEY);
-      // Host token cookie is httpOnly and managed by server
-      // It will expire automatically or can be cleared via /api/logout endpoint
+      localStorage.removeItem('minibag_host_token');
     } catch (err) {
       logger.error('Failed to clear persisted session', { error: err.message });
     }
