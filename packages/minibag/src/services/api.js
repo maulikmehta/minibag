@@ -9,6 +9,9 @@ import logger from '../../../shared/utils/frontendLogger.js';
 // In production, set VITE_API_URL to the actual API URL
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+// Export for direct fetch calls (when not using apiFetch wrapper)
+export { API_BASE_URL };
+
 /**
  * User-friendly error messages for common API errors
  */

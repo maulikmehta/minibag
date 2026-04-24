@@ -5,6 +5,7 @@ import { useNotification } from '../../hooks/useNotification.js';
 import { VALIDATION_LIMITS } from '@shared/constants/limits.js';
 import { ERROR_MESSAGES } from '@shared/constants/errorMessages.js';
 import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
+import { API_BASE_URL } from '../../services/api.js';
 
 // Vibrant color palette from LocalLoops landing page for item bubbles
 const BUBBLE_COLORS = [
@@ -111,7 +112,7 @@ export default function JoinSessionScreen({
 
       // Build URL with optional sessionUuid parameter (for reservation)
       // Use session.id (UUID) not joinSessionId (TEXT) for proper reservation
-      let url = `/api/sessions/nickname-options?firstLetter=${firstLetter}`;
+      let url = `${API_BASE_URL}/api/sessions/nickname-options?firstLetter=${firstLetter}`;
 
       // Add session UUID for reservation (prevent race conditions)
       // Only include if session is loaded with valid UUID

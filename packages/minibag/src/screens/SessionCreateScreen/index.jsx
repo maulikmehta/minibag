@@ -8,6 +8,7 @@ import ProgressBar from '../../components/layout/ProgressBar.jsx';
 import { useNotification } from '../../hooks/useNotification.js';
 import { VALIDATION_LIMITS, QUANTITY_LIMITS, roundQuantity } from '@shared/constants/limits.js';
 import { sanitizeName, getNameValidationError } from '../../utils/validation.js';
+import { API_BASE_URL } from '../../services/api.js';
 
 export default function SessionCreateScreen({
   categories,
@@ -167,8 +168,8 @@ export default function SessionCreateScreen({
       // Extract first letter from host name if available
       const firstLetter = hostName.trim() ? hostName.trim().charAt(0).toUpperCase() : null;
       const url = firstLetter
-        ? `/api/sessions/nickname-options?firstLetter=${firstLetter}`
-        : '/api/sessions/nickname-options';
+        ? `${API_BASE_URL}/api/sessions/nickname-options?firstLetter=${firstLetter}`
+        : `${API_BASE_URL}/api/sessions/nickname-options`;
 
       const response = await fetch(url);
       const data = await response.json();
@@ -709,7 +710,7 @@ export default function SessionCreateScreen({
                       setLoadingHostNicknames(true);
                       try {
                         const firstLetter = hostName.trim().charAt(0).toUpperCase();
-                        const url = `/api/sessions/nickname-options?firstLetter=${firstLetter}`;
+                        const url = `${API_BASE_URL}/api/sessions/nickname-options?firstLetter=${firstLetter}`;
                         const response = await fetch(url);
                         const data = await response.json();
 
