@@ -2269,11 +2269,12 @@ export async function getSessionInvites(req, res) {
     }
 
     // Get all invites with participant info
+    // Note: FK is participants.claimed_invite_id -> invites.id (reverse direction)
     const { data: invites, error: invitesError } = await supabase
       .from('invites')
       .select(`
         *,
-        participant:participants!invites_claimed_by_fkey(
+        participant:participants!participants_claimed_invite_id_fkey(
           id,
           nickname,
           real_name,
