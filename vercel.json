@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd packages/minibag && npx vite build",
+  "buildCommand": "cd packages/minibag && npm install && npx vite build",
   "outputDirectory": "packages/minibag/dist",
   "framework": null,
   "installCommand": "npm install",
