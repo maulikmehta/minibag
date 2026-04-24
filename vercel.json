@@ -3,7 +3,6 @@
   "buildCommand": "npm run build --workspace=@localloops/minibag",
   "outputDirectory": "packages/minibag/dist",
   "framework": "vite",
-  "installCommand": "npm install",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
