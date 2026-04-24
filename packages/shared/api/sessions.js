@@ -2249,14 +2249,17 @@ export async function getSessionInvites(req, res) {
   try {
     const { session_id } = req.params;
 
-    // Get session first
+    // Get session first (maybeSingle handles 0 or 1 row gracefully)
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select('id')
       .eq('session_id', session_id)
-      .single();
+      .maybeSingle();
 
-    if (sessionError) throw sessionError;
+    if (sessionError) {
+      logger.error({ err: sessionError, sessionId: session_id }, 'Error fetching session for invites');
+      throw sessionError;
+    }
 
     if (!session) {
       return res.status(404).json({
