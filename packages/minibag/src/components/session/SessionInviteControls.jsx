@@ -26,7 +26,7 @@ export default function SessionInviteControls({
   const handleCopyLink = async () => {
     if (!session || disabled) return;
 
-    const inviteUrl = buildInviteUrl(session.session_id);
+    const inviteUrl = buildInviteUrl(session.session_id, session.constant_invite_token);
     await copyInviteToClipboard(inviteUrl, session.session_pin, t, notify);
   };
 

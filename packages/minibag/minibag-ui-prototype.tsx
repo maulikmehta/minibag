@@ -35,6 +35,7 @@ import {
   PARTICIPANT_ADD_ITEMS_TOUR_STEPS
 } from './src/config/tooltips.config.js';
 import { transformSessionData, transformParticipant } from './src/utils/sessionTransformers.js';
+import { buildInviteUrl } from './src/utils/inviteHelpers.js';
 import './src/styles/driver-custom.css';
 
 // Hardcoded data removed - now fetched from API via useCatalog hook
@@ -761,7 +762,7 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const handleShare = async () => {
     if (!session) return;
 
-    const shareUrl = `${window.location.origin}/join/${session.session_id}`;
+    const shareUrl = buildInviteUrl(session.session_id, session.constant_invite_token);
     // Use localized message if available, otherwise fallback to English
     const shareText = t('whatsapp.invitation', {
       url: shareUrl,
