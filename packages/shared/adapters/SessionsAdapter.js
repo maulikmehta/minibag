@@ -180,7 +180,7 @@ export class MinibagSessionsAdapter {
           items: participantItems, // Include items in response
         },
         authToken, // For WebSocket auth
-        session_url: `/session/${session.sessionId}`,
+        session_url: `/join/${session.sessionId}`, // BUGFIX: Changed from /session/ to /join/ to match App.jsx route
         session_pin: sessionPin || session_pin, // Return PIN for sharing
       };
     } catch (error) {
