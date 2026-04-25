@@ -64,13 +64,25 @@ function PaymentSplitScreen({
   // Update session status to 'completed' when component mounts (HOST ONLY, non-blocking)
   useEffect(() => {
     // SECURITY FIX: Only host can update session status (requires host token)
-    if (session?.session_id && onUpdateSessionStatus && currentParticipant?.is_creator) {
+    // Early return if participant data not loaded yet
+    if (!currentParticipant) return;
+
+    // Explicit check: is_creator must be explicitly true (not undefined, not false)
+    if (session?.session_id && onUpdateSessionStatus && currentParticipant.is_creator === true) {
+      console.log('[PaymentSplit] Updating session status to completed (host only)');
       // Run in background - don't block UI
       onUpdateSessionStatus('completed').catch(err => {
         console.error('Failed to update session status to completed:', err);
       });
+    } else {
+      console.log('[PaymentSplit] Skipping status update', {
+        hasSession: !!session?.session_id,
+        hasCallback: !!onUpdateSessionStatus,
+        isCreator: currentParticipant?.is_creator,
+        participantId: currentParticipant?.id
+      });
     }
-  }, [session?.session_id, onUpdateSessionStatus, currentParticipant?.is_creator]);
+  }, [session?.session_id, onUpdateSessionStatus, currentParticipant]);
 
   // Fetch bill items from server (eliminates empty items race condition)
   useEffect(() => {
@@ -243,9 +255,22 @@ function PaymentSplitScreen({
   const handleViewBill = async () => {
     try {
       // SECURITY FIX: Check if user is host or participant
+      // Early return if participant data not loaded
+      if (!currentParticipant || !currentParticipant.id) {
+        console.error('[PaymentSplit] Cannot generate bill - participant not loaded');
+        alert(t('errors.failedToGenerateBill'));
+        return;
+      }
+
       // Host (creator): Generate full bill token (participant_id = null)
       // Participant: Generate individual bill token (participant_id = their ID)
-      const participantId = currentParticipant?.is_creator ? null : currentParticipant?.id;
+      const participantId = currentParticipant.is_creator === true ? null : currentParticipant.id;
+      console.log('[PaymentSplit] Generating bill token', {
+        isCreator: currentParticipant.is_creator,
+        participantId,
+        sessionId: session.session_id
+      });
+
       const billTokenData = await generateBillToken(session.session_id, participantId);
       // Open bill in new tab
       window.open(billTokenData.bill_url, '_blank');
