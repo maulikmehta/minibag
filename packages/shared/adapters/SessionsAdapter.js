@@ -303,6 +303,29 @@ export class MinibagSessionsAdapter {
 
       const { slotNumber, participant, authToken } = sdkResult.data;
 
+      // CRITICAL: Sync participant to Supabase (frontend reads from Supabase)
+      // SDK creates participant in Postgres, but frontend queries Supabase
+      const { data: minibagParticipant, error: participantError } = await supabase
+        .from('participants')
+        .insert({
+          id: participant.id,
+          session_id: participant.sessionId,
+          nickname: participant.nickname,
+          avatar_emoji: participant.avatarEmoji,
+          real_name: participant.realName,
+          is_creator: false,
+          items_confirmed: false,
+          joined_at: participant.joinedAt,
+          claimed_invite_id: participant.claimedInviteId,
+        })
+        .select()
+        .single();
+
+      if (participantError) {
+        logger.error({ err: participantError, participantId: participant.id }, 'Failed to sync participant to Supabase');
+        throw new Error('Failed to create participant record');
+      }
+
       return {
         slotNumber,
         participant: {
