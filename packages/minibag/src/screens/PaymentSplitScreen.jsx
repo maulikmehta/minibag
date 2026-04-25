@@ -242,8 +242,11 @@ function PaymentSplitScreen({
 
   const handleViewBill = async () => {
     try {
-      // Generate bill token for host (solo mode - participantId is null)
-      const billTokenData = await generateBillToken(session.session_id, null);
+      // SECURITY FIX: Check if user is host or participant
+      // Host (creator): Generate full bill token (participant_id = null)
+      // Participant: Generate individual bill token (participant_id = their ID)
+      const participantId = currentParticipant?.is_creator ? null : currentParticipant?.id;
+      const billTokenData = await generateBillToken(session.session_id, participantId);
       // Open bill in new tab
       window.open(billTokenData.bill_url, '_blank');
     } catch (error) {
