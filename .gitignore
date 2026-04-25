@@ -41,3 +41,4 @@ temp/
 .planning/
 .env.backup
 .env.production
+.github/WORKFLOW_UPDATE_NOTE.md

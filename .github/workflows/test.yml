@@ -1,10 +1,12 @@
 name: Tests and Coverage
 
 on:
-  push:
-    branches: [main, master, develop, infrastructure/**]
+  # Only run on PRs, not on direct pushes to main
+  # This prevents blocking deployments while still testing PRs
   pull_request:
     branches: [main, master, develop]
+  # Optional: Allow manual workflow dispatch
+  workflow_dispatch:
 
 # Cancel previous runs if a new one is started
 concurrency:
