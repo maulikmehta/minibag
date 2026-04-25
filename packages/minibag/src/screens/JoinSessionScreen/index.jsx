@@ -81,6 +81,34 @@ export default function JoinSessionScreen({
     }
   }, [notify]);
 
+  // Check if user already joined this session (prevent duplicate joins)
+  useEffect(() => {
+    if (!joinSessionId || !session) return;
+
+    try {
+      // Check localStorage for existing session
+      const stored = localStorage.getItem('minibag_active_session');
+      if (!stored) return;
+
+      const { session: storedSession, currentParticipant } = JSON.parse(stored);
+
+      // If stored session matches current session ID and participant exists
+      if (storedSession?.session_id === joinSessionId && currentParticipant?.id) {
+        console.log('User already joined this session, redirecting to session-active', {
+          sessionId: joinSessionId,
+          participantId: currentParticipant.id
+        });
+
+        // Auto-navigate to session-active (skip join form)
+        notify.info('Welcome back! Returning to your session...');
+        onJoinSuccess();
+      }
+    } catch (err) {
+      console.error('Failed to check for existing session:', err);
+      // Continue with normal join flow on error
+    }
+  }, [joinSessionId, session, notify, onJoinSuccess]);
+
   // Fetch nickname options with debouncing and immediate fallback (Issues #11, #15)
   // Initialize fallback nicknames once on mount (Issue #15)
   useEffect(() => {

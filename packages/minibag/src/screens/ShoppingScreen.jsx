@@ -70,13 +70,14 @@ function ShoppingScreen({
   const [itemParticipants, setItemParticipants] = useState({}); // Per-participant quantities
   const [loadingItems, setLoadingItems] = useState(true);
 
-  // Update session status to 'shopping' when component mounts
+  // Update session status to 'shopping' when component mounts (HOST ONLY)
   useEffect(() => {
-    if (session?.session_id && onUpdateSessionStatus && !statusUpdatedRef.current) {
+    // SECURITY FIX: Only host can update session status (requires host token)
+    if (session?.session_id && onUpdateSessionStatus && currentParticipant?.is_creator && !statusUpdatedRef.current) {
       statusUpdatedRef.current = true;
       onUpdateSessionStatus('shopping');
     }
-  }, [session?.session_id, onUpdateSessionStatus]);
+  }, [session?.session_id, onUpdateSessionStatus, currentParticipant?.is_creator]);
 
   // Fetch aggregated items from server (eliminates empty items race condition)
   useEffect(() => {

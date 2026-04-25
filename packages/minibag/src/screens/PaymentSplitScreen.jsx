@@ -61,15 +61,16 @@ function PaymentSplitScreen({
   const [billData, setBillData] = useState(null);
   const [loadingBills, setLoadingBills] = useState(true);
 
-  // Update session status to 'completed' when component mounts (non-blocking)
+  // Update session status to 'completed' when component mounts (HOST ONLY, non-blocking)
   useEffect(() => {
-    if (session?.session_id && onUpdateSessionStatus) {
+    // SECURITY FIX: Only host can update session status (requires host token)
+    if (session?.session_id && onUpdateSessionStatus && currentParticipant?.is_creator) {
       // Run in background - don't block UI
       onUpdateSessionStatus('completed').catch(err => {
         console.error('Failed to update session status to completed:', err);
       });
     }
-  }, [session?.session_id, onUpdateSessionStatus]);
+  }, [session?.session_id, onUpdateSessionStatus, currentParticipant?.is_creator]);
 
   // Fetch bill items from server (eliminates empty items race condition)
   useEffect(() => {
