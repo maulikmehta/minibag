@@ -94,9 +94,22 @@ export default function JoinSessionScreen({
 
       // If stored session matches current session ID and participant exists
       if (storedSession?.session_id === joinSessionId && currentParticipant?.id) {
-        console.log('User already joined this session, redirecting to session-active', {
+        // BUGFIX: Only auto-redirect participants, NOT hosts
+        // Host clicking their own invite link should see join screen (to verify invite works)
+        // Participants who already joined should skip the form
+        if (currentParticipant.is_creator === true) {
+          console.log('Host clicked own invite link - showing join screen for verification', {
+            sessionId: joinSessionId,
+            isCreator: true
+          });
+          // Don't auto-redirect - let host see the join screen
+          return;
+        }
+
+        console.log('Participant already joined this session, redirecting to session-active', {
           sessionId: joinSessionId,
-          participantId: currentParticipant.id
+          participantId: currentParticipant.id,
+          isCreator: currentParticipant.is_creator
         });
 
         // Auto-navigate to session-active (skip join form)
