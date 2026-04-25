@@ -64,28 +64,20 @@ function HomeScreen({
               <p className="text-xs text-gray-500 mt-0.5">Start a new shopping list</p>
             </button>
             <button
-              onClick={() => {
-                setShowPlusMenu(false);
-                setSignUpContext('past-runs');
-                setShowSignUpModal(true);
-              }}
+              disabled
               data-tour="shopping-history"
-              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 border-b border-gray-200 transition-all duration-150 active:bg-green-100"
+              className="w-full px-5 py-4 text-left border-b border-gray-200 cursor-not-allowed opacity-50"
             >
-              <p className="text-base font-medium text-gray-900">Shopping History</p>
-              <p className="text-xs text-gray-500 mt-0.5">View past shopping lists</p>
+              <p className="text-base font-medium text-gray-400">Shopping History</p>
+              <p className="text-xs text-gray-400 mt-0.5">Coming in Pro version</p>
             </button>
             <button
-              onClick={() => {
-                setShowPlusMenu(false);
-                setSignUpContext('pro');
-                setShowSignUpModal(true);
-              }}
+              disabled
               data-tour="go-pro"
-              className="w-full px-5 py-4 text-left hover:bg-green-50 hover:text-green-700 transition-all duration-150 active:bg-green-100"
+              className="w-full px-5 py-4 text-left cursor-not-allowed opacity-50"
             >
-              <p className="text-base font-medium text-gray-900">Go Pro</p>
-              <p className="text-xs text-gray-500 mt-0.5">Unlock premium features</p>
+              <p className="text-base font-medium text-gray-400">Go Pro</p>
+              <p className="text-xs text-gray-400 mt-0.5">Coming soon</p>
             </button>
           </div>
         )}
