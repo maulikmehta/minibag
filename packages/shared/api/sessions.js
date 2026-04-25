@@ -1075,7 +1075,7 @@ export async function createSession(req, res) {
       data: {
         session: session,
         participant: participantWithItems || participant,
-        session_url: `/session/${session_id}`,
+        session_url: `/join/${session_id}`, // Changed from /session/ to /join/ to match App.jsx route
         host_token: host_token, // Return for cross-domain deployments (Vercel → Render)
         session_pin: finalPin, // Return PIN for host to share with participants (null if no PIN)
         auth_method: 'cookie_and_token' // Support both cookie (same-domain) and header (cross-domain)
