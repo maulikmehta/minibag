@@ -90,6 +90,7 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
     setHostTokenCookie(res, result.session.host_token);
 
     // Return SDK result
+    // CRITICAL: host_token must be at top level for frontend localStorage persistence
     return res.status(201).json({
       success: true,
       data: {
@@ -97,10 +98,12 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
         participant: result.participant,
         session_url: result.session_url,
         session_pin: result.session_pin, // Return PIN for sharing with participants
+        host_token: result.session.host_token, // BUGFIX: Extract to top level for cross-domain auth
         // Include SDK-specific fields
         constant_invite_token: result.session.constantInviteToken,
         mode: result.session.mode,
         sdk_version: 'v1',
+        auth_method: 'cookie_and_token', // Support both cookie (same-domain) and header (cross-domain)
       },
       message: 'Session created successfully (via Sessions SDK)'
     });
