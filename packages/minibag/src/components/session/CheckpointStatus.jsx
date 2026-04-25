@@ -68,7 +68,7 @@ export default function CheckpointStatus({
     }
 
     // If checkpoint is not complete, show waiting message
-    if (!checkpointComplete && expectedCount > 0) {
+    if (!checkpointComplete && expectedCount > 0 && waitingCount > 0) {
       return `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond (or 20 min)`;
     }
 
@@ -123,7 +123,7 @@ export default function CheckpointStatus({
         title={
           expectedCount === null
             ? 'Set how many friends joining above'
-            : !checkpointComplete
+            : (!checkpointComplete && waitingCount > 0)
               ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'} to respond (or 20 min timeout)`
               : (participantCount > 0 && !allJoinedParticipantsConfirmed
                   ? `Waiting for ${participantCount - confirmedParticipants} joined ${participantCount - confirmedParticipants === 1 ? 'participant' : 'participants'} to confirm their list`
@@ -138,7 +138,7 @@ export default function CheckpointStatus({
             ? 'Starting...'
             : (expectedCount === null
                 ? 'Start shopping'
-                : !checkpointComplete
+                : (!checkpointComplete && waitingCount > 0)
                   ? `Waiting for ${waitingCount} ${waitingCount === 1 ? 'friend' : 'friends'}...`
                   : 'Start shopping')}
         </span>

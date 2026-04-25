@@ -187,12 +187,19 @@ export default function SessionActiveScreen({
   useEffect(() => {
     if (!session?.session_id || !isHost) return;
 
+    // Skip polling in constant link mode (group mode) - invites not used
+    // Constant link uses single token, not numbered invites
+    if (expectedCount === 1 && session?.constant_invite_token) {
+      console.log('[Invites] Skipping poll - constant link mode uses single token');
+      return;
+    }
+
     fetchInvites();
 
-    // Poll for invite status updates every 3 seconds
+    // Poll for invite status updates every 3 seconds (numbered invite mode only)
     const interval = setInterval(fetchInvites, 3000);
     return () => clearInterval(interval);
-  }, [fetchInvites, session?.session_id, isHost]);
+  }, [fetchInvites, session?.session_id, isHost, expectedCount, session?.constant_invite_token]);
 
   // Compute all items from host + participants (memoized for performance)
   const allItems = useMemo(
