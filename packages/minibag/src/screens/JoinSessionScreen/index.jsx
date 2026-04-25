@@ -137,6 +137,13 @@ export default function JoinSessionScreen({
     // Skip if no name entered yet
     if (!participantName.trim()) return;
 
+    // CRITICAL: Wait for session to load before fetching nicknames
+    // Without session UUID, nicknames won't be reserved → race condition
+    if (!session?.id) {
+      console.log('Waiting for session to load before fetching nicknames...');
+      return;
+    }
+
     // Use closure to track loading state instead of state dependency
     const loadingRef = { current: false };
 
