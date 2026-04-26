@@ -411,6 +411,11 @@ export async function claimNextAvailableSlot(
         );
       }
 
+      // BUGFIX #1: Acquire row-level lock on session to prevent race conditions
+      // This ensures only ONE concurrent join can proceed at a time for this session
+      // Without this lock, multiple users can bypass the participant limit check
+      await tx.$executeRaw`SELECT * FROM "Session" WHERE id = ${session.id}::uuid FOR UPDATE`;
+
       // Step 2: Verify constant invite link exists using direct FK lookup
       // BUGFIX #6: Use sessionId UUID + inviteToken (covered by unique constraint)
       // instead of nested relation query which can be unreliable
