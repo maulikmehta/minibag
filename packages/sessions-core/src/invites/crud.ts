@@ -394,7 +394,6 @@ export async function claimNextAvailableSlot(
 ): Promise<ApiResponse<{ slotNumber: number; participant: any; authToken: string }>> {
   try {
     // Import dependencies needed for this function
-    const { markNicknameAsUsed } = await import('../nicknames/claim.js');
     const { generateAuthToken } = await import('../utils/generators.js');
 
     // Use transaction for atomicity
@@ -472,13 +471,36 @@ export async function claimNextAvailableSlot(
       const slotNumber = currentCount + 1;
 
       // Step 6: Claim nickname from pool (if not fallback)
+      // BUGFIX #2: Make nickname claiming atomic by using transaction client
+      // Previously markNicknameAsUsed() used separate DB connection → orphaned nicknames
       if (nicknameId && !nicknameId.startsWith('fallback-')) {
-        const nicknameResult = await markNicknameAsUsed(nicknameId, session.id);
+        const now = new Date();
 
-        if (nicknameResult.error) {
+        // Atomically mark nickname as used within transaction
+        const nicknameUpdate = await tx.nicknamesPool.updateMany({
+          where: {
+            id: nicknameId,
+            isAvailable: true, // Only claim if still available
+            OR: [
+              { reservedBySession: session.id }, // Reserved by this session
+              { reservedUntil: null }, // Not reserved
+              { reservedUntil: { lt: now } } // Reservation expired
+            ]
+          },
+          data: {
+            isAvailable: false,
+            currentlyUsedIn: session.id,
+            timesUsed: { increment: 1 },
+            lastUsed: now,
+            reservedUntil: null,
+            reservedBySession: null
+          }
+        });
+
+        if (nicknameUpdate.count === 0) {
           throw new SessionError(
             SessionErrorCode.NICKNAME_CLAIM_FAILED,
-            'Failed to claim nickname'
+            'Nickname is no longer available'
           );
         }
       }
