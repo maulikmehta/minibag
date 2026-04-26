@@ -1708,6 +1708,17 @@ export async function joinSession(req, res) {
       });
     }
 
+    // BUGFIX #3: Validate session mode allows joining
+    // Solo mode sessions should only have the creator (no joins allowed)
+    // Group mode or null (legacy) allow joins
+    if (session.mode === 'solo') {
+      return res.status(400).json({
+        success: false,
+        error: 'This is a solo shopping session. Only the creator can participate.',
+        error_code: 'SOLO_MODE_NO_JOINS'
+      });
+    }
+
     // Check if invite link has expired
     const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
     if (session.expected_participants_set_at) {
