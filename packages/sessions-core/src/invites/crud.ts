@@ -399,16 +399,25 @@ export async function claimNextAvailableSlot(
 
     // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {
-      // Step 1: Verify constant invite link exists and is valid
+      // Step 1: Lookup session first to get UUID (BUGFIX #6: direct FK lookup is more reliable)
+      const session = await tx.session.findUnique({
+        where: { sessionId },
+      });
+
+      if (!session) {
+        throw new SessionError(
+          SessionErrorCode.SESSION_NOT_FOUND,
+          'Session not found'
+        );
+      }
+
+      // Step 2: Verify constant invite link exists using direct FK lookup
+      // BUGFIX #6: Use sessionId UUID + inviteToken (covered by unique constraint)
+      // instead of nested relation query which can be unreliable
       const invite = await tx.invite.findFirst({
         where: {
+          sessionId: session.id, // Direct UUID FK lookup
           inviteToken: constantToken,
-          session: {
-            sessionId,
-          },
-        },
-        include: {
-          session: true,
         },
       });
 
@@ -430,23 +439,23 @@ export async function claimNextAvailableSlot(
         throw new Error('This invite link is not a group invite');
       }
 
-      // Step 2: Verify PIN if session requires it
-      if (invite.session.sessionPin && invite.session.sessionPin !== sessionPin) {
+      // Step 3: Verify PIN if session requires it
+      if (session.sessionPin && session.sessionPin !== sessionPin) {
         throw new SessionError(
           SessionErrorCode.INVALID_SESSION_ID,
           'Invalid session PIN'
         );
       }
 
-      // Step 3: Check current participant count vs maxParticipants
+      // Step 4: Check current participant count vs maxParticipants
       const currentCount = await tx.participant.count({
         where: {
-          sessionId: invite.session.id,
+          sessionId: session.id,
           leftAt: null, // Only count active participants
         },
       });
 
-      const maxParticipants = invite.session.maxParticipants || 4;
+      const maxParticipants = session.maxParticipants || 4;
       if (currentCount >= maxParticipants) {
         throw new SessionError(
           SessionErrorCode.PARTICIPANT_LIMIT_REACHED,
@@ -454,12 +463,12 @@ export async function claimNextAvailableSlot(
         );
       }
 
-      // Step 4: Dynamic slot assignment (next available number)
+      // Step 5: Dynamic slot assignment (next available number)
       const slotNumber = currentCount + 1;
 
-      // Step 5: Claim nickname from pool (if not fallback)
+      // Step 6: Claim nickname from pool (if not fallback)
       if (nicknameId && !nicknameId.startsWith('fallback-')) {
-        const nicknameResult = await markNicknameAsUsed(nicknameId, invite.session.id);
+        const nicknameResult = await markNicknameAsUsed(nicknameId, session.id);
 
         if (nicknameResult.error) {
           throw new SessionError(
@@ -469,13 +478,13 @@ export async function claimNextAvailableSlot(
         }
       }
 
-      // Step 6: Generate auth token
+      // Step 7: Generate auth token
       const authToken = generateAuthToken();
 
-      // Step 7: Create participant
+      // Step 8: Create participant
       const participant = await tx.participant.create({
         data: {
-          sessionId: invite.session.id,
+          sessionId: session.id,
           nickname,
           avatarEmoji,
           realName,
@@ -486,7 +495,7 @@ export async function claimNextAvailableSlot(
         },
       });
 
-      // Step 8: Update slot assignments in invite
+      // Step 9: Update slot assignments in invite
       const slotAssignments = (invite.slotAssignments as any[]) || [];
       slotAssignments.push({
         slotNumber,
