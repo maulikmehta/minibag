@@ -65,6 +65,10 @@ initSentry();
 const app = express();
 const server = createServer(app);
 
+// Trust proxy - required for rate limiting behind Render/Cloudflare
+// Render adds X-Forwarded-For header
+app.set('trust proxy', 1);
+
 // Socket.IO setup with same CORS origins as Express
 const socketAllowedOrigins = [
   'http://localhost:5173',

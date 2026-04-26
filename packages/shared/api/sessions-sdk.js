@@ -214,9 +214,12 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
     });
 
   } catch (error) {
+    const { session_id } = req.params;
+    const { selected_nickname, invite_token } = req.body;
+
     logger.error({
       err: error,
-      sessionId: req.params.session_id,
+      sessionId: session_id,
       nickname: selected_nickname,
       inviteToken: invite_token ? 'present' : 'missing'
     }, '[SDK] Session join failed');
