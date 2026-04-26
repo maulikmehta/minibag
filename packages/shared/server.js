@@ -178,6 +178,13 @@ const getAllowedOrigins = () => {
 
 const allowedOrigins = getAllowedOrigins();
 
+// Log CORS configuration for debugging
+logger.info('CORS Configuration', {
+  environment: process.env.NODE_ENV || 'development',
+  allowedOrigins,
+  frontendUrl: process.env.FRONTEND_URL || 'not set'
+});
+
 app.use(cors({
   origin: allowedOrigins,
   credentials: true

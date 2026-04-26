@@ -33,6 +33,14 @@ function JoinSessionWrapper() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
 
+  // Debug: Log extracted sessionId to catch URL parsing issues
+  console.log('[JoinSessionWrapper] Extracted sessionId:', {
+    sessionId,
+    fullUrl: window.location.href,
+    pathname: window.location.pathname,
+    search: window.location.search
+  });
+
   return (
     <MinibagPrototype
       joinSessionId={sessionId}

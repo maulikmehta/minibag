@@ -223,6 +223,14 @@ export async function createSession(sessionData) {
  * @returns {Promise<Object>} Session details with participants and items
  */
 export async function getSession(sessionId) {
+  // Debug: Log sessionId to catch URL construction issues
+  logger.debug('getSession called', {
+    sessionId,
+    endpoint: `/api/sessions/${sessionId}`,
+    sessionIdType: typeof sessionId,
+    sessionIdLength: sessionId?.length
+  });
+
   const response = await apiFetch(`/api/sessions/${sessionId}`);
 
   // DEBUG: Log what we received from API
@@ -243,6 +251,15 @@ export async function getSession(sessionId) {
  * @returns {Promise<Object>} Participant data and session info
  */
 export async function joinSession(sessionId, items = [], nicknameData = {}) {
+  // Debug: Log sessionId and endpoint to catch URL construction issues
+  logger.debug('joinSession called', {
+    sessionId,
+    endpoint: `/api/sessions/${sessionId}/join`,
+    sessionIdType: typeof sessionId,
+    sessionIdLength: sessionId?.length,
+    hasInviteToken: !!nicknameData.invite_token
+  });
+
   const response = await apiFetch(`/api/sessions/${sessionId}/join`, {
     method: 'POST',
     body: JSON.stringify({ items, ...nicknameData }),
