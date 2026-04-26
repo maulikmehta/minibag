@@ -483,6 +483,23 @@ export async function claimNextAvailableSlot(
         }
       }
 
+      // BUGFIX #7: Check for duplicate join attempts (same nickname)
+      // Prevents same user claiming multiple slots via retry/refresh
+      const existingParticipant = await tx.participant.findFirst({
+        where: {
+          sessionId: session.id,
+          nickname,
+          leftAt: null, // Only active participants
+        },
+      });
+
+      if (existingParticipant) {
+        throw new SessionError(
+          SessionErrorCode.PARTICIPANT_LIMIT_REACHED,
+          'You have already joined this session with this nickname'
+        );
+      }
+
       // Step 7: Generate auth token
       const authToken = generateAuthToken();
 
