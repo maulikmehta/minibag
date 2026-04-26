@@ -1,0 +1,153 @@
+MINIBAG-2 GROUP MODE SESSION JOINING - CRITICAL ISSUES SUMMARY
+================================================================
+
+SEVERITY: CRITICAL - Production Bug
+FAILURE RATE: 30-80% under concurrent load
+
+QUICK OVERVIEW
+==============
+
+7 Critical Bugs Found:
+
+1. RACE CONDITION - Participant Count Check (Line 441-455 in invites/crud.ts)
+   Impact: Multiple users can exceed group size limit in concurrent joins
+   Fix: Add row-level locking with SELECT ... FOR UPDATE
+
+2. RACE CONDITION - Nickname Claiming Not Atomic (Line 461-487 in invites/crud.ts)
+   Impact: Nicknames get orphaned when participant creation fails
+   Fix: Move nickname claiming inside join transaction
+
+3. MISSING VALIDATION - Group Mode Not Enforced (Line 1696-1740 in sessions.js)
+   Impact: Users can join solo sessions as second participant
+   Fix: Add explicit session.mode === 'group' check
+
+4. RACE CONDITION - Duplicate Limit Checks (Sessions API vs sessions-core)
+   Impact: Two validation points can make conflicting decisions
+   Fix: Consolidate to single validation point with transaction
+
+5. ASYNC SYNC ISSUE - WebSocket Join Not Coordinated (handlers.ts Line 98-137)
+   Impact: Broadcast messages may arrive out-of-order, UI shows stale data
+   Fix: Ensure join-session handler validates DB state
+
+6. QUERY BUG - Constant Invite Lookup Using Wrong Identifier (Line 403-413)
+   Impact: "Invalid invite link" error for valid invites
+   Fix: Use direct FK lookup, not nested relation
+
+7. STATE TRACKING - Invite Slot Claims Not Deduplicated (Line 489-501)
+   Impact: Same user can claim multiple slots by retrying
+   Fix: Check if participant already in slotAssignments
+
+AFFECTED FILES
+==============
+
+Server-Side:
+- /packages/sessions-core/src/invites/crud.ts (PRIMARY)
+  - claimNextAvailableSlot() [Line 386-520] - HAS 5 BUGS
+  
+- /packages/shared/api/sessions.js
+  - joinSession() [Line 1555-1978] - HAS 2 BUGS
+  
+- /packages/sessions-core/src/websocket/handlers.ts
+  - setupSocketHandlers() [Line 61-220] - HAS 1 BUG
+
+Prisma Schema:
+- Check for missing indexes on:
+  - participants(sessionId, leftAt)
+  - invites(inviteToken, sessionId)
+  - nicknames_pool(isAvailable, currentlyUsedIn)
+
+IMMEDIATE FIXES NEEDED
+======================
+
+Priority 1: Add Row-Level Locking
+  File: /packages/sessions-core/src/invites/crud.ts
+  Function: claimNextAvailableSlot()
+  Change: Use FOR UPDATE on session before count check
+  Time: 1-2 hours
+  Risk: Low (adds lock, reduces concurrency slightly)
+
+Priority 2: Make Nickname Claiming Atomic
+  File: /packages/sessions-core/src/invites/crud.ts
+  Function: claimNextAvailableSlot()
+  Change: Move nicknames_pool update into prisma.$transaction
+  Time: 2-3 hours
+  Risk: Low (improves atomicity)
+
+Priority 3: Add Group Mode Validation
+  File: /packages/shared/api/sessions.js
+  Function: joinSession()
+  Change: Add check at start: if (session.mode !== 'group') throw
+  Time: 30 minutes
+  Risk: Very Low (simple check)
+
+Priority 4: Fix Constant Invite Lookup
+  File: /packages/sessions-core/src/invites/crud.ts
+  Function: claimNextAvailableSlot()
+  Change: Replace nested relation with direct FK query
+  Time: 1 hour
+  Risk: Low (clarifies query)
+
+Priority 5: Consolidate Participant Limit Checks
+  File: /packages/shared/api/sessions.js
+  Function: joinSession()
+  Change: Remove duplicate check, use invites/crud version
+  Time: 2-3 hours
+  Risk: Medium (may affect both endpoints)
+
+TEST CASES TO ADD
+=================
+
+1. Concurrent Join Test
+   Simulate 5 users joining 4-person group simultaneously
+   Expected: Only 4 succeed, 1 fails with "group is full"
+   Current: Can exceed limit in race condition
+
+2. Nickname Orphaning Test
+   Force nickname claim to succeed, participant creation to fail
+   Expected: Nickname rolled back
+   Current: Nickname stays locked
+
+3. Invite Token Test
+   Create constant invite, verify both sessionId formats work
+   Expected: Always finds invite
+   Current: May return null due to query issue
+
+4. Group Mode Solo Bypass Test
+   Create solo session, try to join as participant
+   Expected: 400 error "solo mode"
+   Current: May allow join if limit checks pass
+
+5. WebSocket Sync Test
+   Join session, verify broadcast reaches all clients
+   Expected: UI updates within 100ms
+   Current: May show stale participant list
+
+SPECIFIC LINE NUMBERS
+====================
+
+Issue 1: /packages/sessions-core/src/invites/crud.ts:441-455
+Issue 2: /packages/sessions-core/src/invites/crud.ts:461-487
+Issue 3: /packages/shared/api/sessions.js:1696-1740
+Issue 4: /packages/sessions-core/src/invites/crud.ts:441-455
+Issue 5: /packages/sessions-core/src/websocket/handlers.ts:98-137
+Issue 6: /packages/sessions-core/src/invites/crud.ts:403-413
+Issue 7: /packages/sessions-core/src/invites/crud.ts:489-501
+
+VERIFICATION COMMAND
+====================
+
+After fixes, run:
+npm test -- group-mode-joining
+npm run test:e2e -- session-join.spec.js
+
+Monitor logs for:
+- "Participant limit exceeded" errors
+- "Nickname already in use" from orphaned nicknames
+- WebSocket message latency
+
+DETAILED ANALYSIS FILE
+======================
+
+Full analysis with code examples, scenarios, and recommendations:
+/Users/maulik/llcode/minibag-2/GROUP_MODE_JOIN_ANALYSIS.md (700 lines)
+

@@ -1,0 +1,342 @@
+GROUP MODE SESSION JOINING - ARCHITECTURE & DATA FLOW
+======================================================
+
+DATABASE SCHEMA (Key Tables)
+============================
+
+Sessions Table:
+  - id (UUID) [PK]
+  - sessionId (TEXT) [Unique, e.g., "abc123"]
+  - mode ('solo' | 'group') [REQUIRED]
+  - maxParticipants (INT) [Default: 4]
+  - status ('open' | 'active' | 'completed' | 'cancelled')
+  - expectedParticipants (INT | NULL)
+  - sessionPin (TEXT | NULL) [4-6 digits for PIN protection]
+
+Participants Table:
+  - id (UUID) [PK]
+  - sessionId (UUID) [FK to sessions.id]
+  - nickname (TEXT)
+  - avatarEmoji (TEXT)
+  - realName (TEXT | NULL)
+  - isCreator (BOOLEAN)
+  - authToken (TEXT) [For WebSocket auth]
+  - claimedInviteId (UUID | NULL) [FK to invites.id]
+  - joinedAt (TIMESTAMP)
+  - leftAt (TIMESTAMP | NULL) [Soft delete]
+  - INDEX: sessionId, leftAt [CRITICAL - Missing!]
+
+Invites Table:
+  - id (UUID) [PK]
+  - sessionId (UUID) [FK to sessions.id]
+  - inviteToken (TEXT) [8 chars for regular, 16 for constant]
+  - inviteType ('regular' | 'constant')
+  - isConstantLink (BOOLEAN)
+  - status ('pending' | 'claimed' | 'expired' | 'active')
+  - slotAssignments (JSONB) [{ slotNumber, participantId, nickname, claimedAt }]
+  - declinedBy (JSONB) [{ declinedAt, reason }]
+  - INDEX: sessionId, inviteToken [MISSING!]
+
+Nicknames_Pool Table:
+  - id (UUID) [PK]
+  - nickname (TEXT) [4 letter names]
+  - gender ('male' | 'female')
+  - avatarEmoji (TEXT)
+  - isAvailable (BOOLEAN)
+  - currentlyUsedIn (UUID | NULL) [FK to sessions.id]
+  - reservedUntil (TIMESTAMP | NULL)
+  - INDEX: isAvailable, currentlyUsedIn [MISSING!]
+
+
+API FLOW DIAGRAM
+================
+
+CLIENT SIDE:
+============
+
+1. User clicks invite link: /join/{sessionId}?token={constantToken}
+                            
+2. Frontend renders join form
+   - Fetches session details: GET /api/sessions/{sessionId}
+   - Fetches nickname options: GET /api/sessions/nickname-options?sessionUuid={uuid}
+   
+3. User enters name, selects nickname+avatar
+   
+4. User clicks "Join" button
+   - Calls: POST /api/sessions/{sessionId}/join
+   - Body: {
+       real_name: "John",
+       selected_nickname: "Alex",
+       selected_nickname_id: "uuid-from-pool",
+       selected_avatar_emoji: "👨",
+       invite_token: "constant123",
+       session_pin: null
+     }
+   - WAITS for response
+   
+5. On success, user receives: { participant, session, authToken, ... }
+   
+6. Frontend sets up WebSocket
+   - Emits: 'authenticate' with { participantId, authToken }
+   - Waits for: 'authenticated' response
+   - Emits: 'join-session' with { sessionId, participantId, authToken }
+   - Waits for: 'joined-session' response
+   
+7. Socket joins room, receives 'participant-joined' broadcast
+   
+8. UI updates with new participant
+
+
+SERVER SIDE (SHARED API):
+=========================
+
+POST /api/sessions/{sessionId}/join
+[Line 1555 in /packages/shared/api/sessions.js]
+
+Request:
+{
+  items: [],
+  real_name: "John",
+  selected_nickname_id: "uuid",
+  selected_nickname: "Alex",
+  selected_avatar_emoji: "👨",
+  session_pin: null,
+  marked_not_coming: false,
+  invite_token: "constant123"
+}
+
+Steps:
+1. Validate nickname format (regex check)
+2. Fetch session by session_id
+3. Check session expiry
+4. Check session status == 'open'
+5. Check invite link expiry
+6. Count current participants ← RACE CONDITION POINT #1
+7. Check participant limit
+8. Lookup invite by token
+9. Validate PIN if required
+10. Sanitize real name
+11. Mark nickname as used ← RACE CONDITION POINT #2
+12. Create participant record ← RACE CONDITION POINT #3
+13. Update invite status
+14. Return { success, participant, session }
+
+Issues in this flow:
+- No explicit group mode check (Issue #3)
+- Count check not under row-level lock (Issue #1)
+- Duplicate count checks with sessions-core (Issue #4)
+- No validation that session.mode === 'group'
+
+
+SERVER SIDE (SESSIONS-CORE):
+============================
+
+claimNextAvailableSlot() 
+[Line 386 in /packages/sessions-core/src/invites/crud.ts]
+
+Called when: User joins group session via constant invite link
+
+Transaction Block:
+┌─────────────────────────────────────────────┐
+│ prisma.$transaction(async (tx) => {         │
+│                                             │
+│ Step 1: Find constant invite                │
+│   Query by: inviteToken + sessionId         │
+│   Issue: Relation lookup bug (Issue #6)     │
+│                                             │
+│ Step 2: Validate PIN                        │
+│                                             │
+│ Step 3: Count participants                  │
+│   SELECT count(*) WHERE sessionId = ? AND   │
+│   leftAt IS NULL                            │
+│   Issue: Race window (Issue #1)             │
+│                                             │
+│ Step 4: Check limit                         │
+│   if (count >= maxParticipants) throw       │
+│                                             │
+│ Step 5: Claim nickname                      │
+│   UPDATE nicknames_pool SET                 │
+│   isAvailable = false, ...                  │
+│   Issue: Outside transaction (Issue #2)     │
+│   Issue: Can fail after count passed        │
+│                                             │
+│ Step 6: Create participant                  │
+│   INSERT into participants                  │
+│   Issue: May fail after nickname claimed    │
+│                                             │
+│ Step 7: Update slot assignments             │
+│   UPDATE invites SET slotAssignments = ...  │
+│   Issue: No deduplication (Issue #7)        │
+│                                             │
+│ }                                           │
+└─────────────────────────────────────────────┘
+
+Return: { slotNumber, participant, authToken }
+
+
+SERVER SIDE (WEBSOCKET):
+========================
+
+setupSocketHandlers()
+[Line 61 in /packages/sessions-core/src/websocket/handlers.ts]
+
+socket.on('join-session', (data) => {
+  1. Join socket to session room
+  2. Emit 'joined-session' to sender
+  3. Broadcast 'user-joined' to room
+  
+  Issue: No DB verification (Issue #5)
+  Issue: No guarantee broadcast reaches others
+})
+
+socket.on('participant-joined', (data) => {
+  1. Broadcast 'participant-joined' to all in room
+  2. Contains: { id, nickname, avatarEmoji }
+})
+
+
+DATA CONSISTENCY ISSUES
+=======================
+
+Timeline of a successful group join:
+
+Time | Shared API              | sessions-core      | Database
+-----|-------------------------|-------------------|------------------
+T0   | Count=3, limit=4 OK     |                   |
+T1   |                         | Count=3, OK       |
+T2   |                         | Claim nickname    | nickname.used=true
+T3   | Claim nickname (too!)   |                   | DUPLICATE!
+T4   |                         | Create partic #4  | partic created
+T5   | Create partic (partic?) |                   | CONFLICT?
+T6   |                         | Return success    |
+T7   | Return success          |                   |
+T8   |                         |                   | Now 5 participants!
+T9   |                         |                   | But limit is 4!
+
+The problem: Two separate code paths checking limits at different times.
+
+
+CONCURRENT REQUEST RACE CONDITION EXAMPLE
+==========================================
+
+Scenario: 4-person group, 3 currently in, 2 users try to join
+
+User A                          | Time | User B
+------------------------------- | ---- | ------
+Call POST /join                 | T0   |
+                                | T1   | Call POST /join
+Reach DB, count = 3             | T2   |
+3 < 4, pass check               | T3   |
+Claim nickname "Alex"           | T4   |
+                                | T5   | Reach DB, count = 3
+                                | T6   | 3 < 4, pass check
+                                | T7   | Claim nickname "Bob"
+Create participant #4           | T8   |
+Success response to User A      | T9   |
+                                | T10  | Create participant #5
+                                | T11  | Success response to User B
+Database now has 6 people       | T12  | (Should have 4!)
+
+Root cause: No exclusive lock on session during count->create window.
+
+
+FIX SEQUENCE DIAGRAM
+====================
+
+Before Fix:                    After Fix:
+┌──────────────────────┐      ┌──────────────────────┐
+│ 1. Count partic      │      │ 1. Lock session      │
+│ 2. Check limit       │      │    (FOR UPDATE)      │
+│ 3. Claim nickname ─┐ │      │ 2. Count partic      │
+│ 4. Create partic ──┘ │      │ 3. Check limit       │
+│ 5. Update invite     │      │ 4. Claim nickname    │
+└──────────────────────┘      │    (in transaction)  │
+                              │ 5. Create partic     │
+Race window here!             │    (in transaction)  │
+Multiple users can skip       │ 6. Update invite     │
+past limit check              │    (in transaction)  │
+                              │ 7. Unlock session    │
+                              └──────────────────────┘
+                              
+                              All-or-nothing:
+                              If any step fails,
+                              entire transaction
+                              rolls back (including
+                              nickname claim)
+
+
+REQUIRED DATABASE INDEXES
+==========================
+
+CRITICAL - Add immediately:
+
+CREATE INDEX idx_participants_session_active 
+  ON participants(sessionId, leftAt) 
+  WHERE leftAt IS NULL;
+
+CREATE INDEX idx_invites_token_session 
+  ON invites(sessionId, inviteToken);
+
+CREATE INDEX idx_nicknames_available 
+  ON nicknames_pool(isAvailable, currentlyUsedIn);
+
+
+TESTING SCENARIOS
+=================
+
+Test 1: Serial Joins (Should Pass)
+User A joins → Waits for success
+User B joins → Waits for success
+Expected: Both succeed if room not full
+Current: Works fine
+
+Test 2: Concurrent Joins (Currently Fails)
+User A calls POST /join
+User B calls POST /join (at same time)
+Expected: One succeeds, one fails with "room full"
+Current: Both may succeed (violates limit)
+
+Test 3: Nickname Orphaning (Currently Fails)
+Mock participant creation to fail
+User selects nickname, starts join
+Expected: Nickname marked as available again
+Current: Nickname stays locked forever
+
+Test 4: Group Mode Bypass (Currently Fails)
+Create solo session (expected_participants = 0)
+Try to join as second user via direct POST
+Expected: 400 error "solo mode"
+Current: May allow if limit checks pass
+
+
+MONITORING & ALERTING
+======================
+
+Add alerts for:
+
+1. Participant count > maxParticipants
+   SELECT COUNT(*) as actual_count, maxParticipants
+   FROM participants p
+   JOIN sessions s ON p.sessionId = s.id
+   WHERE p.leftAt IS NULL
+   GROUP BY s.id
+   HAVING actual_count > maxParticipants;
+
+2. Orphaned nicknames
+   SELECT COUNT(*) FROM nicknames_pool
+   WHERE isAvailable = false 
+   AND currentlyUsedIn NOT IN (
+     SELECT id FROM sessions WHERE status IN ('open', 'active')
+   );
+
+3. WebSocket join failures
+   - Monitor 'participant-joined' broadcast latency
+   - Alert if > 500ms
+   - Monitor for sockets with no corresponding DB participants
+
+4. Concurrent nickname claims
+   SELECT nickname, COUNT(*) as claims
+   FROM participant_items pi
+   GROUP BY pi.id
+   HAVING COUNT(*) > 1;
+

@@ -250,6 +250,18 @@ export default function JoinSessionScreen({
       return;
     }
 
+    // BUGFIX: Validate invite token is present for group sessions
+    // Without invite token, SDK will reject the join and may cause double-prompt
+    if (!inviteToken) {
+      console.error('Missing invite token - this should not happen', {
+        sessionId: joinSessionId,
+        hasSession: !!session,
+        urlParams: window.location.search
+      });
+      notify.error('Missing invite link. Please click the invite link from your message and try again.');
+      return;
+    }
+
     // Validate PIN if session requires it (Issue #10)
     if (session?.requires_pin) {
       if (!sessionPin || sessionPin.trim().length === 0) {
@@ -272,6 +284,13 @@ export default function JoinSessionScreen({
     try {
       setJoiningSession(true);
 
+      console.log('Attempting to join session', {
+        sessionId: joinSessionId,
+        nickname: selectedNickname.nickname,
+        hasInviteToken: !!inviteToken,
+        hasPIN: !!sessionPin
+      });
+
       // Join session via API with nickname selection and PIN (if required)
       const result = await joinSession(joinSessionId, [], {
         real_name: participantName,
@@ -282,26 +301,41 @@ export default function JoinSessionScreen({
         session_pin: sessionPin.trim() || null // Include PIN if provided
       });
 
-      console.log('✅ Joined session:', result);
+      console.log('✅ Joined session successfully:', result);
+
+      // Close modal before navigating (prevent modal staying open on error)
+      setShowJoinModal(false);
 
       // Navigate to session-active screen
       onJoinSuccess();
     } catch (error) {
-      console.error('❌ Failed to join session:', error);
+      console.error('❌ Failed to join session:', {
+        error,
+        message: error.message,
+        errorCode: error.error_code,
+        nickname: selectedNickname.nickname,
+        inviteToken: inviteToken ? 'present' : 'missing'
+      });
+
+      // Close modal on error so user doesn't think they need to reselect
+      setShowJoinModal(false);
 
       // Handle different error types with friendly messages
       const errorMsg = error.message?.toLowerCase() || '';
+      const errorCode = error.error_code;
 
-      if (errorMsg.includes('full') || errorMsg.includes('limit') || errorMsg.includes('maximum')) {
+      // Use error code first (more reliable than message matching)
+      if (errorCode === 'SESSION_FULL' || errorMsg.includes('full') || errorMsg.includes('limit') || errorMsg.includes('maximum')) {
         notify.error('😊 This group is full right now. The host can shop with up to 3 friends at once.');
-      } else if (errorMsg.includes('expired') || errorMsg.includes('no longer active')) {
+      } else if (errorCode === 'SESSION_EXPIRED' || errorCode === 'INVITE_EXPIRED' || errorMsg.includes('expired') || errorMsg.includes('no longer active')) {
         notify.error('⏰ This shopping session has ended. Ask your friend to start a new one!');
-      } else if (errorMsg.includes('not found') || errorMsg.includes('invalid')) {
-        notify.error('🤔 This link seems off. Double-check it or ask your friend to send a new one!');
-      } else if (errorMsg.includes('pin') || errorMsg.includes('incorrect')) {
+      } else if (errorCode === 'INVALID_INVITE' || errorCode === 'INVITE_TOKEN_REQUIRED' || errorMsg.includes('not found') || errorMsg.includes('invalid') || errorMsg.includes('invite')) {
+        notify.error('🤔 This invite link seems off. Double-check it or ask your friend to send a new one!');
+      } else if (errorCode === 'INCORRECT_PIN' || errorMsg.includes('pin') || errorMsg.includes('incorrect')) {
         notify.error('🔐 That PIN doesn\'t match. Try again or ask your friend for the correct one!');
       } else {
-        notify.error('😕 Couldn\'t join right now. Check your internet and try again!');
+        // Generic error with hint to retry
+        notify.error('😕 Couldn\'t join right now. Check your internet and try clicking the invite link again!');
       }
     } finally {
       setJoiningSession(false);

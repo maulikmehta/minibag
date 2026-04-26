@@ -154,15 +154,44 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
 
     // Invite token is REQUIRED for SDK atomic flow
     if (!invite_token) {
+      logger.warn({
+        sessionId: session_id,
+        hasNickname: !!selected_nickname,
+        hasRealName: !!real_name
+      }, '[SDK] Join attempted without invite_token - this should not happen with group mode');
+
       return res.status(400).json({
         success: false,
-        error: 'invite_token is required for joining sessions',
-        error_code: 'INVITE_TOKEN_REQUIRED'
+        error: 'Invite link is required to join group sessions. Please use the invite link shared by the host.',
+        error_code: 'INVITE_TOKEN_REQUIRED',
+        userMessage: 'Missing invite link. Please click the link from your invite message.'
+      });
+    }
+
+    // Validate invite token format (8-character hex string)
+    if (!/^[a-f0-9]{8}$/i.test(invite_token)) {
+      logger.warn({
+        sessionId: session_id,
+        tokenFormat: 'invalid',
+        tokenLength: invite_token.length
+      }, '[SDK] Invalid invite token format');
+
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid invite link format. Please check your link and try again.',
+        error_code: 'INVALID_INVITE_FORMAT'
       });
     }
 
     // Use ONLY atomic slot claiming (prevents race conditions)
-    logger.info('[SDK] Using atomic slot claiming via constant invite link');
+    logger.info({
+      sessionId: session_id,
+      nickname: selected_nickname,
+      hasNicknameId: !!selected_nickname_id,
+      hasRealName: !!real_name,
+      inviteTokenPresent: true
+    }, '[SDK] Using atomic slot claiming via constant invite link');
+
     const result = await sessionsAdapter.claimSlotViaConstantLink({
       sessionId: session_id,
       constantToken: invite_token,
@@ -185,10 +214,61 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
     });
 
   } catch (error) {
-    logger.error({ err: error, sessionId: req.params.session_id }, '[SDK] Session join failed, falling back to legacy');
+    logger.error({
+      err: error,
+      sessionId: req.params.session_id,
+      nickname: selected_nickname,
+      inviteToken: invite_token ? 'present' : 'missing'
+    }, '[SDK] Session join failed');
 
-    // Fallback to legacy on error
-    return legacyJoinSession(req, res);
+    // BUGFIX: Don't fall back to legacy when using group mode + SDK
+    // Falling back causes nickname double-prompt because legacy auto-assigns different nickname
+    // Instead, return clear error to frontend so user can retry with same selection
+
+    // Determine error type and return appropriate message
+    const errorMessage = error.message || error.error?.message || 'Failed to join session';
+    const errorCode = error.error_code || error.error?.error_code || 'JOIN_FAILED';
+
+    // Check if it's a specific SDK error we should surface
+    if (errorMessage.includes('full') || errorMessage.includes('limit') || errorCode === 'SESSION_FULL') {
+      return res.status(403).json({
+        success: false,
+        error: 'This group is full. The host can shop with up to 3 friends at once.',
+        error_code: 'SESSION_FULL'
+      });
+    }
+
+    if (errorMessage.includes('expired') || errorCode === 'SESSION_EXPIRED') {
+      return res.status(410).json({
+        success: false,
+        error: 'This shopping session has expired.',
+        error_code: 'SESSION_EXPIRED'
+      });
+    }
+
+    if (errorMessage.includes('invalid invite') || errorMessage.includes('not found') || errorCode === 'INVALID_INVITE') {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid invite link. Please check your link and try again.',
+        error_code: 'INVALID_INVITE'
+      });
+    }
+
+    if (errorMessage.includes('pin') || errorMessage.includes('incorrect') || errorCode === 'INCORRECT_PIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'Incorrect PIN. Please try again.',
+        error_code: 'INCORRECT_PIN'
+      });
+    }
+
+    // Generic error - but DON'T fall back to legacy
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to join session. Please try again.',
+      error_code: errorCode,
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    });
   }
 }
 
