@@ -111,8 +111,15 @@ export async function createSession(
       });
 
       // Step 2: Create constant invite if group mode
+      console.log('[DEBUG] Session creation:', {
+        sessionId: session.sessionId,
+        mode,
+        constantInviteToken,
+        willCreateInvite: mode === 'group' && !!constantInviteToken
+      });
+
       if (mode === 'group' && constantInviteToken) {
-        await tx.invite.create({
+        const invite = await tx.invite.create({
           data: {
             sessionId: session.id,
             inviteToken: constantInviteToken,
@@ -123,6 +130,11 @@ export async function createSession(
             slotAssignments: [],
             declinedBy: [],
           },
+        });
+        console.log('[DEBUG] Created constant invite:', {
+          inviteId: invite.id,
+          token: invite.inviteToken,
+          sessionId: session.sessionId
         });
       }
 
