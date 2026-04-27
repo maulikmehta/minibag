@@ -361,6 +361,7 @@ export async function getParticipants(
 /**
  * Verify participant auth token (for WebSocket authentication)
  * CRITICAL-2 fix: Server-side verification
+ * BUGFIX #7: Check session status - reject tokens for ended sessions
  *
  * @param participantId - Participant UUID
  * @param authToken - Auth token to verify
@@ -375,11 +376,22 @@ export async function verifyParticipant(
       throw new Error('participantId and authToken are required');
     }
 
+    // BUGFIX #7: Include session to check status
     const participant = await prisma.participant.findFirst({
       where: {
         id: participantId,
         authToken,
         leftAt: null, // Still active
+      },
+      include: {
+        session: {
+          select: {
+            id: true,
+            sessionId: true,
+            status: true,
+            expiresAt: true,
+          },
+        },
       },
     });
 
@@ -387,6 +399,25 @@ export async function verifyParticipant(
       throw new SessionError(
         SessionErrorCode.INVALID_HOST_TOKEN,
         'Invalid participant credentials or participant has left'
+      );
+    }
+
+    // BUGFIX #7: Reject token if session has ended
+    // Valid states: 'open', 'active', 'shopping'
+    // Invalid states: 'completed', 'cancelled', 'expired'
+    const validStatuses = ['open', 'active', 'shopping'];
+    if (!validStatuses.includes(participant.session.status)) {
+      throw new SessionError(
+        SessionErrorCode.SESSION_EXPIRED,
+        `Session has ${participant.session.status}. Please refresh to see final state.`
+      );
+    }
+
+    // BUGFIX #7: Also check session hasn't expired by time
+    if (participant.session.expiresAt && new Date() > participant.session.expiresAt) {
+      throw new SessionError(
+        SessionErrorCode.SESSION_EXPIRED,
+        'Session has expired'
       );
     }
 
