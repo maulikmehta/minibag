@@ -102,5 +102,6 @@ export function isValidSessionId(sessionId: string): boolean {
  * @returns {string} - Constant invite token (8 bytes = 16 hex chars)
  */
 export function generateConstantInviteToken(): string {
-  return crypto.randomBytes(8).toString('hex'); // 16 chars
+  // Generate 16-character hex token (8 bytes * 2 hex chars per byte)
+  return crypto.randomBytes(8).toString('hex');
 }
