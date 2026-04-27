@@ -270,6 +270,34 @@ export async function getSession(
 }
 
 /**
+ * BUGFIX #16: Release all nicknames used in a session back to the pool
+ * Called when session is cancelled, completed, or expired
+ *
+ * @param sessionUuid - Session UUID (primary key, not short sessionId)
+ */
+async function releaseSessionNicknames(sessionUuid: string): Promise<void> {
+  try {
+    // Find all nicknames currently used in this session
+    const result = await prisma.nicknamesPool.updateMany({
+      where: { currentlyUsedIn: sessionUuid },
+      data: {
+        isAvailable: true,
+        currentlyUsedIn: null,
+        reservedUntil: null,
+        reservedBySession: null,
+      },
+    });
+
+    if (result.count > 0) {
+      console.log(`[releaseSessionNicknames] Released ${result.count} nicknames for session ${sessionUuid}`);
+    }
+  } catch (error) {
+    console.error(`[releaseSessionNicknames] Failed to release nicknames for session ${sessionUuid}:`, error);
+    // Don't throw - this is a cleanup operation that shouldn't block the main flow
+  }
+}
+
+/**
  * Update session status or metadata
  * Requires host token verification
  *
@@ -333,6 +361,13 @@ export async function updateSession(
       // Set cancelled_at timestamp
       if (updates.status === 'cancelled' && !session.cancelledAt) {
         updateData.cancelledAt = new Date();
+      }
+
+      // BUGFIX #16: Release nicknames when session terminates
+      // This frees up nicknames immediately instead of waiting 4 hours
+      if (['cancelled', 'completed', 'expired'].includes(updates.status)) {
+        await releaseSessionNicknames(session.id);
+        console.log(`✅ Released nicknames for ${updates.status} session ${sessionId}`);
       }
     }
 
