@@ -371,6 +371,72 @@ export async function expireOldInvites(
 }
 
 /**
+ * BUGFIX #3: Check if all invites for a session have been resolved
+ * An invite is resolved if it's claimed, declined, or expired (not pending/active)
+ * Used by host to determine if they can proceed to "start shopping" state
+ *
+ * @param sessionId - Short session ID
+ * @returns Resolution status with counts
+ */
+export async function areAllInvitesResolved(
+  sessionId: string
+): Promise<ApiResponse<{ allResolved: boolean; pendingCount: number; totalCount: number; invites: Invite[] }>> {
+  try {
+    // Get session UUID
+    const session = await prisma.session.findUnique({
+      where: { sessionId },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new SessionError(
+        SessionErrorCode.SESSION_NOT_FOUND,
+        'Session not found'
+      );
+    }
+
+    // Get all invites for this session
+    const invites = await prisma.invite.findMany({
+      where: { sessionId: session.id },
+    });
+
+    const totalCount = invites.length;
+
+    // Count invites that are still pending (not resolved)
+    // Resolved states: 'claimed', 'declined', 'expired'
+    // Unresolved states: 'pending', 'active'
+    const pendingInvites = invites.filter(
+      (invite) => invite.status === 'pending' || invite.status === 'active'
+    );
+
+    const pendingCount = pendingInvites.length;
+    const allResolved = pendingCount === 0;
+
+    return {
+      data: {
+        allResolved,
+        pendingCount,
+        totalCount,
+        invites, // Return full invite list for debugging
+      },
+      error: null,
+    };
+  } catch (error) {
+    if (error instanceof SessionError) {
+      return { data: null, error };
+    }
+
+    return {
+      data: null,
+      error: new SessionError(
+        SessionErrorCode.SESSION_NOT_FOUND,
+        error instanceof Error ? error.message : 'Failed to check invite resolution'
+      ),
+    };
+  }
+}
+
+/**
  * Claim next available slot from a constant invite link (Phase 2 Week 6)
  * For group mode sessions with dynamic participant tracking
  *

@@ -2313,6 +2313,54 @@ export async function getSessionInvites(req, res) {
 }
 
 /**
+ * GET /api/sessions/:session_id/invites/resolved
+ * BUGFIX #3: Check if all invites for a session have been resolved
+ * An invite is resolved if it's claimed, declined, or expired (not pending/active)
+ * Used by host to determine if they can proceed to "start shopping" state
+ */
+export async function checkInvitesResolved(req, res) {
+  try {
+    const { session_id } = req.params;
+
+    // Import SDK function
+    const { areAllInvitesResolved } = await import('@sessions/core');
+
+    // Call SDK function to check resolution
+    const { data, error } = await areAllInvitesResolved(session_id);
+
+    if (error) {
+      logger.error({ err: error, sessionId: session_id }, 'Error checking invite resolution');
+      return res.status(404).json({
+        success: false,
+        error: error.message || 'Session not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        allResolved: data.allResolved,
+        pendingCount: data.pendingCount,
+        totalCount: data.totalCount,
+        // Include invite details for debugging (can be removed in production)
+        invites: data.invites.map(inv => ({
+          id: inv.id,
+          inviteNumber: inv.inviteNumber,
+          status: inv.status,
+          isConstantLink: inv.isConstantLink
+        }))
+      }
+    });
+  } catch (error) {
+    logger.error({ err: error, sessionId: req.params.session_id }, 'Error checking invite resolution');
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
  * GET /api/sessions/nickname-options?firstLetter=R
  * Get 2 available nickname options (1 male, 1 female) for user selection
  * Optionally pass firstLetter query param for personalized nickname matching

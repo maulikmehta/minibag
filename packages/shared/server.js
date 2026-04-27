@@ -362,6 +362,7 @@ app.put('/api/sessions/:session_id/status', validateSessionStatus, sessionsAPI.u
 app.patch('/api/sessions/:session_id/expected', sessionsAPI.updateExpectedParticipants);
 app.patch('/api/sessions/:session_id/participant-limit', sessionsAPI.updateParticipantLimit);
 app.get('/api/sessions/:session_id/invites', sessionsAPI.getSessionInvites);
+app.get('/api/sessions/:session_id/invites/resolved', sessionsAPI.checkInvitesResolved); // BUGFIX #3
 
 // Participants API routes
 app.put('/api/participants/:participant_id/items', participantsAPI.updateParticipantItems);

@@ -21,6 +21,50 @@ export function useExpectedParticipants(session, participants) {
   // Track if invite has expired (20 minutes after expected_participants_set_at)
   const [isInviteExpired, setIsInviteExpired] = useState(false);
 
+  // BUGFIX #3: Track if all invites have been resolved (claimed/declined/expired)
+  const [allInvitesResolved, setAllInvitesResolved] = useState(false);
+  const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
+
+  // BUGFIX #3: Fetch invite resolution status periodically
+  useEffect(() => {
+    if (!session?.session_id || localExpectedCount === null || localExpectedCount === 0) {
+      // No invites to resolve for solo mode or unset mode
+      setAllInvitesResolved(true);
+      setPendingInvitesCount(0);
+      return;
+    }
+
+    const checkInviteResolution = async () => {
+      try {
+        const response = await fetch(`/api/sessions/${session.session_id}/invites/resolved`);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setAllInvitesResolved(result.data.allResolved);
+          setPendingInvitesCount(result.data.pendingCount);
+
+          logger.debug('[Checkpoint] Invite resolution status:', {
+            allResolved: result.data.allResolved,
+            pendingCount: result.data.pendingCount,
+            totalCount: result.data.totalCount
+          });
+        }
+      } catch (error) {
+        logger.error('[Checkpoint] Failed to check invite resolution:', error);
+        // On error, assume not all resolved (safer default)
+        setAllInvitesResolved(false);
+      }
+    };
+
+    // Check immediately
+    checkInviteResolution();
+
+    // Check every 5 seconds (more frequent than timeout check since this blocks progression)
+    const interval = setInterval(checkInviteResolution, 5000);
+
+    return () => clearInterval(interval);
+  }, [session?.session_id, localExpectedCount]);
+
   // Sync local expected count with session data
   useEffect(() => {
     setLocalExpectedCount(
@@ -72,6 +116,7 @@ export function useExpectedParticipants(session, participants) {
   // CONSTANT INVITE MODE LOGIC:
   // - Before timeout: Wait for ALL joined participants to confirm
   // - After timeout: Enable if ≥1 participant confirmed (unconfirmed are auto-excluded)
+  // BUGFIX #3: Also require all invites to be resolved (claimed/declined/expired)
   let checkpointComplete;
 
   if (expectedCount === null) {
@@ -81,22 +126,26 @@ export function useExpectedParticipants(session, participants) {
   } else if (isConstantLinkMode) {
     // CONSTANT LINK MODE: Enable when ALL joined participants confirm (any time)
     // Host decides when to proceed - notification informs them the link is still open
+    // BUGFIX #3: Also require all invites resolved
     const confirmedCount = participants.filter(p =>
       !p.marked_not_coming && p.items_confirmed
     ).length;
 
-    checkpointComplete = joinedCount > 0 && joinedCount === confirmedCount;
+    checkpointComplete = joinedCount > 0 && joinedCount === confirmedCount && allInvitesResolved;
 
     logger.debug('[Checkpoint] Constant link mode:', {
       joinedCount,
       confirmedCount,
       isInviteExpired,
+      allInvitesResolved,
+      pendingInvitesCount,
       checkpointComplete,
-      hint: 'Host can proceed when all joined participants confirm (notification shows link status)'
+      hint: 'Host can proceed when all joined participants confirm AND all invites resolved'
     });
   } else {
     // NUMBERED INVITE MODE (legacy): After timeout, unfilled slots count as "timed out"
-    checkpointComplete = (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount;
+    // BUGFIX #3: Also require all invites resolved
+    checkpointComplete = (joinedCount + notComingCount + autoTimedOutCount) >= expectedCount && allInvitesResolved;
   }
 
   // Calculate waiting count (skip for constant link mode - it allows unlimited joins)
@@ -184,6 +233,9 @@ export function useExpectedParticipants(session, participants) {
     checkpointComplete,
     waitingCount,
     autoTimedOutCount,
-    isInviteExpired
+    isInviteExpired,
+    // BUGFIX #3: Expose invite resolution status
+    allInvitesResolved,
+    pendingInvitesCount
   };
 }
