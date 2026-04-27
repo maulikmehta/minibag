@@ -71,8 +71,8 @@ export default function JoinSessionScreen({
     const urlParams = new URLSearchParams(window.location.search);
     const inv = urlParams.get('inv');
     if (inv) {
-      // Validate format: 8-character hex string (matches generateInviteToken)
-      if (/^[a-f0-9]{8}$/i.test(inv)) {
+      // Validate format: 8-16 character hex string (8 for named invites, 16 for constant invites)
+      if (/^[a-f0-9]{8,16}$/i.test(inv)) {
         setInviteToken(inv);
       } else {
         console.warn('Invalid invite token format', { token: inv });
