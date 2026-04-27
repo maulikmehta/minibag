@@ -82,6 +82,15 @@ export async function createSession(
     // NEW: Generate constant invite token for group mode
     const constantInviteToken = mode === 'group' ? generateConstantInviteToken() : null;
 
+    // DEBUG: Verify token length
+    if (constantInviteToken) {
+      console.log('[DEBUG] Generated constantInviteToken:', {
+        token: constantInviteToken,
+        length: constantInviteToken.length,
+        expected: 16
+      });
+    }
+
     // NEW: Determine maxParticipants (default 4 for free tier)
     const finalMaxParticipants = maxParticipants || 4;
 
