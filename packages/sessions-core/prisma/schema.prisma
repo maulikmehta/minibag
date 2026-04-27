@@ -74,6 +74,7 @@ model Session {
   // Relations
   participants Participant[]
   invites      Invite[]
+  pinAttempts  PinAttempt? // BUGFIX #9: PIN rate limiting
 
   @@map("sessions")
   @@index([sessionId])
@@ -158,4 +159,29 @@ model Invite {
   @@index([status])
   @@index([inviteType])
   @@index([isConstantLink])
+}
+
+// PIN Attempts - Rate limiting for brute-force protection
+// BUGFIX #9: Move from in-memory Map to database for persistence across restarts
+model PinAttempt {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Session relation (unique - one rate limit record per session)
+  sessionId String  @unique @map("session_id") @db.Uuid
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Attempt tracking
+  attempts    Int      @default(0) // Number of failed attempts
+  lastAttempt DateTime @map("last_attempt") @db.Timestamptz(6) // Timestamp of last attempt
+
+  // Blocking
+  blockedUntil DateTime? @map("blocked_until") @db.Timestamptz(6) // Timestamp when block expires
+
+  // Auto-cleanup tracking
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("pin_attempts")
+  @@index([sessionId])
+  @@index([blockedUntil]) // For cleanup queries
+  @@index([lastAttempt]) // For expiry queries
 }
