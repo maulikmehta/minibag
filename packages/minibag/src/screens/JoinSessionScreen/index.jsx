@@ -491,6 +491,22 @@ export default function JoinSessionScreen({
     );
   }
 
+  // Show loading state while fetching session data (prevents "Someone" flash)
+  if (sessionLoading) {
+    return (
+      <div className="max-w-md mx-auto bg-white min-h-screen">
+        <AppHeader
+          i18n={i18n}
+          onLanguageChange={handleLanguageChange}
+        />
+        <div className="pt-20 p-6 flex flex-col items-center justify-center min-h-screen">
+          <Loader2 size={48} className="text-green-600 animate-spin mb-4" />
+          <p className="text-sm text-gray-600">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
       <AppHeader
