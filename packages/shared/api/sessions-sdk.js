@@ -89,8 +89,17 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
     // Set host token cookie for authentication
     setHostTokenCookie(res, result.session.host_token);
 
+    // DEBUG: Log what we're sending to frontend
+    logger.info('[DEBUG] API response tokens:', {
+      sessionId: result.session.session_id,
+      constantFromSessionSnake: result.session.constant_invite_token,
+      constantFromSessionCamel: result.session.constantInviteToken,
+      willSendToFrontend: result.session.constant_invite_token || result.session.constantInviteToken
+    });
+
     // Return SDK result
     // CRITICAL: host_token must be at top level for frontend localStorage persistence
+    // BUGFIX: Use snake_case constant_invite_token consistently (frontend expects snake_case)
     return res.status(201).json({
       success: true,
       data: {
@@ -100,7 +109,7 @@ export async function createSessionWithSDK(req, res, legacyCreateSession) {
         session_pin: result.session_pin, // Return PIN for sharing with participants
         host_token: result.session.host_token, // BUGFIX: Extract to top level for cross-domain auth
         // Include SDK-specific fields
-        constant_invite_token: result.session.constantInviteToken,
+        constant_invite_token: result.session.constant_invite_token, // BUGFIX: Use snake_case (frontend expects this)
         mode: result.session.mode,
         sdk_version: 'v1',
         auth_method: 'cookie_and_token', // Support both cookie (same-domain) and header (cross-domain)

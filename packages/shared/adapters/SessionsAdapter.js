@@ -165,11 +165,21 @@ export class MinibagSessionsAdapter {
       }
 
       // Step 5: Return combined response with items
+      // DEBUG: Log what tokens we're returning
+      logger.info('[DEBUG] SessionsAdapter returning:', {
+        sessionId: session.sessionId,
+        mode,
+        constantInviteTokenFromSDK: constantInviteToken,
+        constantTokenInSupabase: minibagSession.constant_invite_token,
+        tokensMatch: constantInviteToken === minibagSession.constant_invite_token
+      });
+
       return {
         session: {
           ...minibagSession,
-          // Include SDK fields for frontend
-          constantInviteToken: mode === 'group' ? constantInviteToken : null,
+          // BUGFIX: Override with correct token to ensure consistency
+          constant_invite_token: constantInviteToken, // Ensure snake_case has correct value
+          constantInviteToken: mode === 'group' ? constantInviteToken : null, // Also provide camelCase
         },
         participant: {
           id: participant.id,
