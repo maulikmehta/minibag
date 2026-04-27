@@ -418,6 +418,15 @@ export async function claimNextAvailableSlot(
       // Step 2: Verify constant invite link exists using direct FK lookup
       // BUGFIX #6: Use sessionId UUID + inviteToken (covered by unique constraint)
       // instead of nested relation query which can be unreliable
+
+      // DEBUG: Log invite lookup parameters
+      console.log('[DEBUG] Invite lookup:', {
+        sessionId: session.id,
+        sessionShortId: session.sessionId,
+        constantToken,
+        constantTokenLength: constantToken?.length
+      });
+
       const invite = await tx.invite.findFirst({
         where: {
           sessionId: session.id, // Direct UUID FK lookup
@@ -425,7 +434,22 @@ export async function claimNextAvailableSlot(
         },
       });
 
+      // DEBUG: Log invite lookup result
+      console.log('[DEBUG] Invite found:', invite ? {
+        id: invite.id,
+        token: invite.inviteToken,
+        status: invite.status,
+        isConstantLink: invite.isConstantLink
+      } : null);
+
       if (!invite) {
+        // DEBUG: List all invites for this session to help diagnose
+        const allInvites = await tx.invite.findMany({
+          where: { sessionId: session.id },
+          select: { inviteToken: true, status: true, isConstantLink: true }
+        });
+        console.log('[DEBUG] All invites for session:', allInvites);
+
         throw new SessionError(
           SessionErrorCode.SESSION_NOT_FOUND,
           'Invalid or expired invite link'
