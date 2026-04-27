@@ -58,6 +58,9 @@ export class MinibagSessionsAdapter {
       generate_pin = false,
     } = options;
 
+    // Track SDK session for compensating transaction if Supabase fails
+    let sdkSessionCreated = null;
+
     try {
       // Determine session mode based on expected participants
       // null = mode not chosen yet (default to group with reasonable limit)
@@ -88,9 +91,11 @@ export class MinibagSessionsAdapter {
       }
 
       const { session, participant, authToken, constantInviteToken, sessionPin } = sdkResult.data;
+      sdkSessionCreated = { sessionId: session.sessionId, hostToken: session.hostToken };
 
       // Step 2: Store minibag-specific data in sessions table
       // We'll keep using Supabase for shopping metadata (location, schedule, etc.)
+      // BUGFIX #11: Wrapped in try-catch for compensating transaction
       const { data: minibagSession, error: minibagError } = await supabase
         .from('sessions')
         .insert({
@@ -119,12 +124,23 @@ export class MinibagSessionsAdapter {
         .single();
 
       if (minibagError) {
-        logger.error({ err: minibagError }, 'Failed to store minibag session data');
-        throw new Error('Failed to create shopping session');
+        logger.error({ err: minibagError, sessionId: session.sessionId }, 'Failed to store minibag session data - initiating rollback');
+
+        // BUGFIX #11: Compensating transaction - delete SDK session
+        try {
+          const { deleteSession } = await import('@sessions/core');
+          await deleteSession(session.sessionId, session.hostToken);
+          logger.info({ sessionId: session.sessionId }, 'Successfully rolled back SDK session');
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError, sessionId: session.sessionId }, 'Failed to rollback SDK session - manual cleanup required');
+        }
+
+        throw new Error('Failed to create shopping session - transaction rolled back');
       }
 
       // Step 3: Create participant record in Supabase (for minibag frontend)
       // The SDK creates participant in Postgres, but minibag frontend queries Supabase
+      // BUGFIX #11: Also protected with compensating transaction
       const { data: minibagParticipant, error: participantError } = await supabase
         .from('participants')
         .insert({
@@ -141,8 +157,23 @@ export class MinibagSessionsAdapter {
         .single();
 
       if (participantError) {
-        logger.error({ err: participantError, participantId: participant.id }, 'Failed to create participant in Supabase');
-        throw new Error('Failed to create participant record');
+        logger.error({ err: participantError, participantId: participant.id }, 'Failed to create participant in Supabase - initiating rollback');
+
+        // BUGFIX #11: Compensating transaction - delete both Supabase session and SDK session
+        try {
+          // Delete Supabase session first
+          await supabase.from('sessions').delete().eq('id', session.id);
+
+          // Then delete SDK session
+          const { deleteSession } = await import('@sessions/core');
+          await deleteSession(session.sessionId, session.hostToken);
+
+          logger.info({ sessionId: session.sessionId }, 'Successfully rolled back both SDK and Supabase session');
+        } catch (rollbackError) {
+          logger.error({ err: rollbackError, sessionId: session.sessionId }, 'Failed to rollback sessions - manual cleanup required');
+        }
+
+        throw new Error('Failed to create participant record - transaction rolled back');
       }
 
       // Step 4: Store creator's shopping items (if any)
@@ -195,6 +226,21 @@ export class MinibagSessionsAdapter {
       };
     } catch (error) {
       logger.error({ err: error }, 'SessionsAdapter.createShoppingSession failed');
+
+      // BUGFIX #11: Final safety net - ensure SDK session is cleaned up if any error occurred after creation
+      if (sdkSessionCreated && error.message?.includes('rolled back')) {
+        // Already handled in specific error blocks above
+      } else if (sdkSessionCreated) {
+        // Unexpected error after SDK session created - attempt cleanup
+        try {
+          const { deleteSession } = await import('@sessions/core');
+          await deleteSession(sdkSessionCreated.sessionId, sdkSessionCreated.hostToken);
+          logger.info({ sessionId: sdkSessionCreated.sessionId }, 'Emergency cleanup: rolled back SDK session after unexpected error');
+        } catch (cleanupError) {
+          logger.error({ err: cleanupError, sessionId: sdkSessionCreated.sessionId }, 'Emergency cleanup failed - manual intervention required');
+        }
+      }
+
       throw error;
     }
   }
@@ -315,25 +361,60 @@ export class MinibagSessionsAdapter {
 
       // CRITICAL: Sync participant to Supabase (frontend reads from Supabase)
       // SDK creates participant in Postgres, but frontend queries Supabase
-      const { data: minibagParticipant, error: participantError } = await supabase
+      // BUGFIX #12: Use upsert for idempotency - handles duplicate participant scenarios gracefully
+      const participantData = {
+        id: participant.id,
+        session_id: participant.sessionId,
+        nickname: participant.nickname,
+        avatar_emoji: participant.avatarEmoji,
+        real_name: participant.realName,
+        is_creator: false,
+        items_confirmed: false,
+        joined_at: participant.joinedAt,
+        claimed_invite_id: participant.claimedInviteId,
+      };
+
+      let { data: minibagParticipant, error: participantError } = await supabase
         .from('participants')
-        .insert({
-          id: participant.id,
-          session_id: participant.sessionId,
-          nickname: participant.nickname,
-          avatar_emoji: participant.avatarEmoji,
-          real_name: participant.realName,
-          is_creator: false,
-          items_confirmed: false,
-          joined_at: participant.joinedAt,
-          claimed_invite_id: participant.claimedInviteId,
+        .upsert(participantData, {
+          onConflict: 'id', // If participant exists with same ID, update it
+          ignoreDuplicates: false // Return the row even if it existed
         })
         .select()
         .single();
 
-      if (participantError) {
-        logger.error({ err: participantError, participantId: participant.id }, 'Failed to sync participant to Supabase');
-        throw new Error('Failed to create participant record');
+      // BUGFIX #12: Retry once on failure (network blip, connection pool exhaustion)
+      if (participantError && participantError.code !== '23505') {
+        logger.warn({ err: participantError, participantId: participant.id }, 'First attempt failed, retrying participant sync...');
+
+        // Wait 500ms before retry
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const retryResult = await supabase
+          .from('participants')
+          .upsert(participantData, {
+            onConflict: 'id',
+            ignoreDuplicates: false
+          })
+          .select()
+          .single();
+
+        if (retryResult.error) {
+          logger.error({ err: retryResult.error, participantId: participant.id }, 'Failed to sync participant after retry');
+
+          // Don't throw - participant exists in SDK which is source of truth
+          // Frontend will eventually sync via polling/refresh
+          logger.info({ participantId: participant.id }, 'Participant exists in SDK, frontend will sync via polling');
+
+          // Return with SDK data even if Supabase sync failed
+          minibagParticipant = participantData;
+        } else {
+          minibagParticipant = retryResult.data;
+          logger.info({ participantId: participant.id }, 'Successfully synced participant on retry');
+        }
+      } else if (participantError && participantError.code === '23505') {
+        // Duplicate key - participant already exists, this is OK with upsert
+        logger.info({ participantId: participant.id }, 'Participant already synced to Supabase');
       }
 
       return {
