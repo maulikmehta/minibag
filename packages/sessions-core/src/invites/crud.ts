@@ -628,8 +628,12 @@ export async function declineInvite(
       );
     }
 
+    // BUGFIX #1: Named invites should use declineNamedInvite() instead
     if (!invite.isConstantLink) {
-      throw new Error('Can only decline constant invite links');
+      throw new SessionError(
+        SessionErrorCode.INVALID_OPERATION,
+        'Use declineNamedInvite() for named invites'
+      );
     }
 
     // Track decline in JSON field
@@ -656,6 +660,79 @@ export async function declineInvite(
       error: new SessionError(
         SessionErrorCode.TRANSACTION_FAILED,
         error instanceof Error ? error.message : 'Failed to decline invite'
+      ),
+    };
+  }
+}
+
+/**
+ * BUGFIX #1: Decline a named invite (numbered invite)
+ * Marks the invite as declined without creating a participant record
+ *
+ * @param inviteId - UUID of the named invite (not token)
+ * @param reason - Optional reason for declining
+ * @returns Updated invite with declined status
+ */
+export async function declineNamedInvite(
+  inviteId: string,
+  reason?: string
+): Promise<ApiResponse<Invite>> {
+  try {
+    // Find the invite
+    const invite = await prisma.invite.findUnique({
+      where: { id: inviteId },
+      include: { session: true }
+    });
+
+    if (!invite) {
+      throw new SessionError(
+        SessionErrorCode.SESSION_NOT_FOUND,
+        'Invite not found'
+      );
+    }
+
+    // Check if already claimed
+    if (invite.status === 'claimed') {
+      throw new SessionError(
+        SessionErrorCode.INVALID_OPERATION,
+        'Cannot decline an invite that has already been claimed'
+      );
+    }
+
+    // Check if already declined (idempotent)
+    if (invite.status === 'declined') {
+      return { data: invite, error: null };
+    }
+
+    // Check if session is still active
+    if (!['open', 'active'].includes(invite.session.status)) {
+      throw new SessionError(
+        SessionErrorCode.SESSION_EXPIRED,
+        'Cannot decline invite for ended session'
+      );
+    }
+
+    // Update invite status to declined
+    const updated = await prisma.invite.update({
+      where: { id: inviteId },
+      data: {
+        status: 'declined',
+        declinedAt: new Date(),
+        declineReason: reason || null
+      }
+    });
+
+    return { data: updated, error: null };
+  } catch (error) {
+    if (error instanceof SessionError) {
+      return { data: null, error };
+    }
+
+    return {
+      data: null,
+      error: new SessionError(
+        SessionErrorCode.TRANSACTION_FAILED,
+        error instanceof Error ? error.message : 'Failed to decline named invite'
       ),
     };
   }
