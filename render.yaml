@@ -4,7 +4,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: cd packages/sessions-core && npm install --include=dev && npm run build && cd ../shared && npm install --production
+    buildCommand: npm install && cd packages/sessions-core && npm run build
     startCommand: cd packages/sessions-core && npx prisma db push --skip-generate --accept-data-loss && cd ../shared && npm start
     envVars:
       - key: NODE_ENV
