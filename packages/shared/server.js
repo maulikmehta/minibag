@@ -468,10 +468,15 @@ async function startServer() {
     // Start nickname cleanup job (runs every hour to prevent pool depletion)
     const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
 
+    // BUGFIX #9: Start PIN rate limiter cleanup job (runs every 10 minutes)
+    const { startPinRateLimiterCleanup } = await import('./utils/pinRateLimiter.js');
+    const stopPinRateLimiterCleanup = startPinRateLimiterCleanup();
+
     // Graceful shutdown handler
     process.on('SIGTERM', () => {
       logger.info('SIGTERM signal received: closing HTTP server');
       stopNicknameCleanup();
+      stopPinRateLimiterCleanup(); // BUGFIX #9: Stop PIN cleanup job
       server.close(() => {
         logger.info('HTTP server closed');
       });

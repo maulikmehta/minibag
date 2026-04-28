@@ -543,13 +543,31 @@ export async function claimNextAvailableSlot(
           );
         }
 
+        // BUGFIX #9: Check rate limiting before PIN verification
+        const { checkPinAttempt, recordFailedPinAttempt, clearPinAttempts } =
+          await import('../../shared/utils/pinRateLimiter.js');
+
+        const rateLimit = await checkPinAttempt(session.id);
+        if (!rateLimit.allowed) {
+          throw new SessionError(
+            SessionErrorCode.RATE_LIMITED,
+            `Too many failed attempts. Try again in ${rateLimit.retryAfter} seconds.`
+          );
+        }
+
         const isPinValid = await bcrypt.compare(sessionPin, session.sessionPin);
         if (!isPinValid) {
+          // Record failed attempt
+          await recordFailedPinAttempt(session.id, sessionPin);
+
           throw new SessionError(
             SessionErrorCode.INVALID_SESSION_ID,
             'Invalid session PIN'
           );
         }
+
+        // Clear attempts on successful auth
+        await clearPinAttempts(session.id);
       }
 
       // Step 4: Check current participant count vs maxParticipants
