@@ -38,6 +38,9 @@ if (USE_SESSIONS_SDK) {
   getNicknameOptionsWithSDK = sdk.getNicknameOptionsWithSDK;
 }
 
+// BUGFIX #9: Import PIN rate limiter from sessions-core
+import { startPinRateLimiterCleanup } from '@sessions/core';
+
 // Validation middleware imports
 import {
   validateSessionCreation,
@@ -469,8 +472,6 @@ async function startServer() {
     const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
 
     // BUGFIX #9: Start PIN rate limiter cleanup job (runs every 10 minutes)
-    // Import from sessions-core package (moved from shared/utils)
-    const { startPinRateLimiterCleanup } = await import('@sessions/core');
     const stopPinRateLimiterCleanup = startPinRateLimiterCleanup();
 
     // Graceful shutdown handler
