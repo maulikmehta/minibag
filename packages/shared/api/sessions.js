@@ -2361,6 +2361,57 @@ export async function checkInvitesResolved(req, res) {
 }
 
 /**
+ * POST /api/sessions/:session_id/invites/:invite_id/decline
+ * BUGFIX #1: Decline a named invite without creating a participant
+ * Used when invited user clicks "I can't make it" button
+ */
+export async function declineInvite(req, res) {
+  try {
+    const { session_id, invite_id } = req.params;
+    const { reason } = req.body || {};
+
+    // Import SDK function
+    const { declineNamedInvite } = await import('@sessions/core');
+
+    // Call SDK function to decline invite
+    const { data, error } = await declineNamedInvite(invite_id, reason);
+
+    if (error) {
+      logger.error({ err: error, inviteId: invite_id }, 'Error declining invite');
+
+      // Return appropriate status code based on error
+      const statusCode = error.code === 'SESSION_NOT_FOUND' ? 404
+        : error.code === 'INVALID_OPERATION' ? 400
+        : 500;
+
+      return res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to decline invite'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        invite: {
+          id: data.id,
+          inviteNumber: data.inviteNumber,
+          status: data.status,
+          declinedAt: data.declinedAt,
+          declineReason: data.declineReason
+        }
+      }
+    });
+  } catch (error) {
+    logger.error({ err: error, inviteId: req.params.invite_id }, 'Error declining invite');
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
  * GET /api/sessions/nickname-options?firstLetter=R
  * Get 2 available nickname options (1 male, 1 female) for user selection
  * Optionally pass firstLetter query param for personalized nickname matching

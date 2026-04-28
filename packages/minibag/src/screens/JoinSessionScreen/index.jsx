@@ -344,8 +344,10 @@ export default function JoinSessionScreen({
 
   // Handle declining a session
   const handleDeclineSession = async () => {
-    // If no nickname available yet, just navigate away silently
-    if (!selectedNickname) {
+    // BUGFIX #1: Use dedicated decline endpoint for named invites
+    // For constant link invites (no invite token), just navigate away
+    if (!inviteToken) {
+      notify.info('Navigating back to home.');
       onNavigateToHome();
       return;
     }
@@ -353,20 +355,61 @@ export default function JoinSessionScreen({
     try {
       setJoiningSession(true);
 
+      // For named invites, use decline endpoint (cleaner than marked_not_coming)
+      // Named invites have 8-char tokens, constant invites have 16-char tokens
+      const isNamedInvite = inviteToken && inviteToken.length === 8;
+
+      if (isNamedInvite) {
+        // First, fetch invite details to get invite ID
+        const inviteResponse = await fetch(`${API_BASE_URL}/api/sessions/${joinSessionId}/invites`);
+        const inviteData = await inviteResponse.json();
+
+        if (inviteData.success && inviteData.data?.invites) {
+          // Find invite matching our token
+          const invite = inviteData.data.invites.find(inv => inv.invite_token === inviteToken);
+
+          if (invite && invite.id) {
+            // Use dedicated decline endpoint (BUGFIX #1)
+            const declineResponse = await fetch(
+              `${API_BASE_URL}/api/sessions/${joinSessionId}/invites/${invite.id}/decline`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'User declined via invite link' })
+              }
+            );
+
+            const declineResult = await declineResponse.json();
+
+            if (!declineResult.success) {
+              throw new Error(declineResult.error || 'Failed to decline invite');
+            }
+
+            console.log('✅ Declined named invite via new endpoint');
+            notify.info('You\'ve declined the invitation. The host has been notified.');
+            onNavigateToHome();
+            return;
+          }
+        }
+      }
+
+      // Fallback for constant link invites or if named invite decline fails
       // Join session with marked_not_coming: true to notify host of decline
-      // Use provided name or placeholder for anonymous declines
+      if (!selectedNickname) {
+        onNavigateToHome();
+        return;
+      }
+
       await joinSession(joinSessionId, [], {
         real_name: participantName.trim() || 'Declined User',
-        selected_nickname_id: selectedNickname.id || null, // Fallback nicknames don't have ID
+        selected_nickname_id: selectedNickname.id || null,
         selected_nickname: selectedNickname.nickname,
         selected_avatar_emoji: selectedNickname.avatar_emoji,
         marked_not_coming: true,
-        invite_token: inviteToken // Include invite token if present
+        invite_token: inviteToken
       });
 
-      console.log('✅ Declined session - host notified');
-
-      // Show confirmation message and navigate immediately
+      console.log('✅ Declined session - host notified (fallback method)');
       notify.info('You\'ve declined the invitation. The host has been notified.');
       onNavigateToHome();
     } catch (error) {
