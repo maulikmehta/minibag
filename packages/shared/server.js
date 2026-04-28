@@ -469,7 +469,8 @@ async function startServer() {
     const stopNicknameCleanup = sessionsAPI.startNicknameCleanup();
 
     // BUGFIX #9: Start PIN rate limiter cleanup job (runs every 10 minutes)
-    const { startPinRateLimiterCleanup } = await import('./utils/pinRateLimiter.js');
+    // Import from sessions-core (moved from shared/utils)
+    const { startPinRateLimiterCleanup } = await import('../sessions-core/src/utils/pinRateLimiter.js');
     const stopPinRateLimiterCleanup = startPinRateLimiterCleanup();
 
     // Graceful shutdown handler
