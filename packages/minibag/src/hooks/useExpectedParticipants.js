@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import logger from '../../../shared/utils/frontendLogger.js';
+import { API_BASE_URL } from '../services/api.js';
 
 /**
  * Hook for managing expected participants and checkpoint logic
@@ -36,7 +37,7 @@ export function useExpectedParticipants(session, participants) {
 
     const checkInviteResolution = async () => {
       try {
-        const response = await fetch(`/api/sessions/${session.session_id}/invites/resolved`);
+        const response = await fetch(`${API_BASE_URL}/api/sessions/${session.session_id}/invites/resolved`);
         const result = await response.json();
 
         if (result.success && result.data) {
