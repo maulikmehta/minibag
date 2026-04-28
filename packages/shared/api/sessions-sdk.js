@@ -177,8 +177,8 @@ export async function joinSessionWithSDK(req, res, legacyJoinSession) {
       });
     }
 
-    // Validate invite token format (16-character hex string for constant invites)
-    if (!/^[a-f0-9]{16}$/i.test(invite_token)) {
+    // Validate invite token format (8-character hex string)
+    if (!/^[a-f0-9]{8}$/i.test(invite_token)) {
       logger.warn({
         sessionId: session_id,
         tokenFormat: 'invalid',
