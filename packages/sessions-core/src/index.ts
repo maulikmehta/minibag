@@ -28,6 +28,7 @@ export { getDatabaseClient, disconnectDatabase } from './database/client.js';
 
 // Export utilities
 export * from './utils/generators.js';
+export * from './utils/pinRateLimiter.js';
 
 // Export dashboard (optional monitoring)
 export * from './dashboard/index.js';

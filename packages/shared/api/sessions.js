@@ -16,14 +16,14 @@ import {
   getMaxAbsolute,
   validateParticipantCount
 } from '../constants/productTiers.js';
-// BUGFIX #9: Import from sessions-core (moved from shared/utils)
+// BUGFIX #9: Import from sessions-core package (moved from shared/utils)
 import {
   checkPinAttempt,
   recordFailedPinAttempt,
   clearPinAttempts,
   getPinAttemptCount,
   startPinRateLimiterCleanup
-} from '../../sessions-core/src/utils/pinRateLimiter.js';
+} from '@sessions/core';
 import { sanitizeText, escapeHtml } from '../utils/sanitize.js';
 import { CLEANUP_INTERVALS } from '../config/cleanup.js';
 
