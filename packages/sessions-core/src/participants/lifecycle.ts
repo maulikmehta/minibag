@@ -87,7 +87,7 @@ export async function joinSession(
 
       // BUGFIX #9: Check rate limiting before PIN verification
       const { checkPinAttempt, recordFailedPinAttempt, clearPinAttempts } =
-        await import('../../../shared/utils/pinRateLimiter.js');
+        await import('../utils/pinRateLimiter.js');
 
       const rateLimit = await checkPinAttempt(session.id);
       if (!rateLimit.allowed) {

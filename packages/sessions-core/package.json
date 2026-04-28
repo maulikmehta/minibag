@@ -36,6 +36,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@prisma/client": "^5.7.1",
+    "bcrypt": "^5.1.1",
     "nanoid": "^5.0.4",
     "zod": "^4.1.12"
   },
