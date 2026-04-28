@@ -2187,9 +2187,20 @@ export async function updateExpectedParticipants(req, res) {
 
     // Generate/delete invites based on expected_participants
     let invites = [];
-    if (expected_participants >= 1) {
-      // Generate invite links for group mode (any positive number)
+    if (expected_participants > 1) {
+      // Generate numbered invites for multi-participant mode (2+)
       invites = await regenerateInvites(session.id, expected_participants);
+    } else if (expected_participants === 1) {
+      // Group mode (constant link) - fetch existing constant invite, don't regenerate
+      const { data, error } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: true });
+
+      if (!error && data) {
+        invites = data;
+      }
     } else {
       // Delete all invites when switching to solo (0) or null
       await supabase
