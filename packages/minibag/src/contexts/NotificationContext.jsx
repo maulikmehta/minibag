@@ -90,8 +90,19 @@ export function NotificationProvider({ children }) {
         // Add new notification
         const updated = [...prev, notification];
 
-        // Keep only the most recent MAX_NOTIFICATIONS
+        // BUGFIX #18: Clear timers for notifications being dropped
         if (updated.length > MAX_NOTIFICATIONS) {
+          const dropped = updated.slice(0, updated.length - MAX_NOTIFICATIONS);
+
+          // Clear timers for dropped notifications
+          dropped.forEach(droppedNotif => {
+            const timer = timersRef.current.toasts.get(droppedNotif.id);
+            if (timer) {
+              clearTimeout(timer);
+              timersRef.current.toasts.delete(droppedNotif.id);
+            }
+          });
+
           return updated.slice(-MAX_NOTIFICATIONS);
         }
 

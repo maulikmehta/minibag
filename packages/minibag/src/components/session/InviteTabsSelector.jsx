@@ -5,6 +5,7 @@ import { useNotification } from '../../hooks/useNotification.js';
 import InviteCard from './InviteCard.jsx';
 import { buildInviteUrl, copyInviteToClipboard, shareInvite } from '../../utils/inviteHelpers.js';
 import { API_BASE_URL } from '../../services/api.js';
+import socketService from '../../services/socket.js';
 
 /**
  * Tabbed interface for selecting participant mode and managing invite links
@@ -44,6 +45,39 @@ export default function InviteTabsSelector({
       setActiveTab(expectedCount);
     }
   }, [expectedCount]);
+
+  // BUGFIX #17: Real-time invite status updates via WebSocket
+  useEffect(() => {
+    if (!sessionId || !onInvitesUpdate) return;
+
+    const handleParticipantJoined = (participant) => {
+      // Update invite status immediately when participant claims an invite
+      if (participant.claimed_invite_id) {
+        const updatedInvites = invites.map(inv =>
+          inv.id === participant.claimed_invite_id
+            ? {
+                ...inv,
+                status: 'claimed',
+                participant: {
+                  id: participant.id,
+                  nickname: participant.nickname,
+                  avatar_emoji: participant.avatar_emoji
+                }
+              }
+            : inv
+        );
+
+        onInvitesUpdate(updatedInvites);
+      }
+    };
+
+    // Listen for participant-joined events
+    socketService.on('participant-joined', handleParticipantJoined);
+
+    return () => {
+      socketService.off('participant-joined', handleParticipantJoined);
+    };
+  }, [sessionId, invites, onInvitesUpdate]);
 
   const tabs = [
     { value: 0, label: 'Solo', icon: Users },

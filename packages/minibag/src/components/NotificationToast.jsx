@@ -41,10 +41,23 @@ function NotificationItem({ notification, onDismiss }) {
   const styles = NOTIFICATION_STYLES[notification.type] || NOTIFICATION_STYLES.info;
   const role = NOTIFICATION_ROLES[notification.type] || 'status';
 
+  // BUGFIX #18: Track animation timer for cleanup
+  const animationTimerRef = React.useRef(null);
+
+  // BUGFIX #18: Cleanup animation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (animationTimerRef.current) {
+        clearTimeout(animationTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleDismiss = () => {
     setIsExiting(true);
-    // Wait for animation to complete before removing
-    setTimeout(() => {
+    // BUGFIX #18: Track timer for cleanup
+    animationTimerRef.current = setTimeout(() => {
+      animationTimerRef.current = null;
       onDismiss(notification.id);
     }, 200);
   };
