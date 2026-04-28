@@ -183,37 +183,48 @@ function generateInviteToken() {
  * @param {number} count - Number of invites to create (configurable per product/tier)
  */
 async function regenerateInvites(sessionId, count) {
-  // Validate count is positive (upper limit enforced by product tier configuration)
-  if (count < 1) {
-    throw new Error('Invite count must be at least 1');
+  // BUGFIX #13: Use SDK generateInvites instead of direct Supabase insert
+  const { generateInvites } = await import('@sessions/core');
+
+  // Get session short ID from UUID
+  const { data: session, error: sessionError } = await supabase
+    .from('sessions')
+    .select('session_id')
+    .eq('id', sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    throw new Error('Session not found');
   }
 
-  // Delete existing invites for this session
-  await supabase
-    .from('invites')
-    .delete()
-    .eq('session_id', sessionId);
+  // Generate invites in SDK (source of truth)
+  const { data: sdkInvites, error: sdkError } = await generateInvites(session.session_id, count);
 
-  // Generate new invites
-  const invites = [];
-  for (let i = 1; i <= count; i++) {
-    invites.push({
-      session_id: sessionId,
-      invite_token: generateInviteToken(),
-      invite_number: i,
-      status: 'pending'
-    });
+  if (sdkError) {
+    throw sdkError;
   }
 
-  // Insert all invites
+  // Sync to Supabase for frontend display (read-only)
+  const invitesToSync = sdkInvites.map(inv => ({
+    id: inv.id,
+    session_id: sessionId,
+    invite_token: inv.inviteToken,
+    invite_number: inv.inviteNumber,
+    status: inv.status,
+    created_at: inv.createdAt,
+    expires_at: inv.expiresAt
+  }));
+
   const { data, error } = await supabase
     .from('invites')
-    .insert(invites)
+    .upsert(invitesToSync, { onConflict: 'id' })
     .select();
 
-  if (error) throw error;
+  if (error) {
+    logger.warn({ err: error }, 'Failed to sync invites to Supabase, but SDK has them');
+  }
 
-  return data;
+  return data || invitesToSync;
 }
 
 /**

@@ -26,8 +26,12 @@ import type {
   SessionStatus,
 } from './types.js';
 import { SessionError, SessionErrorCode } from './types.js';
+import bcrypt from 'bcrypt';
 
 const prisma = getDatabaseClient();
+
+// BUGFIX #10: Bcrypt rounds for PIN hashing
+const BCRYPT_ROUNDS = 10;
 
 /**
  * Create a new session with host participant
@@ -69,9 +73,15 @@ export async function createSession(
     }
 
     // Generate PIN if requested
-    let finalPin = sessionPin;
+    let plainPin = sessionPin;
     if (generatePin && !sessionPin) {
-      finalPin = generateSessionPin(4); // Generate 4-digit PIN
+      plainPin = generateSessionPin(4); // Generate 4-digit PIN
+    }
+
+    // BUGFIX #10: Hash PIN with bcrypt before storing
+    let hashedPin: string | null = null;
+    if (plainPin) {
+      hashedPin = await bcrypt.hash(plainPin, BCRYPT_ROUNDS);
     }
 
     // Generate IDs and tokens
@@ -108,7 +118,7 @@ export async function createSession(
           creatorRealName,
           status: 'open',
           hostToken,
-          sessionPin: finalPin,
+          sessionPin: hashedPin, // BUGFIX #10: Store hashed PIN
           expectedParticipants,
           checkpointComplete: expectedParticipants === 0,
           expiresAt,
@@ -184,7 +194,7 @@ export async function createSession(
         session: result.session,
         participant: result.participant,
         sessionUrl: `/session/${sessionId}`,
-        sessionPin: finalPin,
+        sessionPin: plainPin, // BUGFIX #10: Return plain PIN (only time it's visible)
         hostToken,
         authToken,
         constantInviteToken, // NEW: Return token for products to sync to their databases

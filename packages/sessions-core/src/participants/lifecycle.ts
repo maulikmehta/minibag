@@ -10,6 +10,7 @@ import { generateAuthToken } from '../utils/generators.js';
 import { SessionError, SessionErrorCode } from '../sessions/types.js';
 import type { Participant } from '@prisma/client';
 import type { ApiResponse } from '../sessions/types.js';
+import bcrypt from 'bcrypt';
 
 const prisma = getDatabaseClient();
 
@@ -75,12 +76,22 @@ export async function joinSession(
       );
     }
 
-    // Verify PIN if required
-    if (session.sessionPin && session.sessionPin !== sessionPin) {
-      throw new SessionError(
-        SessionErrorCode.INVALID_SESSION_ID,
-        'Invalid session PIN'
-      );
+    // BUGFIX #10: Verify PIN with bcrypt timing-safe comparison
+    if (session.sessionPin) {
+      if (!sessionPin) {
+        throw new SessionError(
+          SessionErrorCode.INVALID_SESSION_ID,
+          'Session PIN required'
+        );
+      }
+
+      const isPinValid = await bcrypt.compare(sessionPin, session.sessionPin);
+      if (!isPinValid) {
+        throw new SessionError(
+          SessionErrorCode.INVALID_SESSION_ID,
+          'Invalid session PIN'
+        );
+      }
     }
 
     // Check if session has expired

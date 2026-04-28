@@ -9,6 +9,7 @@ import { getDatabaseClient } from '../database/client.js';
 import { SessionError, SessionErrorCode } from '../sessions/types.js';
 import type { Invite } from '@prisma/client';
 import type { ApiResponse } from '../sessions/types.js';
+import bcrypt from 'bcrypt';
 
 const prisma = getDatabaseClient();
 
@@ -533,12 +534,22 @@ export async function claimNextAvailableSlot(
         throw new Error('This invite link is not a group invite');
       }
 
-      // Step 3: Verify PIN if session requires it
-      if (session.sessionPin && session.sessionPin !== sessionPin) {
-        throw new SessionError(
-          SessionErrorCode.INVALID_SESSION_ID,
-          'Invalid session PIN'
-        );
+      // BUGFIX #10: Verify PIN with bcrypt timing-safe comparison
+      if (session.sessionPin) {
+        if (!sessionPin) {
+          throw new SessionError(
+            SessionErrorCode.INVALID_SESSION_ID,
+            'Session PIN required'
+          );
+        }
+
+        const isPinValid = await bcrypt.compare(sessionPin, session.sessionPin);
+        if (!isPinValid) {
+          throw new SessionError(
+            SessionErrorCode.INVALID_SESSION_ID,
+            'Invalid session PIN'
+          );
+        }
       }
 
       // Step 4: Check current participant count vs maxParticipants
