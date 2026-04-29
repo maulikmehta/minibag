@@ -145,7 +145,10 @@ export async function createSession(
             inviteType: 'constant',
             isConstantLink: true,
             status: 'active',
-            expiresAt: session.expiresAt,
+            // BUGFIX: Constant invite links never expire independently
+            // They remain valid as long as session.status === 'open'
+            // Setting expiresAt to session.expiresAt breaks sessions created with past scheduled_time
+            expiresAt: null,
             slotAssignments: [],
             declinedBy: [],
           },
