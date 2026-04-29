@@ -26,8 +26,9 @@ export interface CreateSessionOptions {
   sessionPin?: string | null; // 4-6 digit PIN
   generatePin?: boolean; // Auto-generate 4-digit PIN
 
-  // Expiry
-  expiresInHours?: number; // Default: 24 hours
+  // Scheduling & Expiry
+  scheduledTime?: string; // ISO timestamp when shopping is scheduled (default: now)
+  expiresInHours?: number; // Hours after scheduledTime (default: 24 hours)
 }
 
 /**

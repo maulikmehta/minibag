@@ -81,7 +81,8 @@ export class MinibagSessionsAdapter {
         creatorAvatarEmoji: selected_avatar_emoji,
         creatorRealName: real_name,
         nicknameId: selected_nickname_id,
-        expiresInHours: 2, // Standard 2-hour expiry
+        scheduledTime: scheduled_time, // BUGFIX: Pass scheduled_time for correct expiry calculation
+        expiresInHours: 2, // Standard 2-hour expiry AFTER scheduled_time
         sessionPin: session_pin,
         generatePin: generate_pin, // Auto-generate PIN if requested
       });

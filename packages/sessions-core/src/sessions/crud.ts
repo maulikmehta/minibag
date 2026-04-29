@@ -53,6 +53,7 @@ export async function createSession(
       expectedParticipants = null,
       sessionPin = null,
       generatePin = false,
+      scheduledTime,
       expiresInHours = 24,
       // NEW: Phase 2 Week 6 fields
       mode = 'solo',
@@ -104,8 +105,11 @@ export async function createSession(
     // NEW: Determine maxParticipants (default 4 for free tier)
     const finalMaxParticipants = maxParticipants || 4;
 
-    // Calculate expiry
-    const expiresAt = new Date();
+    // Calculate expiry from scheduledTime (or NOW if not provided)
+    // BUGFIX: Use scheduledTime as base, not current time
+    // This ensures sessions expire X hours after scheduled shopping time, not creation time
+    const baseTime = scheduledTime ? new Date(scheduledTime) : new Date();
+    const expiresAt = new Date(baseTime);
     expiresAt.setHours(expiresAt.getHours() + expiresInHours);
 
     // Use transaction for atomicity (CRITICAL-3 fix)
