@@ -177,6 +177,44 @@ export class MinibagSessionsAdapter {
         throw new Error('Failed to create participant record - transaction rolled back');
       }
 
+      // Step 3.5: Sync constant invite to Supabase (for frontend queries)
+      // SDK creates invite in PostgreSQL, we mirror to Supabase for frontend
+      if (mode === 'group' && constantInviteToken) {
+        const { error: inviteError } = await supabase
+          .from('invites')
+          .insert({
+            session_id: session.id,
+            invite_token: constantInviteToken,
+            invite_type: 'constant',
+            is_constant_link: true,
+            status: 'active',
+            expires_at: null, // Constant invites never expire independently
+            slot_assignments: [],
+            declined_by: []
+          });
+
+        if (inviteError) {
+          logger.error({ err: inviteError, sessionId: session.sessionId, token: constantInviteToken }, 'Failed to sync constant invite to Supabase - initiating rollback');
+
+          // BUGFIX: Compensating transaction - delete all created records
+          try {
+            await supabase.from('participants').delete().eq('id', participant.id);
+            await supabase.from('sessions').delete().eq('id', session.id);
+
+            const { deleteSession } = await import('@sessions/core');
+            await deleteSession(session.sessionId, session.hostToken);
+
+            logger.info({ sessionId: session.sessionId }, 'Successfully rolled back session, participant, and SDK session');
+          } catch (rollbackError) {
+            logger.error({ err: rollbackError, sessionId: session.sessionId }, 'Failed to rollback after invite sync failure - manual cleanup required');
+          }
+
+          throw new Error('Failed to sync invite to Supabase - transaction rolled back');
+        }
+
+        logger.info({ sessionId: session.sessionId, inviteToken: constantInviteToken }, 'Successfully synced constant invite to Supabase');
+      }
+
       // Step 4: Store creator's shopping items (if any)
       let participantItems = [];
       if (items && items.length > 0) {
