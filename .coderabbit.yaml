@@ -251,10 +251,3 @@ issue_enrichment:
 
   labeling:
     auto_apply_labels: true
-    labeling_instructions:
-      - "Label P0/critical for data loss or security issues"
-      - "Label P1/high for race conditions or sync failures"
-      - "Label P2/medium for UX issues"
-      - "Label 'security' for any auth/crypto/injection concerns"
-      - "Label 'database' for PostgreSQL/Supabase sync issues"
-      - "Label 'race-condition' for concurrency bugs"
