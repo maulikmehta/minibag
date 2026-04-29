@@ -180,9 +180,13 @@ export class MinibagSessionsAdapter {
       // Step 3.5: Sync constant invite to Supabase (for frontend queries)
       // SDK creates invite in PostgreSQL, we mirror to Supabase for frontend
       if (mode === 'group' && constantInviteToken) {
+        const crypto = await import('crypto');
+        const inviteId = crypto.randomUUID();
+
         const { error: inviteError } = await supabase
           .from('invites')
           .insert({
+            id: inviteId, // Explicit UUID required
             session_id: session.id,
             invite_token: constantInviteToken,
             invite_type: 'constant',
