@@ -1,0 +1,260 @@
+# CodeRabbit AI Code Review Configuration
+# Project: MiniBag-2 (LocalLoops Shopping Sessions)
+# Focus: Security, Data Integrity, Race Conditions
+
+language: "en-US"
+tone_instructions: "Be direct and technical. Flag security issues as critical. Focus on production reliability."
+early_access: true
+enable_free_tier: true
+
+# Review Configuration
+reviews:
+  # Assertive profile for production-critical code
+  profile: "assertive"
+  request_changes_workflow: true
+
+  # Auto-review all PRs
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+      - "DRAFT"
+
+  # Enhanced summaries
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  poem: false
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+
+  # Auto-apply labels for bug severity
+  auto_apply_labels: true
+  suggested_labels: true
+  suggested_reviewers: false
+
+  # Path-specific instructions for critical areas
+  path_instructions:
+    # Sessions Core - PostgreSQL SDK (CRITICAL)
+    - path: "packages/sessions-core/src/**/*.ts"
+      instructions: |
+        CRITICAL SECURITY & DATA INTEGRITY CHECKS:
+
+        1. **Transaction Safety**:
+           - All database writes must be in transactions
+           - Check for compensating transactions on failure
+           - Verify rollback paths exist
+           - Flag any two-phase commits without cleanup
+
+        2. **Security Issues**:
+           - PINs must be hashed (bcrypt), never plain text
+           - Auth tokens must have expiration
+           - Rate limiting must persist in database
+           - Check for SQL injection vulnerabilities
+
+        3. **Race Conditions**:
+           - Use FOR UPDATE locks for slot claiming
+           - Verify atomic operations for nickname claims
+           - Check concurrent participant joins
+           - Look for TOCTOU bugs
+
+        4. **Resource Cleanup**:
+           - Nickname release on session end
+           - Auth token invalidation
+           - Proper cascade deletes
+
+        5. **Error Handling**:
+           - Never throw raw errors to client
+           - Always return ApiResponse<T> with error field
+           - Log security events
+
+    # Shared Adapters - Supabase/SDK Sync (HIGH PRIORITY)
+    - path: "packages/shared/adapters/**/*.js"
+      instructions: |
+        DATA SYNC VALIDATION:
+
+        1. **Two-Database Consistency**:
+           - PostgreSQL (SDK) is source of truth
+           - Supabase writes must compensate on failure
+           - Flag orphaned records (SDK created but Supabase failed)
+           - Verify upsert for idempotency
+
+        2. **Participant Sync**:
+           - Must use upsert not insert (handle duplicates)
+           - Retry logic for transient failures
+           - Don't fail user flow if Supabase sync fails
+
+        3. **Session Creation**:
+           - If Supabase insert fails, delete SDK session
+           - Verify both session AND participant synced
+           - Check constant invite token generation
+
+        4. **Invite Handling**:
+           - Named invites must be in SDK (not just Supabase)
+           - Verify invite status sync
+           - Check decline vs claim logic
+
+    # Frontend React - Real-time UI (MEDIUM PRIORITY)
+    - path: "packages/minibag/src/**/*.{jsx,js}"
+      instructions: |
+        UI/UX & REAL-TIME CHECKS:
+
+        1. **WebSocket Reconnection**:
+           - Must re-sync state on reconnect
+           - Check for stale data after disconnect
+           - Verify event handlers cleanup
+
+        2. **State Management**:
+           - No memory leaks in useEffect
+           - Clear timers on unmount
+           - Verify notification queue limits
+
+        3. **Error Handling**:
+           - User-friendly error messages
+           - Retry logic for API calls
+           - Network error recovery
+
+        4. **Checkpoint Logic**:
+           - Check for invite resolution before shopping
+           - Verify expected participant count
+           - Handle decline flow correctly
+
+    # API Routes - Express/Serverless (HIGH PRIORITY)
+    - path: "packages/shared/api/**/*.js"
+      instructions: |
+        API ENDPOINT VALIDATION:
+
+        1. **Authentication**:
+           - Verify auth token on protected routes
+           - Check token expiration
+           - Validate session status
+
+        2. **Input Validation**:
+           - Sanitize all inputs
+           - Check for injection attacks
+           - Validate request schemas
+
+        3. **Rate Limiting**:
+           - PIN validation must be rate-limited
+           - Store attempts in database
+           - Return proper 429 status codes
+
+        4. **CORS & Security Headers**:
+           - Verify FRONTEND_URL in CORS
+           - Check CSP headers
+           - Validate origin
+
+  # Security & Code Quality Tools
+  tools:
+    # JavaScript/TypeScript Linters
+    eslint:
+      enabled: true
+      level: "warning"
+
+    # Security Scanners
+    semgrep:
+      enabled: true
+      level: "error"
+
+    trivy:
+      enabled: true
+      level: "warning"
+
+    trufflehog:
+      enabled: true
+      level: "error"
+
+    # SQL Injection & XSS Detection
+    bearer:
+      enabled: true
+      level: "error"
+
+    # Secrets Detection
+    gitleaks:
+      enabled: true
+      level: "error"
+
+    # General Security
+    bandit:
+      enabled: false  # Python only
+
+    # Test Coverage
+    vitest:
+      enabled: true
+      level: "info"
+
+  # Ignore generated files and vendor code
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/*.min.js"
+    - "!**/package-lock.json"
+    - "!**/.next/**"
+    - "!**/coverage/**"
+    - "!**/*.sql"  # Review SQL migrations separately
+
+# Chat Configuration
+chat:
+  art: false
+  allow_non_org_members: false
+  auto_reply: true
+
+# Knowledge Base - Use project context
+knowledge_base:
+  opt_out: false
+
+  web_search:
+    enabled: true
+
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "PRODUCTION_BUG_FIX_PLAN.md"
+      - "PRODUCTION_MIGRATION_GUIDE.md"
+      - "RACE_CONDITIONS_FIXED.md"
+      - "TESTING.md"
+      - "DEPLOYMENT.md"
+      - ".cursorrules"
+
+  learnings:
+    scope: "local"  # Keep learnings to this repo
+
+  pull_requests:
+    scope: "local"
+
+# Code Generation
+code_generation:
+  docstrings:
+    language: "en-US"
+    path_instructions:
+      - path: "packages/sessions-core/src/**/*.ts"
+        instructions: "Generate TSDoc comments with @throws, @example, and @security tags for critical functions"
+
+  unit_tests:
+    path_instructions:
+      - path: "packages/sessions-core/src/**/*.ts"
+        instructions: "Generate Vitest tests covering success, failure, edge cases, and security scenarios"
+
+# Issue Enrichment
+issue_enrichment:
+  auto_enrich:
+    enabled: true
+
+  planning:
+    enabled: true
+    auto_planning:
+      enabled: false  # Manual planning for now
+
+  labeling:
+    auto_apply_labels: true
+    labeling_instructions:
+      - "Label P0/critical for data loss or security issues"
+      - "Label P1/high for race conditions or sync failures"
+      - "Label P2/medium for UX issues"
+      - "Label 'security' for any auth/crypto/injection concerns"
+      - "Label 'database' for PostgreSQL/Supabase sync issues"
+      - "Label 'race-condition' for concurrency bugs"
