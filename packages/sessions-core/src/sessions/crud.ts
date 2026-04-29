@@ -105,11 +105,17 @@ export async function createSession(
     // NEW: Determine maxParticipants (default 4 for free tier)
     const finalMaxParticipants = maxParticipants || 4;
 
-    // Calculate expiry from NOW (not scheduledTime)
-    // BUGFIX: Prevent false "expired" errors when scheduledTime is in past
-    // Sessions are valid for X hours from creation, regardless of scheduled time
-    // This fixes issue where users get "expired" error on invite links
-    const expiresAt = new Date();
+    // Calculate expiry with hybrid logic (handles both past and future scheduled times)
+    // - Future scheduledTime: expires X hours AFTER scheduled time (user's expected behavior)
+    // - Past scheduledTime: expires X hours from NOW (prevents immediate expiry)
+    // - No scheduledTime: expires X hours from NOW (backwards compatible)
+    const now = new Date();
+    const scheduledDate = scheduledTime ? new Date(scheduledTime) : null;
+    const baseTime = scheduledDate && scheduledDate > now
+      ? scheduledDate  // Future: use scheduled time
+      : now;           // Past or null: use NOW
+
+    const expiresAt = new Date(baseTime);
     expiresAt.setHours(expiresAt.getHours() + expiresInHours);
 
     // Use transaction for atomicity (CRITICAL-3 fix)

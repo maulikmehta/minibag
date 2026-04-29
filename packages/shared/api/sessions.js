@@ -1129,6 +1129,23 @@ export async function getSession(req, res) {
     // Check if session has expired
     const is_session_expired = isSessionExpired(session);
 
+    // Auto-update status if expired (sync with SDK behavior in joinSession)
+    // This prevents race condition where getSession says 'open' but joinSession rejects as 'expired'
+    if (is_session_expired && session.status === 'open') {
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({
+          status: 'expired',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', session.id);
+
+      if (!updateError) {
+        session.status = 'expired';
+        logger.info({ sessionId: session.session_id }, 'Auto-marked session as expired');
+      }
+    }
+
     // Get participants with their items and invite info
     const { data: participants, error: participantsError } = await supabase
       .from('participants')

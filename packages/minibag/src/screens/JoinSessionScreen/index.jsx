@@ -467,7 +467,10 @@ export default function JoinSessionScreen({
   // Check if session failed to load or doesn't exist
   const sessionNotFound = !sessionLoading && !session && joinSessionId;
 
-  // Check if invite link has expired
+  // Check if session itself has expired (time-based expiry)
+  const isSessionExpired = session?.is_session_expired || false;
+
+  // Check if invite link has expired (named invite timeout)
   const isInviteExpired = session?.is_invite_expired || false;
 
   // Memoize PIN validation
@@ -476,7 +479,7 @@ export default function JoinSessionScreen({
     return sessionPin.length === 4;
   }, [session?.requires_pin, sessionPin]);
 
-  if (sessionNotFound) {
+  if (sessionNotFound || isSessionExpired) {
     return (
       <div className="max-w-md mx-auto bg-white min-h-screen">
         <AppHeader
@@ -487,9 +490,13 @@ export default function JoinSessionScreen({
           <div className="w-16 h-16 mb-4 rounded-2xl bg-red-100 flex items-center justify-center">
             <X size={32} className="text-red-600" strokeWidth={2.5} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Session not found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+            {isSessionExpired ? 'Shopping session ended' : 'Session not found'}
+          </h1>
           <p className="text-sm text-gray-600 mb-8 text-center max-w-sm">
-            This shopping list has expired or doesn't exist anymore.
+            {isSessionExpired
+              ? 'This shopping session has ended. Ask your friend to start a new one!'
+              : 'This shopping list has expired or doesn\'t exist anymore.'}
           </p>
 
           <div className="w-full flex justify-center">
