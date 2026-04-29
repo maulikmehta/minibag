@@ -112,11 +112,26 @@ export async function joinSession(
       await clearPinAttempts(session.id);
     }
 
-    // Check if session has expired
-    if (session.expiresAt && new Date() > session.expiresAt) {
+    // Check session status first (primary expiry check)
+    if (!['open', 'active'].includes(session.status)) {
       throw new SessionError(
         SessionErrorCode.SESSION_EXPIRED,
-        'Session has expired'
+        'This shopping session has ended. Ask your friend to start a new one!'
+      );
+    }
+
+    // Check time-based expiry as fallback (secondary check)
+    // This catches sessions where cleanup job hasn't run yet
+    if (session.expiresAt && new Date() > session.expiresAt) {
+      // Auto-mark as expired before throwing
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { status: 'expired', completedAt: new Date() }
+      });
+
+      throw new SessionError(
+        SessionErrorCode.SESSION_EXPIRED,
+        'This shopping session has expired. Ask your friend to start a new one!'
       );
     }
 
@@ -431,7 +446,7 @@ export async function verifyParticipant(
       );
     }
 
-    // BUGFIX #7: Reject token if session has ended
+    // BUGFIX #7: Reject token if session has ended (status-based check)
     // Valid states: 'open', 'active', 'shopping'
     // Invalid states: 'completed', 'cancelled', 'expired'
     const validStatuses = ['open', 'active', 'shopping'];
@@ -442,8 +457,14 @@ export async function verifyParticipant(
       );
     }
 
-    // BUGFIX #7: Also check session hasn't expired by time
+    // Check time-based expiry as fallback (secondary check)
     if (participant.session.expiresAt && new Date() > participant.session.expiresAt) {
+      // Auto-mark as expired
+      await prisma.session.update({
+        where: { id: participant.session.id },
+        data: { status: 'expired', completedAt: new Date() }
+      });
+
       throw new SessionError(
         SessionErrorCode.SESSION_EXPIRED,
         'Session has expired'
