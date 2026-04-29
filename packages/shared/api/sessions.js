@@ -1164,8 +1164,10 @@ export async function getSession(req, res) {
     }, '[getSession] Database returned participants');
 
     // Calculate if invite link has expired
+    // BUGFIX: Constant invite token never expires (shareable link for group mode)
     const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
-    const is_invite_expired = session.expected_participants_set_at
+    const hasConstantToken = !!session.constant_invite_token;
+    const is_invite_expired = session.expected_participants_set_at && !hasConstantToken
       ? (new Date() - new Date(session.expected_participants_set_at)) >= TIMEOUT_MS
       : false;
 
@@ -1732,8 +1734,12 @@ export async function joinSession(req, res) {
     }
 
     // Check if invite link has expired
+    // BUGFIX: Skip timeout for constant invite token (shareable link for group mode)
+    // Constant token allows multiple users to join using the same link beyond 20min timeout
     const TIMEOUT_MS = SESSION_LIMITS.PARTICIPANT_TIMEOUT_MINUTES * 60 * 1000;
-    if (session.expected_participants_set_at) {
+    const hasConstantToken = !!session.constant_invite_token;
+
+    if (session.expected_participants_set_at && !hasConstantToken) {
       const elapsed = new Date() - new Date(session.expected_participants_set_at);
       if (elapsed >= TIMEOUT_MS) {
         return res.status(410).json({
