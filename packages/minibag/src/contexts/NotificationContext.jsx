@@ -75,6 +75,14 @@ export function NotificationProvider({ children }) {
       timestamp: Date.now()
     };
 
+    // DEBUG: Log notification creation
+    console.log('[Notification] Creating notification:', {
+      type,
+      message,
+      priority: notificationPriority,
+      id
+    });
+
     // Route to banner or toast based on priority
     if (notificationPriority === NOTIFICATION_PRIORITY.LOW ||
         notificationPriority === NOTIFICATION_PRIORITY.NORMAL) {
