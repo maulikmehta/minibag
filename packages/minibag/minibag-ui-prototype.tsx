@@ -762,6 +762,14 @@ export default function MinibagPrototype({ joinSessionId = null, billSessionId =
   const handleShare = async () => {
     if (!session) return;
 
+    // DEBUG: Log session token to diagnose invite link issue
+    console.log('[DEBUG] handleShare - session token:', {
+      session_id: session.session_id,
+      constant_invite_token: session.constant_invite_token,
+      mode: session.mode,
+      fullSession: session
+    });
+
     const shareUrl = buildInviteUrl(session.session_id, session.constant_invite_token);
     // Use localized message if available, otherwise fallback to English
     const shareText = t('whatsapp.invitation', {
