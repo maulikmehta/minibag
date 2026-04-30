@@ -889,6 +889,10 @@ export async function createSession(req, res) {
     const tierConfig = getProductConfig(product, tier);
     const max_participants = tierConfig.max_absolute;
 
+    // BUGFIX: Generate constant invite token for group mode (shareable link)
+    // Uses 16-char hex token (compatible with SDK)
+    const constant_invite_token = tier === 'group' ? crypto.randomBytes(8).toString('hex') : null;
+
     // Transaction-like behavior with rollback capability
     // Step 1: Create session with host_token, optional PIN, and max_participants
     const { data: session, error: sessionError } = await supabase
@@ -909,7 +913,9 @@ export async function createSession(req, res) {
         checkpoint_complete: expected_participants === 0, // Auto-complete if no participants expected
         host_token, // Store host token for creator authentication
         session_pin: finalPin, // Store PIN for participant authentication (null if no PIN)
-        max_participants // Dynamic limit based on product tier configuration
+        max_participants, // Dynamic limit based on product tier configuration
+        mode: tier, // Track mode for frontend routing
+        constant_invite_token // Shareable invite token for group mode
       })
       .select()
       .single();
@@ -1076,6 +1082,39 @@ export async function createSession(req, res) {
         ...participant,
         items: insertedItems || []
       };
+    }
+
+    // Step 4: Create constant invite record for group mode
+    // This enables SDK-compatible join flow
+    if (tier === 'group' && constant_invite_token) {
+      const { error: inviteError } = await supabase
+        .from('invites')
+        .insert({
+          id: crypto.randomUUID(), // Explicit UUID required
+          session_id: session.id,
+          invite_token: constant_invite_token,
+          invite_type: 'constant',
+          is_constant_link: true,
+          status: 'active',
+          expires_at: null, // Constant invites never expire independently
+          slot_assignments: [],
+          declined_by: []
+        });
+
+      if (inviteError) {
+        logger.error({
+          err: inviteError,
+          sessionId: session.session_id,
+          token: constant_invite_token
+        }, 'Failed to create constant invite record - non-blocking error');
+        // Don't throw - session already created successfully
+        // Frontend can still work, just missing invite record
+      } else {
+        logger.info({
+          sessionId: session.session_id,
+          inviteToken: constant_invite_token
+        }, 'Successfully created constant invite record');
+      }
     }
 
     // Set host token as httpOnly cookie (secure authentication)
