@@ -468,6 +468,7 @@ export class MinibagSessionsAdapter {
           nickname: participant.nickname,
           avatar_emoji: participant.avatarEmoji,
           real_name: participant.realName,
+          is_creator: false, // Participants are never creators
         },
         authToken,
       };

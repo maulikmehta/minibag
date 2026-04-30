@@ -284,6 +284,15 @@ export function useSession(sessionId = null) {
 
       // API SUCCESS: Replace optimistic data with real data
       setSession(result.session);
+
+      // DEBUG: Log participant data to diagnose is_creator issue
+      console.log('[DEBUG] Join result participant:', {
+        id: result.participant?.id,
+        nickname: result.participant?.nickname,
+        is_creator: result.participant?.is_creator,
+        fullParticipant: result.participant
+      });
+
       setCurrentParticipant(result.participant);
 
       // Replace optimistic participant with real participant in list
