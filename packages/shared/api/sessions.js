@@ -1149,8 +1149,8 @@ export async function getSession(req, res) {
   try {
     const { session_id } = req.params;
 
-    // Get session
-    const { data: session, error: sessionError } = await supabase
+    // Get session from Supabase
+    let { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select('*')
       .eq('session_id', session_id)
@@ -1158,19 +1158,85 @@ export async function getSession(req, res) {
 
     if (sessionError) throw sessionError;
 
+    // BUGFIX: If session not in Supabase, check Postgres (SDK) and sync
     if (!session) {
-      return res.status(404).json({
-        success: false,
-        error: 'Session not found'
-      });
+      try {
+        const { getSession: sdkGetSession } = await import('@sessions/core');
+        const sdkResult = await sdkGetSession(session_id);
+
+        if (sdkResult.data && !sdkResult.error) {
+          // Session exists in Postgres but not Supabase - sync it
+          const sdkSession = sdkResult.data;
+
+          logger.warn({
+            sessionId: session_id,
+            reason: 'Session exists in Postgres but missing from Supabase - syncing'
+          }, 'Data integrity issue detected - auto-syncing session');
+
+          // Insert session into Supabase
+          const { data: syncedSession, error: syncError } = await supabase
+            .from('sessions')
+            .insert({
+              id: sdkSession.id,
+              session_id: sdkSession.sessionId,
+              creator_nickname: sdkSession.creatorNickname,
+              creator_real_name: sdkSession.creatorRealName,
+              status: sdkSession.status,
+              host_token: sdkSession.hostToken,
+              session_pin: sdkSession.sessionPin,
+              mode: sdkSession.mode,
+              max_participants: sdkSession.maxParticipants,
+              constant_invite_token: sdkSession.constantInviteToken,
+              expected_participants: sdkSession.expectedParticipants,
+              expected_participants_set_at: sdkSession.expectedParticipantsSetAt,
+              checkpoint_complete: sdkSession.checkpointComplete,
+              created_at: sdkSession.createdAt,
+              completed_at: sdkSession.completedAt,
+              cancelled_at: sdkSession.cancelledAt,
+              expires_at: sdkSession.expiresAt,
+            })
+            .select()
+            .single();
+
+          if (syncError) {
+            logger.error({ err: syncError, sessionId: session_id }, 'Failed to sync session from Postgres to Supabase');
+            // Continue with SDK data even if sync failed
+            session = {
+              id: sdkSession.id,
+              session_id: sdkSession.sessionId,
+              status: sdkSession.status,
+              mode: sdkSession.mode,
+              constant_invite_token: sdkSession.constantInviteToken,
+              expires_at: sdkSession.expiresAt?.toISOString(),
+            };
+          } else {
+            session = syncedSession;
+            logger.info({ sessionId: session_id }, 'Successfully synced session from Postgres to Supabase');
+          }
+        } else {
+          // Session not in either database
+          return res.status(404).json({
+            success: false,
+            error: 'Session not found'
+          });
+        }
+      } catch (sdkError) {
+        logger.error({ err: sdkError, sessionId: session_id }, 'Failed to check Postgres for missing session');
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        });
+      }
     }
 
-    // Check if session has expired
-    const is_session_expired = isSessionExpired(session);
+    // BUGFIX: Don't auto-mark group mode sessions as expired
+    // Group mode with constant invite tokens should only be marked expired by SDK
+    // to prevent race conditions between Postgres (SDK) and Supabase
+    const isGroupMode = session.mode === 'group' && session.constant_invite_token;
+    const is_session_expired = !isGroupMode && isSessionExpired(session);
 
-    // Auto-update status if expired (sync with SDK behavior in joinSession)
-    // This prevents race condition where getSession says 'open' but joinSession rejects as 'expired'
-    if (is_session_expired && session.status === 'open') {
+    // Only auto-update status for solo/legacy sessions
+    if (is_session_expired && session.status === 'open' && !isGroupMode) {
       const { error: updateError } = await supabase
         .from('sessions')
         .update({
